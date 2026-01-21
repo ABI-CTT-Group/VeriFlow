@@ -132,10 +132,19 @@ You provided a ComfyUI screenshot. To be clear:
 - You want the *visual style* (dark inputs, curved colored wires, execution nodes)?
 - Do you need the complex "custom node" definition UI of ComfyUI, or just a fixed set of "Tool" nodes that populate from the database?
 
+**A12.** **ComfyUI Mechanics + VeriFlow Theme.**
+- **Mechanics:** Complex "custom node" definition IS required (ports, resizing, etc.).
+- **Data Source:** Node definitions populated from "Scholar" findings (extracted measurements/tools).
+- **Theme:** Match `docs/UI.png` (VeriFlow theme), NOT default ComfyUI style.
+
 **Q13. Execution Trigger**
 When the user clicks "Run" in the UI:
 - Does the Backend generate the *entire* Airflow DAG at that moment and push it?
 - Does it wait for Airflow to acknowledge before showing "Running"?
+
+**A13.** **Immediate DAG Generation.**
+- "Run" -> Backend converts CWL to DAG -> Pushes to Airflow.
+- UI waits for Airflow "Running" status before updating.
 
 **Q14. Docker Building**
 The PRD says Agent B (Engineer) generates Dockerfiles.
@@ -143,6 +152,21 @@ The PRD says Agent B (Engineer) generates Dockerfiles.
 - Or do we just generate the text of the Dockerfile for the user to use later?
 - *Assumption:* To run "on the paper's original data" (Execution), we must build the image.
 
+**A14.** **Active Docker Build.**
+- "Engineer" generates Dockerfile text -> **Builds** image using Docker Daemon.
+- Requirement: Access to `/var/run/docker.sock` or remote Docker host.
+
 **Q15. Agent Memory/Context**
-- Since we are passing raw PDF to Gemini, are we relying on Gemini 1.5 Pro's 2M context window?
+- Since we are passing raw PDF to Gemini, are we relying on Gemini 3 Pro's large context window?
 - Do we need persistent "Agent Memory" (vector DB) for anything other than the PDF content? (You mentioned `pgvector` in Option A, so clarifying its use).
+
+**A15.** **Persistent Memory + Model Switching.**
+- Default: Gemini 3 Pro (large context).
+- Configurable models per agent.
+- Persistent Memory (pgvector): Used for confidence metrics, past decisions, citation linking (not just PDF content).
+
+---
+
+## Interview Complete
+
+Proceeding to generate `planning/spec.md`.
