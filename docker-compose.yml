@@ -1,0 +1,144 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: veriflow-db
+    environment:
+      POSTGRES_USER: veriflow
+      POSTGRES_PASSWORD: veriflow_dev
+      POSTGRES_DB: veriflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veriflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: veriflow-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: veriflow
+      MINIO_ROOT_PASSWORD: veriflow_dev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.api
+    container_name: veriflow-api
+    environment:
+      DATABASE_URL: postgresql://veriflow:veriflow_dev@db:5432/veriflow
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: veriflow
+      MINIO_SECRET_KEY: veriflow_dev
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Vue Frontend
+  ui:
+    build:
+      context: ./ui
+      dockerfile: ../docker/Dockerfile.ui
+    container_name: veriflow-ui
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    environment:
+      VITE_API_URL: http://localhost:8000
+
+  # Apache Airflow
+  airflow-webserver:
+    image: apache/airflow:3.0.0-python3.12
+    container_name: veriflow-airflow
+    command: webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://veriflow:veriflow_dev@db:5432/veriflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  airflow-scheduler:
+    image: apache/airflow:3.0.0-python3.12
+    container_name: veriflow-airflow-scheduler
+    command: scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://veriflow:veriflow_dev@db:5432/veriflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+
+  airflow-init:
+    image: apache/airflow:3.0.0-python3.12
+    container_name: veriflow-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://veriflow:veriflow_dev@db:5432/veriflow
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:
