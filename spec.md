@@ -11,7 +11,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that converts scientif
 **Core Loop:**
 1.  **Ingest:** Upload PDF.
 2.  **Extract:** "Scholar Agent" identifies Study Design (ISA) and Tools.
-3.  **Construct:** User assembles workflow visually (ComfyUI-style).
+3.  **Construct:** The Scholar agent will assemble the workflow and the user can visually verify it.
 4.  **Engineer:** "Engineer Agent" generates standard CWL + Docker containers.
 5.  **Execute:** System runs workflow on Airflow 3 using the paper's data.
 
