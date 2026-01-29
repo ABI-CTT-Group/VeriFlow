@@ -97,7 +97,7 @@
 ### Q7. Reviewer Validation Rules
 - [x] What are the **specific validation checks** the Reviewer performs?
 - [x] How does it detect MIME-type mismatches?
-- [x] What is the **threshold** for flagging incompatibility vs auto-generating an adapter?
+- [x] What information does each agent's session contain?
 
 **Answer:**
 > Validation checks include (but not limited to):
@@ -233,56 +233,113 @@
 
 ---
 
-## Follow-up Questions (Batch 2)
-
-Based on your answers, I need clarification on a few remaining ambiguities:
+## Follow-up Questions (Batch 2) - ANSWERED
 
 ### F1. WebSocket Protocol Details
-- [ ] What is the **WebSocket endpoint URL** (e.g., `ws://localhost:8000/ws/logs`)?
-- [ ] What are the **specific JSON message types** for: agent status, node status, log entries?
-- [ ] How does the client **subscribe** to a specific execution (by execution_id)?
+- [x] What is the **WebSocket endpoint URL**?
+- [x] What are the **specific JSON message types**?
+- [x] How does the client **subscribe** to a specific execution?
+
+**Answer:**
+> - Endpoint: `ws://localhost:8000/ws/logs`
+> - Use `execution_id` to run workflow
+> - Introduce `execution_sub_id` to track execution status of individual workflow tools
+> - Message types: Recommend based on best practices
+
+---
 
 ### F2. ISA-JSON Confidence Extension
-- [ ] ISA-JSON doesn't natively support confidence scores. Should we add a **custom extension** (e.g., `x-confidence` field) to each object?
-- [ ] What is the **structure** of confidence metadata: per-Investigation, per-Study, per-Assay, or per-property?
+- [x] Should we add a custom extension (e.g., `x-confidence` field)?
+- [x] What is the structure: per-Investigation, per-Study, per-Assay, or per-property?
+
+**Answer:**
+> **Important Clarification**: Confidence scores are SEPARATE from ISA-JSON.
+> 
+> - Scholar generates ISA descriptions from paper
+> - Confidence score = Scholar's confidence in generated description
+> - Confidence is NOT part of ISA-JSON standard (cannot modify standard)
+> - Store confidence scores in **separate file within same SDS**
+> - ISA descriptions say nothing about where information came from (addressing this is out of scope)
+
+---
 
 ### F3. CWL-to-Frontend Graph Mapping
-- [ ] The frontend uses React Flow format (`nodes: [{id, type, data, position}], edges: [{id, source, target}]`). How should CWL Workflows be **transformed** to this format?
-- [ ] What determines **node positioning** (auto-layout algorithm, or stored in CWL metadata)?
+- [x] How should CWL Workflows be transformed to `{nodes, edges}` format?
+- [x] What determines **node positioning**?
+
+**Answer:**
+> - **Frontend uses Vue 3 with Vue Flow** (NOT React - the UI code provided is React but implementation should recreate in Vue 3)
+> - Use **auto-layout algorithm** for node positioning
+> - Recommend solution based on best practices for CWL → Vue Flow conversion
+
+---
 
 ### F4. MinIO Configuration
-- [ ] What is the **bucket structure** for SDS datasets (e.g., `veriflow/{upload_id}/datasets/`)?
-- [ ] Should the backend expose **presigned URLs** for file downloads, or use a proxy endpoint?
+- [x] What is the **bucket structure** for SDS datasets?
+- [x] Should the backend expose **presigned URLs** for downloads?
+
+**Answer:**
+> **Four MinIO buckets:**
+> 1. `measurements` - Primary measurement datasets
+> 2. `workflow` - Workflow datasets
+> 3. `workflow-tool` - Workflow tool datasets
+> 4. `process` - Workflow execution output datasets (derived datasets)
+> 
+> Use **presigned URLs** for downloads.
+
+---
 
 ### F5. Pre-loaded Examples
-- [ ] For MAMA-MIA, should the **PDF, extracted ISA, CWL workflow, and sample data** all be pre-loaded in the system?
-- [ ] Where should these pre-loaded assets be stored (bundled in backend, or in MinIO on first startup)?
+- [x] Should PDF, extracted ISA, CWL workflow, and sample data all be pre-loaded?
+- [x] Where should these assets be stored?
+
+**Answer:**
+> **Critical Design Decision: Pre-load INPUTS only, NOT results.**
+> 
+> - Do NOT hard-code final outputs (ISA, CWL, etc.)
+> - VeriFlow should process examples by pre-loading inputs to trigger full pipeline
+> - **Input-Based Flow**: When user selects example, system fetches PDF URL + Context Text File
+> - Context file provides Scholar agent with supplemental details for successful "one-shot" execution
+> - **Dynamic Analysis**: Proves AI is actually performing analysis, not displaying static results
+> - **Benchmarking**: Use manually verified MAMA-MIA data as Ground Truth to validate pipeline
+> - **User Experience**: For hackathon, "PDF + Context" bundle automated behind single click
+> 
+> **Storage Locations:**
+> - Workflow SDS → MinIO `workflow` bucket
+> - Workflow Tool SDS → MinIO `workflow-tool` bucket
+> - Sample data SDS → MinIO `measurements` bucket
+
+---
 
 ### F6. Agent Session State
-- [ ] What is the **session boundary** (per-upload, per-workflow, or global)?
-- [ ] How is session state **persisted** between page refreshes (database, in-memory)?
-- [ ] What information does each agent's session contain?
+- [x] What is the **session boundary**?
+- [x] How is session state **persisted**?
+- [x] What information does each agent's session contain?
+
+**Answer:**
+> - Session persistence: **Database**
+> - Session content: Recommend based on best practices
 
 ---
 
 ## Interview Summary
 
-**Questions Asked**: 16 original + 6 follow-ups = 22 total  
-**Fully Answered**: 16  
-**Pending Follow-ups**: 6  
+**Questions Asked**: 22 total (16 original + 6 follow-ups)  
+**Fully Answered**: 22  
+**Pending**: 0  
 
 **Key Decisions Made**:
 1. CWL v1.3 for all workflows
-2. ISA-JSON for study design serialization
-3. Confidence scores: percentage (0-100)
-4. Direct Gemini API with session state
+2. ISA-JSON for study design serialization (confidence scores in separate file)
+3. **Vue 3 + Vue Flow** for frontend (recreate from React reference)
+4. Direct Gemini API with session state (persisted in database)
 5. Airflow 3 local with JWT auth
-6. MinIO for all SDS storage
-7. WebSocket (JSON) for real-time logs
+6. MinIO with 4 buckets: measurements, workflow, workflow-tool, process
+7. WebSocket (JSON) for real-time logs via `ws://localhost:8000/ws/logs`
 8. Subject limit: 1 for MVP
 9. MAMA-MIA as primary example, Biv-me as stretch goal
-10. No workflow state loading for MVP
+10. **Pre-load inputs only (PDF + Context), NOT results** - prove end-to-end capability
+11. No workflow state loading for MVP
+12. Auto-layout algorithm for workflow node positioning
 
-**Next Steps**:
-1. User provides answers to Follow-up Questions (F1-F6)
-2. Generate SPEC.md when all critical ambiguities resolved
+**Status**: ✅ **READY TO GENERATE SPEC.md**
