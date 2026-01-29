@@ -114,7 +114,6 @@ onUnmounted(() => {
     <div v-if="title" class="px-3 py-2 border-b border-slate-200 font-medium text-sm text-slate-700 bg-white">
       {{ title }}
     </div>
-
     <!-- Content -->
     <div class="flex-1 overflow-auto relative">
       <slot />

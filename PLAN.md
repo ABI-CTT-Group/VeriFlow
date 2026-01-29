@@ -18,6 +18,22 @@
 - The AI MUST treat it as immutable ground truth
 - The frontend task is a **UI porting task**, not a UI design task
 
+## UI Parity Hard Rule (Global)
+
+### UI Source of Truth Priority Order
+When performing any UI porting or parity validation, the following priority MUST be respected:
+
+1. Global CSS / Design System (index.css, theme tokens, CSS variables)
+2. Screenshot reference (UI.jpg)
+3. Component structure and Tailwind class usage
+4. JSX / TSX / Vue SFC markup
+
+Any mismatch in Global CSS MUST be resolved before component-level adjustments.
+
+### Hard Rule
+Component-level Tailwind class parity is NOT sufficient to guarantee visual parity.
+Global CSS (colors, typography, spacing scale, resets) must be synchronized first.
+
 ## Change Policy
 
 - The AI is NOT allowed to:
