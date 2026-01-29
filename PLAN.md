@@ -6,6 +6,27 @@
 
 ---
 
+## Execution Scope
+
+- This PLAN is intended for **AI execution**
+- The AI MUST strictly follow all constraints defined in this document
+- Any ambiguity must be resolved by asking the developer, not by assumption
+
+## UI Authority Declaration
+
+- The UI located at `planning/UI` is the **authoritative UI definition**
+- The AI MUST treat it as immutable ground truth
+- The frontend task is a **UI porting task**, not a UI design task
+
+## Change Policy
+
+- The AI is NOT allowed to:
+  - Modify PRD, SPEC, or UI
+  - Introduce new features
+  - Simplify or redesign UI
+- Any required deviation MUST be explicitly reported and justified
+
+
 ## 1. Overview
 
 ### 1.1 System Goals
@@ -43,7 +64,41 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 ---
 
-## 2. Development Stages
+## 2. UI Conversion Contract (CRITICAL)
+
+This project includes a **strict UI porting task**, not UI design or redesign.
+
+### UI Ground Truth
+- The UI located at `planning/UI` (React implementation) is the **single source of truth**
+- This includes:
+  - Layout and panel structure
+  - Visual hierarchy and spacing
+  - Component boundaries
+  - User interactions and behaviors
+  - Conditional rendering logic
+
+### Target Requirement
+- The frontend MUST be implemented using **Vue 3 (Composition API)**
+- The resulting Vue UI MUST be visually and functionally equivalent to the React UI
+
+### Hard Rules
+- ❌ DO NOT create new UI components that do not exist in planning/UI
+- ❌ DO NOT merge or split components unless explicitly present in React source
+- ❌ DO NOT redesign or reinterpret the UI
+- ❌ DO NOT simplify layout or components
+- ❌ DO NOT introduce new UI patterns
+- ❌ DO NOT remove existing UI affordances
+- ✅ ONLY translate React components into Vue 3 equivalents
+
+### Acceptance Standard
+- Any visual or interaction difference between:
+  - `planning/UI` (React)
+  - `frontend/src` (Vue)
+  is considered a **bug**, not an enhancement
+
+---
+
+## 3. Development Stages
 
 ### Stage 1: Infrastructure & Foundation
 **Entry Criteria**: Project repository initialized  
@@ -53,7 +108,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 **Entry Criteria**: Stage 1 complete  
 **Exit Criteria**: All API endpoints functional with mock data, Pydantic models validated
 
-### Stage 3: Frontend Vue.js Application
+### Stage 3: Frontend UI Porting (React → Vue 3)
 **Entry Criteria**: Stage 2 complete  
 **Exit Criteria**: All UI modules implemented, connected to backend APIs
 
@@ -71,98 +126,216 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 ---
 
-## 3. Tasks per Stage
+## 4. Tasks per Stage
 
 ### Stage 1: Infrastructure & Foundation
 
 #### AI Tasks
-- [ ] Create `docker-compose.yml` with all services (FastAPI, PostgreSQL, MinIO, Airflow)
-- [ ] Create PostgreSQL database schema (`agent_sessions`, `conversation_history`, `executions`)
-- [ ] Configure MinIO buckets (`measurements`, `workflow`, `workflow-tool`, `process`)
-- [ ] Create Airflow DAGs folder structure
-- [ ] Write environment variable configuration (`.env.example`)
-- [ ] Create FastAPI project skeleton with routers
-- [ ] Create Vue 3 project with Vite and Vue Flow
+- [x] Create `docker-compose.yml` with all services (FastAPI, PostgreSQL, MinIO, Airflow)
+- [x] Create PostgreSQL database schema (`agent_sessions`, `conversation_history`, `executions`)
+- [x] Configure MinIO buckets (`measurements`, `workflow`, `workflow-tool`, `process`)
+- [x] Create Airflow DAGs folder structure
+- [x] Write environment variable configuration (`.env.example`)
+- [x] Create FastAPI project skeleton with routers
+- [x] Create Vue 3 project with Vite and Vue Flow
 
 #### Developer Tasks
-- [ ] Obtain Gemini API key and set `GEMINI_API_KEY` environment variable
-- [ ] Run `docker-compose up` to verify all services start
-- [ ] Validate MinIO console accessible at `localhost:9001`
-- [ ] Validate Airflow web UI accessible at `localhost:8080`
+- [x] Obtain Gemini API key and set `GEMINI_API_KEY` environment variable
+- [x] Run `docker-compose up` to verify all services start
+- [x] Validate MinIO console accessible at `localhost:9001`
+- [x] Validate Airflow web UI accessible at `localhost:8080`
 
 ---
 
 ### Stage 2: Backend Core APIs
 
 #### AI Tasks
-- [ ] Implement Pydantic models for all data structures:
-  - [ ] `SDSManifestRow`
-  - [ ] `Investigation`, `Study`, `Assay` (ISA-JSON)
-  - [ ] `ConfidenceScores`
-  - [ ] `WorkflowGraph`, `VueFlowNode`, `VueFlowEdge`
-  - [ ] `AgentSession`, `Message`
-- [ ] Implement Publication API:
-  - [ ] `POST /publications/upload` - File upload with MinIO storage
-  - [ ] `GET /study-design/{upload_id}` - Return ISA hierarchy
-  - [ ] `PUT /study-design/nodes/{node_id}/properties` - Update property
-- [ ] Implement Workflow API:
-  - [ ] `POST /workflows/assemble` - Generate graph from assay
-  - [ ] `GET /workflows/{workflow_id}` - Get workflow state
-  - [ ] `PUT /workflows/{workflow_id}` - Save workflow
-- [ ] Implement Catalogue API:
-  - [ ] `GET /catalogue` - List all data objects
-  - [ ] `PUT /catalogue/{item_id}` - Update item metadata
-- [ ] Implement Execution API:
-  - [ ] `POST /executions` - Trigger workflow run
-  - [ ] `GET /executions/{execution_id}` - Get execution status
-  - [ ] `GET /executions/{execution_id}/results` - Get result files
-- [ ] Implement WebSocket endpoint:
-  - [ ] `ws://localhost:8000/ws/logs` - Real-time log streaming
-- [ ] Implement Viewer API:
-  - [ ] `GET /sources/{source_id}` - Get PDF citation snippet
-- [ ] Create MinIO service layer for presigned URLs
-- [ ] Create PostgreSQL service layer for session management
+- [x] Implement Pydantic models for all data structures:
+  - [x] `SDSManifestRow`
+  - [x] `Investigation`, `Study`, `Assay` (ISA-JSON)
+  - [x] `ConfidenceScores`
+  - [x] `WorkflowGraph`, `VueFlowNode`, `VueFlowEdge`
+  - [x] `AgentSession`, `Message`
+- [x] Implement Publication API:
+  - [x] `POST /publications/upload` - File upload with MinIO storage
+  - [x] `GET /study-design/{upload_id}` - Return ISA hierarchy
+  - [x] `PUT /study-design/nodes/{node_id}/properties` - Update property
+- [x] Implement Workflow API:
+  - [x] `POST /workflows/assemble` - Generate graph from assay
+  - [x] `GET /workflows/{workflow_id}` - Get workflow state
+  - [x] `PUT /workflows/{workflow_id}` - Save workflow
+- [x] Implement Catalogue API:
+  - [x] `GET /catalogue` - List all data objects
+  - [x] `PUT /catalogue/{item_id}` - Update item metadata
+- [x] Implement Execution API:
+  - [x] `POST /executions` - Trigger workflow run
+  - [x] `GET /executions/{execution_id}` - Get execution status
+  - [x] `GET /executions/{execution_id}/results` - Get result files
+- [x] Implement WebSocket endpoint:
+  - [x] `ws://localhost:8000/ws/logs` - Real-time log streaming
+- [x] Implement Viewer API:
+  - [x] `GET /sources/{source_id}` - Get PDF citation snippet
+- [x] Create MinIO service layer for presigned URLs
+- [x] Create PostgreSQL service layer for session management
 
 #### Developer Tasks
-- [ ] Verify API endpoints with Postman/curl
-- [ ] Confirm database tables created correctly
+- [x] Verify API endpoints with Postman/curl
+- [x] Confirm database tables created correctly
 
 ---
 
-### Stage 3: Frontend Vue.js Application
+### Stage 3: Frontend UI Porting (React → Vue 3)
+
+The AI MUST complete UI porting and parity validation
+BEFORE implementing any additional frontend logic or optimizations
+
+#### Input Reference (Mandatory)
+- Source UI: `planning/UI` (React implementation)
+- This directory MUST be read and treated as the authoritative reference
+- All Vue components MUST correspond 1-to-1 with React components where possible
 
 #### AI Tasks
-- [ ] Set up Vue 3 + TypeScript + Vite project
-- [ ] Install dependencies: Vue Flow, Pinia, Tailwind CSS 4, Lucide icons
-- [ ] Create Pinia store for workflow state:
-  - [ ] `uploadId`, `uploadedPdfUrl`, `hasUploadedFiles`
-  - [ ] `hierarchy`, `confidenceScores`, `selectedAssay`
-  - [ ] `workflowId`, `graph`, `isAssembled`, `selectedNode`
-  - [ ] `executionId`, `isWorkflowRunning`, `nodeStatuses`, `logs`
-  - [ ] UI state: panel collapse states, console height
-- [ ] Implement Left Panel:
-  - [ ] `UploadModule.vue` - Drag-and-drop file upload
-  - [ ] `StudyDesignModule.vue` - Tree view with confidence scores
-- [ ] Implement Center Panel:
-  - [ ] `WorkflowCanvas.vue` - Vue Flow integration with custom nodes
-  - [ ] `MeasurementNode.vue` - Blue node with dataset selectors
-  - [ ] `ToolNode.vue` - Purple node with input/output ports
-  - [ ] `ModelNode.vue` - Green node with config params
-  - [ ] `DataObjectCatalogue.vue` - Tree view of data objects
-  - [ ] `ViewerPanel.vue` - PDF viewer with plugin system
-- [ ] Implement Right Panel:
-  - [ ] `DatasetNavigationModule.vue` - File tree viewer
-- [ ] Implement Bottom Panel:
-  - [ ] `ConsoleModule.vue` - Real-time logs with resize
-- [ ] Implement panel resize and collapse functionality
-- [ ] Implement drag-and-drop between catalogue and canvas
-- [ ] Implement node connection logic (output→input ports)
-- [ ] Implement "Run Workflow" button with status updates
-- [ ] Connect all components to backend APIs
+- [x] Set up Vue 3 + TypeScript + Vite project
+- [x] Install dependencies: Vue Flow, Pinia, Tailwind CSS 4, Lucide icons
+- [x] Create Pinia store for workflow state:
+  - [x] `uploadId`, `uploadedPdfUrl`, `hasUploadedFiles`
+  - [x] `hierarchy`, `confidenceScores`, `selectedAssay`
+  - [x] `workflowId`, `graph`, `isAssembled`, `selectedNode`
+  - [x] `executionId`, `isWorkflowRunning`, `nodeStatuses`, `logs`
+  - [x] UI state: panel collapse states, console height
+- [x] Implement Left Panel:
+  - [x] `UploadModule.vue` - Drag-and-drop file upload
+  - [x] `StudyDesignModule.vue` - Tree view with confidence scores
+- [x] Implement Center Panel:
+  - [x] `WorkflowCanvas.vue` - Vue Flow integration with custom nodes
+  - [x] `MeasurementNode.vue` - Blue node with dataset selectors
+  - [x] `ToolNode.vue` - Purple node with input/output ports
+  - [x] `ModelNode.vue` - Green node with config params
+  - [x] `DataObjectCatalogue.vue` - Tree view of data objects
+  - [x] `ViewerPanel.vue` - PDF viewer with plugin system
+- [x] Implement Right Panel:
+  - [x] `DatasetNavigationModule.vue` - File tree viewer
+- [x] Implement Bottom Panel:
+  - [x] `ConsoleModule.vue` - Real-time logs with resize
+- [x] Implement panel resize and collapse functionality
+- [x] Implement drag-and-drop between catalogue and canvas
+- [x] Implement node connection logic (output→input ports)
+- [x] Implement "Run Workflow" button with status updates
+- [x] Connect all components to backend APIs
 
 #### Developer Tasks
-- [ ] Review component visual design matches specifications
-- [ ] Verify drag-and-drop interactions work correctly
+- [x] Review component visual design matches specifications
+- [x] Verify drag-and-drop interactions work correctly
+
+#### UI Parity Validation (Required)
+
+Before Stage 3 can be considered complete, the AI MUST:
+
+- [ ] Enumerate all React components found in `planning/UI`
+- [ ] List corresponding Vue components created
+- [ ] Confirm parity for each component:
+  - Layout structure
+  - Props / state mapping
+  - User interactions
+- [ ] Report any deviation explicitly with justification
+
+Stage 3 is NOT complete until UI parity is verified.
+
+## Stage 3.1 – UI Parity Correction Pass
+
+**Purpose**  
+Ensure the Vue 3 implementation is visually and functionally identical to the React UI provided in `planning/UI`.
+
+This stage exists because Stage 3 produced a Vue UI that does not fully match the React reference.
+Stage 3 remains logically complete, but UI parity must be explicitly validated and corrected here.
+
+
+
+### Ground Truth (STRICT)
+The following sources define the canonical UI and must be followed in priority order:
+
+1. React UI source code in `planning/UI`
+2. React UI screenshots in `planning/UI/UI.jpg`
+3. UI behavior implicitly expressed by React component logic
+
+If any ambiguity exists:
+- Screenshots take precedence over inferred layouts
+- React behavior takes precedence over Vue implementation convenience
+
+
+
+### Rules (NON-NEGOTIABLE)
+- This is a **correction pass**, not new UI development.
+- No redesign, refactor, optimization, or stylistic interpretation is allowed.
+- Vue components must mirror React components one-to-one unless explicitly justified.
+- “Visually similar” is insufficient — parity must be exact.
+- All existing Vue UI code is assumed incorrect until verified against React.
+- No progression to subsequent stages is allowed until parity is confirmed.
+
+
+
+### Tasks
+### Tasks (AI Tasks)
+
+- [x] Enumerate all React UI components in `planning/UI`
+- [x] Map each React component to its corresponding Vue component
+- [x] Compare layout structure and component hierarchy
+- [x] Compare visual styling using screenshots as ground truth
+- [x] Compare state variables and conditional rendering
+- [x] Compare all user interactions and side effects
+- [x] List all UI mismatches explicitly
+- [x] Fix all identified mismatches in Vue components
+- [x] Re-verify full parity after fixes
+- [x] Create `stage3-ui-parity.md` report
+- [x] Update Stage 3.1 task checkboxes in PLAN.md
+
+
+
+### Outputs
+- `stage3-ui-parity.md` parity report containing:
+  - Full React → Vue component mapping
+  - Identified discrepancies
+  - Applied fixes
+  - Remaining issues (if any)
+- Updated Vue 3 UI code with confirmed parity
+
+
+
+### Exit Criteria
+- Every React UI component has a corresponding Vue component.
+- No unresolved visual, layout, or interaction differences remain.
+- `stage3-ui-parity.md` explicitly confirms full parity.
+- Stage 3.1 tasks are fully checked off in PLAN.md.
+
+## Stage 3.2 – UI Visual Refinement Pass
+
+**Objective:**  
+Ensure the Vue 3 frontend **visually matches the React UI reference**. Focus on:
+
+- Button sizes, text size, line height  
+- Element margins and padding  
+- Fonts, colors, borders, backgrounds  
+- Icon sizes and positioning  
+- Interactive states (hover, active, disabled)
+
+**Reference Inputs:**  
+- React UI source: `planning/UI`  
+- Screenshot reference: `UI.jpg`
+
+### Tasks
+
+#### AI Tasks
+- [x] Compare each Vue component with the corresponding React component and screenshot.
+- [x] Identify all visual deviations (font size, button size, spacing, colors, borders, icons, interactive states).
+- [x] Correct CSS/Tailwind classes or component styles.
+- [x] Ensure hot-reload is working and updates are reflected in the dev server.
+- [x] Update `PLAN.md` Stage 3.2 tasks as complete.
+- [x] Generate `reports/stage3.2.md` in the Completion Report format.
+
+#### Developer Tasks
+- [ ] Validate all visual corrections in the browser.
+- [ ] Confirm interactive behaviors match React UI.
+- [ ] Sign off Stage 3.2 completion.
 
 ---
 
@@ -244,7 +417,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 ---
 
-## 4. Testing Plan per Stage
+## 5. Testing Plan per Stage
 
 ### Stage 1: Infrastructure Tests
 
@@ -346,7 +519,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 ---
 
-## 5. Quality Gates
+## 6. Quality Gates
 
 ### Per-Stage Completion Criteria
 
@@ -371,7 +544,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 ---
 
-## 6. Risks and Mitigations
+## 7. Risks and Mitigations
 
 ### Stage 1 Risks
 
@@ -391,7 +564,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Vue Flow learning curve | Medium | Use existing UI code from `planning/UI/src` as reference |
+| UI deviation from React source | High | Enforce strict UI porting contract and parity checklist |
 | Panel resize/collapse state bugs | Medium | Comprehensive E2E tests for state persistence |
 
 ### Stage 4 Risks
@@ -417,7 +590,7 @@ VeriFlow is an autonomous "Research Reliability Engineer" that:
 
 ---
 
-## 7. Final Review and Handoff
+## 8. Final Review and Handoff
 
 ### AI Verification Steps
 

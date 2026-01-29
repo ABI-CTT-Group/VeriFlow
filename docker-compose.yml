@@ -1,144 +1,149 @@
+version: '3.8'
+
 services:
-  # PostgreSQL Database
-  db:
-    image: pgvector/pgvector:pg16
-    container_name: veriflow-db
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: veriflow-backend
+    ports:
+      - "8000:8000"
     environment:
-      POSTGRES_USER: veriflow
-      POSTGRES_PASSWORD: veriflow_dev
-      POSTGRES_DB: veriflow
+      - DATABASE_URL=postgresql://veriflow:veriflow123@postgres:5432/veriflow
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=veriflow
+      - MINIO_SECRET_KEY=veriflow123
+      - AIRFLOW_API_URL=http://airflow-webserver:8080
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+    networks:
+      - veriflow-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: veriflow-postgres
     ports:
       - "5432:5432"
+    environment:
+      - POSTGRES_USER=veriflow
+      - POSTGRES_PASSWORD=veriflow123
+      - POSTGRES_DB=veriflow
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U veriflow"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - veriflow-network
 
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
     container_name: veriflow-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: veriflow
-      MINIO_ROOT_PASSWORD: veriflow_dev
     ports:
       - "9000:9000"
       - "9001:9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # FastAPI Backend
-  api:
-    build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.api
-    container_name: veriflow-api
     environment:
-      DATABASE_URL: postgresql://veriflow:veriflow_dev@db:5432/veriflow
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: veriflow
-      MINIO_SECRET_KEY: veriflow_dev
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-    ports:
-      - "8000:8000"
+      - MINIO_ROOT_USER=veriflow
+      - MINIO_ROOT_PASSWORD=veriflow123
+    command: server /data --console-address ":9001"
     volumes:
-      - ./backend:/app
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - minio-data:/data
+    networks:
+      - veriflow-network
 
-  # Vue Frontend
-  ui:
-    build:
-      context: ./ui
-      dockerfile: ../docker/Dockerfile.ui
-    container_name: veriflow-ui
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./ui:/app
-      - /app/node_modules
+  # MinIO bucket initialization
+  minio-init:
+    image: minio/mc:latest
+    container_name: veriflow-minio-init
     depends_on:
-      - api
-    environment:
-      VITE_API_URL: http://localhost:8000
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set veriflow http://minio:9000 veriflow veriflow123;
+      mc mb --ignore-existing veriflow/measurements;
+      mc mb --ignore-existing veriflow/workflow;
+      mc mb --ignore-existing veriflow/workflow-tool;
+      mc mb --ignore-existing veriflow/process;
+      echo 'Buckets created successfully';
+      exit 0;
+      "
+    networks:
+      - veriflow-network
 
-  # Apache Airflow
+  # Airflow Webserver
   airflow-webserver:
-    image: apache/airflow:3.0.0-python3.12
-    container_name: veriflow-airflow
-    command: webserver
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://veriflow:veriflow_dev@db:5432/veriflow
-      AIRFLOW__CORE__FERNET_KEY: ''
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    image: apache/airflow:2.8.0
+    container_name: veriflow-airflow-webserver
     ports:
       - "8080:8080"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://veriflow:veriflow123@postgres:5432/veriflow
+      - AIRFLOW__CORE__FERNET_KEY=81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=
+      - AIRFLOW__WEBSERVER__SECRET_KEY=veriflow-secret-key
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.session
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=airflow
+      - _AIRFLOW_WWW_USER_PASSWORD=airflow
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
+    command: >
+      bash -c "
+      airflow db migrate &&
+      airflow users create --username airflow --password airflow --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+      airflow webserver
+      "
+    networks:
+      - veriflow-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
 
+  # Airflow Scheduler
   airflow-scheduler:
-    image: apache/airflow:3.0.0-python3.12
+    image: apache/airflow:2.8.0
     container_name: veriflow-airflow-scheduler
-    command: scheduler
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://veriflow:veriflow_dev@db:5432/veriflow
-      AIRFLOW__CORE__FERNET_KEY: ''
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://veriflow:veriflow123@postgres:5432/veriflow
+      - AIRFLOW__CORE__FERNET_KEY=81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
     depends_on:
-      db:
+      airflow-webserver:
         condition: service_healthy
-
-  airflow-init:
-    image: apache/airflow:3.0.0-python3.12
-    container_name: veriflow-airflow-init
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        airflow db migrate &&
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://veriflow:veriflow_dev@db:5432/veriflow
-    depends_on:
-      db:
-        condition: service_healthy
+    command: airflow scheduler
+    networks:
+      - veriflow-network
 
 volumes:
-  postgres_data:
-  minio_data:
+  postgres-data:
+  minio-data:
+  airflow-logs:
+
+networks:
+  veriflow-network:
+    driver: bridge

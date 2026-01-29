@@ -1,0 +1,30 @@
+# VeriFlow Backend Dependencies
+
+# FastAPI and ASGI
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# Database
+asyncpg>=0.29.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+
+# Object Storage
+minio>=7.2.0
+
+# AI/ML
+google-generativeai>=0.3.0
+
+# PDF Processing
+pymupdf>=1.23.0
+
+# Workflow
+pyyaml>=6.0.1
+cwltool>=3.1.20231114134824
+
+# Utilities
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+httpx>=0.26.0
+websockets>=12.0
