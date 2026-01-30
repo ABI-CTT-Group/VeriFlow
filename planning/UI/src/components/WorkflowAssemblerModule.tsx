@@ -1,12 +1,29 @@
-import { useState, useRef, useCallback } from 'react';
-import { Play, Square, Download } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Play, Square, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GraphNode } from './GraphNode';
 import { ConnectionLine } from './ConnectionLine';
+import { ViewerPanel } from './ViewerPanel';
+import { DataObjectCatalogue } from './DataObjectCatalogue';
+import { ResizablePanel } from './ResizablePanel';
 
 interface WorkflowAssemblerModuleProps {
   selectedAssay: string | null;
   onSelectNode: (node: any) => void;
   selectedNode: any;
+  viewerPdfUrl?: string;
+  isViewerVisible?: boolean;
+  onViewerClose?: () => void;
+  activePropertyId?: string;
+  isAssembled?: boolean;
+  shouldCollapseViewer?: boolean;
+  onCatalogueSourceClick?: (propertyId: string) => void;
+  hasUploadedFiles?: boolean;
+  isWorkflowRunning?: boolean;
+  setCollapseAllExceptSelected?: (value: boolean) => void;
+  defaultViewerPlugin?: string;
+  onRunWorkflow?: () => void;
+  onDatasetSelect?: (datasetId: string | null) => void;
+  selectedDatasetId?: string;
 }
 
 interface Connection {
@@ -28,7 +45,21 @@ interface Port {
 export function WorkflowAssemblerModule({ 
   selectedAssay, 
   onSelectNode,
-  selectedNode 
+  selectedNode,
+  viewerPdfUrl,
+  isViewerVisible = false,
+  onViewerClose,
+  activePropertyId,
+  isAssembled = false,
+  shouldCollapseViewer = false,
+  onCatalogueSourceClick,
+  hasUploadedFiles,
+  isWorkflowRunning,
+  setCollapseAllExceptSelected,
+  defaultViewerPlugin,
+  onRunWorkflow,
+  onDatasetSelect,
+  selectedDatasetId
 }: WorkflowAssemblerModuleProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [numSubjects, setNumSubjects] = useState(1);
@@ -40,7 +71,47 @@ export function WorkflowAssemblerModule({
     { id: 'conn-5', sourceNodeId: 'tool-3', sourcePortId: 'out-0', targetNodeId: 'output-1', targetPortId: 'in-0' }
   ]);
   const [dragConnection, setDragConnection] = useState<{ sourceNodeId: string; sourcePortId: string; x: number; y: number } | null>(null);
+  const [isViewerCollapsed, setIsViewerCollapsed] = useState(!isViewerVisible || shouldCollapseViewer);
+  const [isCatalogueCollapsed, setIsCatalogueCollapsed] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Auto-collapse viewer when shouldCollapseViewer becomes true
+  useEffect(() => {
+    if (shouldCollapseViewer) {
+      setIsViewerCollapsed(true);
+    }
+  }, [shouldCollapseViewer]);
+
+  // Auto-expand viewer when isViewerVisible becomes true
+  useEffect(() => {
+    if (isViewerVisible) {
+      setIsViewerCollapsed(false);
+    }
+  }, [isViewerVisible]);
+
+  // Auto-select first input measurement when assay is selected for assembly
+  useEffect(() => {
+    if (selectedAssay && isAssembled) {
+      const firstInputNode = nodes.find(n => n.type === 'measurement' && n.role === 'input');
+      if (firstInputNode && !selectedNode) {
+        // Select the dataset within the input node, not the node itself
+        const firstDataset = firstInputNode.outputs?.[0];
+        if (firstDataset?.datasetId && onDatasetSelect) {
+          onDatasetSelect(firstDataset.datasetId);
+        }
+      }
+    }
+  }, [selectedAssay, isAssembled]);
+
+  const handleRunWorkflow = () => {
+    setIsRunning(true);
+    if (setCollapseAllExceptSelected) {
+      setCollapseAllExceptSelected(true);
+    }
+    if (onRunWorkflow) {
+      onRunWorkflow();
+    }
+  };
 
   const handlePortMouseDown = useCallback((nodeId: string, portId: string, portType: 'input' | 'output', event: React.MouseEvent) => {
     if (portType === 'output') {
@@ -97,6 +168,76 @@ export function WorkflowAssemblerModule({
     return '';
   };
 
+  // Show "Assemble to begin" message if assay is selected but not assembled
+  if (selectedAssay && !isAssembled && !isViewerVisible) {
+    return (
+      <div className="h-full flex items-center justify-center text-slate-400 bg-slate-50">
+        <div className="text-center">
+          <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+          <p className="text-sm font-medium text-slate-600">Ready to assemble</p>
+          <p className="text-xs mt-1">Click "Assemble Selected Assay" to generate the workflow</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show viewer-only mode when source is clicked but workflow not assembled
+  if (selectedAssay && !isAssembled && isViewerVisible) {
+    return (
+      <div className="h-full flex overflow-hidden bg-white">
+        {/* Viewer Panel (Collapsible) */}
+        <div 
+          className="relative border-r border-slate-200 transition-all duration-300 flex-shrink-0"
+          style={{ 
+            width: isViewerCollapsed ? '32px' : '400px'
+          }}
+        >
+          {/* Collapsed state - show rotated label */}
+          {isViewerCollapsed ? (
+            <button
+              onClick={() => setIsViewerCollapsed(false)}
+              className="h-full w-full bg-slate-50 hover:bg-slate-100 transition-colors flex items-center justify-center border-r border-slate-200"
+            >
+              <span className="text-xs font-medium text-slate-600 whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                Document Viewer
+              </span>
+            </button>
+          ) : (
+            /* Expanded state - show close button */
+            <button
+              onClick={() => setIsViewerCollapsed(true)}
+              className="absolute top-3 right-3 z-10 w-6 h-6 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-colors flex items-center justify-center"
+            >
+              <ChevronLeft className="w-3 h-3 text-slate-600" />
+            </button>
+          )}
+
+          {/* Content */}
+          <div className={`h-full overflow-hidden ${isViewerCollapsed ? 'hidden' : 'block'}`}>
+            <ViewerPanel 
+              pdfUrl={viewerPdfUrl}
+              onClose={onViewerClose}
+              activePropertyId={activePropertyId}
+            />
+          </div>
+        </div>
+
+        {/* Empty space showing "Ready to assemble" */}
+        <div className="flex-1 flex items-center justify-center text-slate-400 bg-slate-50">
+          <div className="text-center">
+            <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+            <p className="text-sm font-medium text-slate-600">Ready to assemble</p>
+            <p className="text-xs mt-1">Click "Assemble Selected Assay" to generate the workflow</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!selectedAssay) {
     return (
       <div className="h-full flex items-center justify-center text-slate-400 bg-slate-50">
@@ -104,7 +245,7 @@ export function WorkflowAssemblerModule({
           <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
-          <p className="text-sm">Select an assay from Study Design to begin</p>
+          <p className="text-sm">{hasUploadedFiles ? "Select an assay from Study Design to assemble it's workflow" : "Upload a paper to begin"}</p>
         </div>
       </div>
     );
@@ -118,10 +259,9 @@ export function WorkflowAssemblerModule({
       role: 'input',
       name: 'Input Measurements',
       x: 50,
-      y: 100,
+      y: 50,
       outputs: [
-        { id: 'out-0', label: 'MRI Scan', datasetId: 'dce-mri-scans', sampleId: 'Subject_001/T1w.nii.gz' },
-        { id: 'out-1', label: 'Metadata', datasetId: 'dce-mri-scans', sampleId: 'Subject_001/metadata.json' }
+        { id: 'out-0', label: 'MRI Scan', datasetId: 'dce-mri-scans', sampleId: 'Subject_001/T1w.nii.gz' }
       ],
       totalSubjects: 384
     },
@@ -129,8 +269,8 @@ export function WorkflowAssemblerModule({
       id: 'tool-1',
       type: 'tool',
       name: 'DICOM to NIfTI',
-      x: 400,
-      y: 80,
+      x: 450,
+      y: 50,
       status: 'completed',
       confidence: 0.95,
       inputs: [
@@ -144,8 +284,8 @@ export function WorkflowAssemblerModule({
       id: 'tool-2',
       type: 'tool',
       name: 'nnU-Net Segmentation',
-      x: 650,
-      y: 150,
+      x: 800,
+      y: 50,
       status: 'running',
       confidence: 0.88,
       inputs: [
@@ -160,8 +300,8 @@ export function WorkflowAssemblerModule({
       id: 'model-1',
       type: 'model',
       name: 'nnU-Net Pretrained Weights',
-      x: 400,
-      y: 300,
+      x: 450,
+      y: 320,
       outputs: [
         { id: 'out-0', label: 'Weights' }
       ]
@@ -170,8 +310,8 @@ export function WorkflowAssemblerModule({
       id: 'tool-3',
       type: 'tool',
       name: 'Post-processing',
-      x: 950,
-      y: 150,
+      x: 1150,
+      y: 50,
       status: 'pending',
       confidence: 0.92,
       inputs: [
@@ -186,8 +326,8 @@ export function WorkflowAssemblerModule({
       type: 'measurement',
       role: 'output',
       name: 'Output Measurements',
-      x: 1250,
-      y: 150,
+      x: 1500,
+      y: 50,
       inputs: [
         { id: 'in-0', label: 'Result', datasetId: 'tumor-segmentation', sampleId: 'Subject_001/tumor_mask.nii.gz' }
       ]
@@ -195,68 +335,107 @@ export function WorkflowAssemblerModule({
   ];
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h3 className="text-sm font-medium text-slate-900">Workflow Assembler</h3>
-            <p className="text-xs text-slate-500">{getAssayName()}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsRunning(!isRunning)}
-              className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded ${
-                isRunning
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              {isRunning ? (
-                <>
-                  <Square className="w-3 h-3" />
-                  Abort
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3" />
-                  Run All
-                </>
-              )}
-            </button>
-            <button className="flex items-center gap-2 px-3 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50">
-              <Download className="w-3 h-3" />
-              Export
-            </button>
-          </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-white min-h-0">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
+        <div>
+          <span className="text-sm font-medium text-slate-700">3. Assemble, Review, and Validate Workflow</span>
+          <p className="text-xs text-slate-500 mt-0.5">CWL Workflow Assembly & Validation</p>
         </div>
-        <div className="flex items-center gap-4">
+        
+        {/* Workflow Controls */}
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-600">Subjects:</label>
+            <label className="text-xs font-medium text-slate-700">Subjects:</label>
             <input
               type="number"
               min="1"
-              max={384}
+              max="384"
               value={numSubjects}
               onChange={(e) => setNumSubjects(parseInt(e.target.value) || 1)}
-              className="w-20 px-2 py-1 text-xs border border-slate-300 rounded"
+              className="w-16 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-xs text-slate-400">of 384</span>
+            <span className="text-xs text-slate-500">/ 384</span>
+          </div>
+          <div className="w-px h-6 bg-slate-200"></div>
+          <div className="flex items-center gap-2">
+            {!isRunning ? (
+              <button
+                onClick={handleRunWorkflow}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+              >
+                <Play className="w-3.5 h-3.5" />
+                Run Workflow
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsRunning(false)}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors flex items-center gap-1.5"
+              >
+                <Square className="w-3.5 h-3.5" />
+                Stop
+              </button>
+            )}
+            <button className="px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded hover:bg-slate-50 transition-colors flex items-center gap-1.5">
+              <Download className="w-3.5 h-3.5" />
+              Export Workflow (CWL)
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Catalogue Sidebar */}
-        <div className="w-64 border-r border-slate-200 bg-white overflow-auto">
-          <CataloguePanel />
-        </div>
+      {/* Main Content Area with 3 horizontal panels */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Viewer Panel (Resizable & Collapsible) */}
+        {!isViewerCollapsed ? (
+          <ResizablePanel
+            side="left"
+            defaultWidth={400}
+            minWidth={300}
+            maxWidth={600}
+          >
+            <div className="h-full overflow-hidden bg-white relative">
+              {/* Header with collapse button */}
+              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsViewerCollapsed(true)}
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-medium text-slate-700">Document Viewer</span>
+                </div>
+              </div>
 
-        {/* Canvas */}
+              {/* Content */}
+              <div className="h-full overflow-hidden" style={{ paddingTop: '52px' }}>
+                <ViewerPanel 
+                  pdfUrl={isViewerVisible ? viewerPdfUrl : undefined}
+                  onClose={onViewerClose}
+                  activePropertyId={activePropertyId}
+                />
+              </div>
+            </div>
+          </ResizablePanel>
+        ) : (
+          /* Collapsed viewer */
+          <div className="w-8 bg-slate-50 border-r border-slate-200 flex-shrink-0">
+            <button
+              onClick={() => setIsViewerCollapsed(false)}
+              className="h-full w-full hover:bg-slate-100 transition-colors flex items-center justify-center"
+            >
+              <span className="text-xs font-medium text-slate-600 whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                Document Viewer
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Stage - Canvas (Center, flexible) */}
         <div 
           ref={canvasRef}
-          className="flex-1 overflow-auto bg-slate-50 relative"
+          className="flex-1 overflow-auto bg-slate-50 relative min-w-0"
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
@@ -316,265 +495,55 @@ export function WorkflowAssemblerModule({
                 key={node.id}
                 node={node}
                 isSelected={selectedNode?.id === node.id}
-                onSelect={() => onSelectNode(node)}
+                onSelect={() => {
+                  onSelectNode(node);
+                  // Clear dataset selection when clicking on non-measurement nodes
+                  if (node.type !== 'measurement' && onDatasetSelect) {
+                    onDatasetSelect(null);
+                  }
+                }}
                 onPortMouseDown={handlePortMouseDown}
                 onPortMouseUp={handlePortMouseUp}
+                onDatasetSelect={onDatasetSelect}
+                selectedDatasetId={selectedDatasetId}
               />
             ))}
           </div>
         </div>
 
-        {/* Property Editor Sidebar */}
-        <div className="w-80 border-l border-slate-200 bg-white overflow-auto">
-          <PropertyEditorPanel selectedNode={selectedNode} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CataloguePanel() {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['measurements', 'tools', 'models']));
-
-  const toggleSection = (section: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(section)) {
-      newExpanded.delete(section);
-    } else {
-      newExpanded.add(section);
-    }
-    setExpandedSections(newExpanded);
-  };
-
-  const measurements = [
-    {
-      id: 'meas-1',
-      name: 'MRI T1 Scans',
-      description: '120 breast MRI scans, T1-weighted, DICOM format',
-      icon: 'database'
-    },
-    {
-      id: 'meas-2',
-      name: 'Tumor Annotations',
-      description: 'Expert-labeled segmentation masks, NIfTI format',
-      icon: 'database'
-    },
-    {
-      id: 'meas-3',
-      name: 'Clinical Metadata',
-      description: 'Patient demographics, tumor characteristics',
-      icon: 'database'
-    }
-  ];
-
-  const tools = [
-    {
-      id: 'tool-1',
-      name: 'DICOM Converter',
-      description: 'Converts DICOM to NIfTI format using dcm2niix',
-      icon: 'tool'
-    },
-    {
-      id: 'tool-2',
-      name: 'Image Preprocessor',
-      description: 'Normalization, registration, bias field correction',
-      icon: 'tool'
-    },
-    {
-      id: 'tool-3',
-      name: 'Segmentation Engine',
-      description: 'U-Net based tumor segmentation pipeline',
-      icon: 'tool'
-    },
-    {
-      id: 'tool-4',
-      name: 'Quality Control',
-      description: 'Automated QC checks for segmentation outputs',
-      icon: 'tool'
-    }
-  ];
-
-  const models = [
-    {
-      id: 'model-1',
-      name: 'nnU-Net Weights',
-      description: 'Pretrained weights for breast tumor segmentation',
-      icon: 'box'
-    },
-    {
-      id: 'model-2',
-      name: 'ResNet Classifier',
-      description: 'Tumor classification model weights',
-      icon: 'box'
-    }
-  ];
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-slate-200">
-        <h3 className="text-sm font-medium text-slate-900">Data Object Catalogue</h3>
-        <p className="text-xs text-slate-500 mt-0.5">Drag items to workflow</p>
-      </div>
-      
-      <div className="flex-1 overflow-auto">
-        {/* Measurements Section */}
-        <div className="border-b border-slate-200">
-          <button
-            onClick={() => toggleSection('measurements')}
-            className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 transition-colors"
+        {/* Data Object Catalogue (Resizable & Collapsible) */}
+        {!isCatalogueCollapsed ? (
+          <ResizablePanel
+            side="right"
+            defaultWidth={320}
+            minWidth={280}
+            maxWidth={500}
           >
-            <svg className="w-4 h-4 text-slate-400 transition-transform" style={{ transform: expandedSections.has('measurements') ? 'rotate(0deg)' : 'rotate(-90deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-            </svg>
-            <span className="text-sm font-medium text-slate-900">Measurements</span>
-            <span className="text-xs text-slate-500">({measurements.length})</span>
-          </button>
-          
-          {expandedSections.has('measurements') && (
-            <div className="px-3 pb-3 space-y-2">
-              {measurements.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm hover:border-blue-300 transition-all cursor-move group"
-                  draggable
-                >
-                  <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-400 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm4-16h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2z" />
-                  </svg>
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="h-full overflow-hidden bg-white relative">
+              {/* Content */}
+              <div className="h-full overflow-hidden">
+                <DataObjectCatalogue 
+                  activeWorkflow={true} 
+                  onSourceClick={onCatalogueSourceClick}
+                  selectedNodeId={selectedNode?.id}
+                  onDatasetSelect={onDatasetSelect}
+                  selectedDatasetId={selectedDatasetId}
+                  onCollapse={() => setIsCatalogueCollapsed(true)}
+                />
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Tools Section */}
-        <div className="border-b border-slate-200">
-          <button
-            onClick={() => toggleSection('tools')}
-            className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 transition-colors"
-          >
-            <svg className="w-4 h-4 text-slate-400 transition-transform" style={{ transform: expandedSections.has('tools') ? 'rotate(0deg)' : 'rotate(-90deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="text-sm font-medium text-slate-900">Tools</span>
-            <span className="text-xs text-slate-500">({tools.length})</span>
-          </button>
-          
-          {expandedSections.has('tools') && (
-            <div className="px-3 pb-3 space-y-2">
-              {tools.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm hover:border-purple-300 transition-all cursor-move group"
-                  draggable
-                >
-                  <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-400 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm4-16h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2z" />
-                  </svg>
-                  <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Models Section */}
-        <div className="border-b border-slate-200">
-          <button
-            onClick={() => toggleSection('models')}
-            className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 transition-colors"
-          >
-            <svg className="w-4 h-4 text-slate-400 transition-transform" style={{ transform: expandedSections.has('models') ? 'rotate(0deg)' : 'rotate(-90deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            <span className="text-sm font-medium text-slate-900">Models</span>
-            <span className="text-xs text-slate-500">({models.length})</span>
-          </button>
-          
-          {expandedSections.has('models') && (
-            <div className="px-3 pb-3 space-y-2">
-              {models.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm hover:border-green-300 transition-all cursor-move group"
-                  draggable
-                >
-                  <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-400 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm4-16h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2z" />
-                  </svg>
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PropertyEditorPanel({ selectedNode }: { selectedNode: any }) {
-  if (!selectedNode) {
-    return (
-      <div className="p-4 text-center text-slate-400">
-        <p className="text-sm">Select a node to edit properties</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4">
-      <h3 className="text-sm font-medium text-slate-700 mb-3">Property Editor</h3>
-      <div className="space-y-3">
-        <div>
-          <label className="text-xs font-medium text-slate-700 block mb-1">Name</label>
-          <input
-            type="text"
-            defaultValue={selectedNode.name}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        {selectedNode.confidence !== undefined && (
-          <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">Confidence</label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              defaultValue={selectedNode.confidence * 100}
-              className="w-full"
-            />
-            <p className="text-xs text-slate-500 mt-1">{(selectedNode.confidence * 100).toFixed(0)}%</p>
+          </ResizablePanel>
+        ) : (
+          /* Collapsed catalogue */
+          <div className="w-8 bg-slate-50 border-l border-slate-200 flex-shrink-0">
+            <button
+              onClick={() => setIsCatalogueCollapsed(false)}
+              className="h-full w-full hover:bg-slate-100 transition-colors flex items-center justify-center"
+            >
+              <span className="text-xs font-medium text-slate-600 whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                Data Object Catalogue
+              </span>
+            </button>
           </div>
         )}
       </div>

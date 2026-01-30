@@ -121,79 +121,71 @@ export function ConsoleModule() {
   };
 
   return (
-    <Resizable
-      defaultSize={{ width: '100%', height: 250 }}
-      enable={{ top: true, right: false, bottom: false, left: false }}
-      minHeight={150}
-      className="border-t border-slate-200 bg-white"
-    >
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="px-4 py-2 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-slate-600" />
-            <span className="text-sm font-medium text-slate-700">Console</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-xs text-slate-500">All agents active</span>
-            </div>
-          </div>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-2 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-slate-600" />
         </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs">
-          {messages.map((message) => (
-            <div key={message.id} className="flex gap-3">
-              <span className="text-slate-400 whitespace-nowrap">
-                {formatTime(message.timestamp)}
-              </span>
-              <div className="flex-1">
-                {message.type === 'user' ? (
-                  <div className="flex items-start gap-2">
-                    <User className="w-4 h-4 text-slate-600 mt-0.5" />
-                    <span className="text-slate-900">{message.content}</span>
-                  </div>
-                ) : message.type === 'agent' ? (
-                  <div className="flex items-start gap-2">
-                    <Bot className={`w-4 h-4 mt-0.5 ${getAgentColor(message.agent)}`} />
-                    <div>
-                      <span className={`font-semibold ${getAgentColor(message.agent)}`}>
-                        {getAgentName(message.agent)}:
-                      </span>{' '}
-                      <span className="text-slate-700">{message.content}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-slate-500 italic">{message.content}</span>
-                )}
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="border-t border-slate-200 p-3">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Chat with VeriFlow agents..."
-              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={handleSend}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+            <span className="text-xs text-slate-500">All agents active</span>
           </div>
         </div>
       </div>
-    </Resizable>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs">
+        {messages.map((message) => (
+          <div key={message.id} className="flex gap-3">
+            <span className="text-slate-400 whitespace-nowrap">
+              {formatTime(message.timestamp)}
+            </span>
+            <div className="flex-1">
+              {message.type === 'user' ? (
+                <div className="flex items-start gap-2">
+                  <User className="w-4 h-4 text-slate-600 mt-0.5" />
+                  <span className="text-slate-900">{message.content}</span>
+                </div>
+              ) : message.type === 'agent' ? (
+                <div className="flex items-start gap-2">
+                  <Bot className={`w-4 h-4 mt-0.5 ${getAgentColor(message.agent)}`} />
+                  <div>
+                    <span className={`font-semibold ${getAgentColor(message.agent)}`}>
+                      {getAgentName(message.agent)}:
+                    </span>{' '}
+                    <span className="text-slate-700">{message.content}</span>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-slate-500 italic">{message.content}</span>
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input - Fixed at bottom */}
+      <div className="border-t border-slate-200 p-3 flex-shrink-0">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Chat with VeriFlow agents..."
+            className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={handleSend}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

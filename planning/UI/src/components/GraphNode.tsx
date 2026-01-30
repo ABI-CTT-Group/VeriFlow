@@ -7,6 +7,8 @@ interface GraphNodeProps {
   onSelect: () => void;
   onPortMouseDown: (nodeId: string, portId: string, portType: 'input' | 'output', event: React.MouseEvent) => void;
   onPortMouseUp: (nodeId: string, portId: string, portType: 'input' | 'output') => void;
+  onDatasetSelect?: (datasetId: string) => void;
+  selectedDatasetId?: string;
 }
 
 const availableDatasets = [
@@ -14,7 +16,7 @@ const availableDatasets = [
   { id: 'tumor-segmentation', name: 'Tumor Segmentation', samples: ['Subject_001/tumor_mask.nii.gz', 'Subject_002/tumor_mask.nii.gz'] }
 ];
 
-export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortMouseUp }: GraphNodeProps) {
+export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortMouseUp, onDatasetSelect, selectedDatasetId }: GraphNodeProps) {
   const [editingPort, setEditingPort] = useState<string | null>(null);
 
   const getSampleDisplayName = (samplePath: string) => {
@@ -67,10 +69,17 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
 
   return (
     <div
-      onClick={onSelect}
-      className={`absolute bg-white rounded-lg border-2 cursor-pointer transition-all ${
+      onClick={(e) => {
+        // Prevent selecting measurement nodes themselves - only datasets inside them are selectable
+        if (node.type === 'measurement') {
+          e.stopPropagation();
+          return;
+        }
+        onSelect();
+      }}
+      className={`absolute bg-white rounded-lg border-2 transition-all ${
         isSelected ? 'border-blue-500 shadow-lg' : getStatusColor()
-      }`}
+      } ${node.type === 'measurement' ? 'cursor-default' : 'cursor-pointer'}`}
       style={{ 
         left: `${node.x}px`, 
         top: `${node.y}px`,
@@ -105,28 +114,30 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
         {/* Input Ports */}
         {node.inputs && node.inputs.length > 0 && (
           <div className="space-y-2 mb-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-600">Inputs</p>
-              {node.role === 'output' && (
-                <button 
-                  className="text-slate-400 hover:text-slate-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Add new input handler
-                  }}
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+            {/* Only show "Inputs" label if NOT output measurement node */}
+            {node.role !== 'output' && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-600">Inputs</p>
+              </div>
+            )}
             {node.inputs.map((input: any, index: number) => (
               <div key={input.id} className="relative">
                 {input.datasetId ? (
-                  <div className="border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                    <div className="flex items-start gap-2 mb-2">
+                  <div 
+                    className={`border rounded-lg p-2 bg-white cursor-pointer transition-all ${
+                      selectedDatasetId === input.datasetId 
+                        ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
+                        : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDatasetSelect && onDatasetSelect(input.datasetId);
+                    }}
+                  >
+                    <div className="flex items-start gap-2">
                       {/* Input Port Circle */}
                       <div
-                        className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-pointer hover:border-blue-500 hover:bg-blue-50 z-10"
+                        className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
                         onMouseUp={() => onPortMouseUp(node.id, input.id, 'input')}
                         style={{ pointerEvents: 'auto' }}
                       />
@@ -134,9 +145,10 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">Dataset</label>
                           <select 
-                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             value={input.datasetId}
                             onClick={(e) => e.stopPropagation()}
+                            readOnly
                           >
                             {availableDatasets.map(ds => (
                               <option key={ds.id} value={ds.id}>{ds.name}</option>
@@ -147,9 +159,10 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
                           <div>
                             <label className="text-xs text-slate-500 block mb-1">Sample</label>
                             <select 
-                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               value={input.sampleId}
                               onClick={(e) => e.stopPropagation()}
+                              readOnly
                             >
                               {availableDatasets.find(ds => ds.id === input.datasetId)?.samples.map(sample => (
                                 <option key={sample} value={sample}>{getSampleDisplayName(sample)}</option>
@@ -158,46 +171,13 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-col gap-1">
-                        {index > 0 && (
-                          <button 
-                            className="text-slate-400 hover:text-slate-600 p-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Move up handler
-                            }}
-                          >
-                            <ChevronUp className="w-3 h-3" />
-                          </button>
-                        )}
-                        {index < node.inputs.length - 1 && (
-                          <button 
-                            className="text-slate-400 hover:text-slate-600 p-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Move down handler
-                            }}
-                          >
-                            <ChevronDown className="w-3 h-3" />
-                          </button>
-                        )}
-                        <button 
-                          className="text-red-400 hover:text-red-600 p-0.5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Remove handler
-                          }}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     {/* Input Port Circle */}
                     <div
-                      className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-pointer hover:border-blue-500 hover:bg-blue-50 z-10"
+                      className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
                       onMouseUp={() => onPortMouseUp(node.id, input.id, 'input')}
                       style={{ pointerEvents: 'auto' }}
                     />
@@ -214,32 +194,35 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
         {/* Output Ports */}
         {node.outputs && node.outputs.length > 0 && (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-600">Outputs</p>
-              {node.role === 'input' && (
-                <button 
-                  className="text-slate-400 hover:text-slate-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Add new output handler
-                  }}
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+            {/* Only show "Outputs" label if NOT input measurement node */}
+            {node.role !== 'input' && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-600">Outputs</p>
+              </div>
+            )}
             {node.outputs.map((output: any, index: number) => (
               <div key={output.id} className="relative">
                 {output.datasetId ? (
-                  <div className="border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                    <div className="flex items-start gap-2 mb-2">
+                  <div 
+                    className={`border rounded-lg p-2 bg-white cursor-pointer transition-all ${
+                      selectedDatasetId === output.datasetId 
+                        ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
+                        : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDatasetSelect && onDatasetSelect(output.datasetId);
+                    }}
+                  >
+                    <div className="flex items-start gap-2">
                       <div className="flex-1 space-y-1.5">
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">Dataset</label>
                           <select 
-                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             value={output.datasetId}
                             onClick={(e) => e.stopPropagation()}
+                            readOnly
                           >
                             {availableDatasets.map(ds => (
                               <option key={ds.id} value={ds.id}>{ds.name}</option>
@@ -250,9 +233,10 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
                           <div>
                             <label className="text-xs text-slate-500 block mb-1">Sample</label>
                             <select 
-                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               value={output.sampleId}
                               onClick={(e) => e.stopPropagation()}
+                              readOnly
                             >
                               {availableDatasets.find(ds => ds.id === output.datasetId)?.samples.map(sample => (
                                 <option key={sample} value={sample}>{getSampleDisplayName(sample)}</option>
@@ -261,42 +245,9 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-col gap-1">
-                        {index > 0 && (
-                          <button 
-                            className="text-slate-400 hover:text-slate-600 p-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Move up handler
-                            }}
-                          >
-                            <ChevronUp className="w-3 h-3" />
-                          </button>
-                        )}
-                        {index < node.outputs.length - 1 && (
-                          <button 
-                            className="text-slate-400 hover:text-slate-600 p-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Move down handler
-                            }}
-                          >
-                            <ChevronDown className="w-3 h-3" />
-                          </button>
-                        )}
-                        <button 
-                          className="text-red-400 hover:text-red-600 p-0.5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Remove handler
-                          }}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
                       {/* Output Port Circle */}
                       <div
-                        className="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-pointer hover:border-blue-500 hover:bg-blue-50 z-10"
+                        className="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
                         onMouseDown={(e) => onPortMouseDown(node.id, output.id, 'output', e)}
                         style={{ pointerEvents: 'auto' }}
                       />
@@ -309,7 +260,7 @@ export function GraphNode({ node, isSelected, onSelect, onPortMouseDown, onPortM
                     </div>
                     {/* Output Port Circle */}
                     <div
-                      className="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-pointer hover:border-blue-500 hover:bg-blue-50 z-10"
+                      className="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
                       onMouseDown={(e) => onPortMouseDown(node.id, output.id, 'output', e)}
                       style={{ pointerEvents: 'auto' }}
                     />

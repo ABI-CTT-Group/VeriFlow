@@ -1,52 +1,84 @@
-import { useState, ReactNode } from 'react';
-import { Resizable } from 're-resizable';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ReactNode, useRef, useState, useEffect } from 'react';
 
 interface ResizablePanelProps {
-  title: string;
   children: ReactNode;
-  defaultHeight?: number;
-  defaultCollapsed?: boolean;
+  side: 'left' | 'right';
+  minWidth?: number;
+  maxWidth?: number;
+  defaultWidth?: number;
+  className?: string;
 }
 
-export function ResizablePanel({ 
-  title, 
-  children, 
-  defaultHeight = 300,
-  defaultCollapsed = false 
+export function ResizablePanel({
+  children,
+  side = 'left',
+  minWidth = 250,
+  maxWidth = 600,
+  defaultWidth = 320,
+  className = ''
 }: ResizablePanelProps) {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [width, setWidth] = useState(defaultWidth);
+  const [isResizing, setIsResizing] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const rect = panel.getBoundingClientRect();
+      let newWidth: number;
+
+      if (side === 'left') {
+        newWidth = e.clientX - rect.left;
+      } else {
+        newWidth = rect.right - e.clientX;
+      }
+
+      // Constrain width
+      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, side, minWidth, maxWidth]);
 
   return (
-    <Resizable
-      defaultSize={{ width: '100%', height: isCollapsed ? 40 : defaultHeight }}
-      enable={{ 
-        top: false, 
-        right: false, 
-        bottom: !isCollapsed, 
-        left: false 
-      }}
-      minHeight={isCollapsed ? 40 : 100}
-      className="border-b border-slate-200"
+    <div
+      ref={panelRef}
+      className={`relative bg-white border-slate-200 flex-shrink-0 ${
+        side === 'left' ? 'border-r' : 'border-l'
+      } ${className}`}
+      style={{ width: `${width}px` }}
     >
-      <div className="h-full flex flex-col bg-white">
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center justify-between px-4 py-2 border-b border-slate-200 hover:bg-slate-50 transition-colors"
-        >
-          <span className="text-sm font-medium text-slate-700">{title}</span>
-          {isCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          )}
-        </button>
-        {!isCollapsed && (
-          <div className="flex-1 overflow-auto">
-            {children}
-          </div>
-        )}
-      </div>
-    </Resizable>
+      {/* Content */}
+      {children}
+
+      {/* Resize Handle */}
+      <div
+        className={`absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-blue-400 cursor-col-resize transition-all ${
+          side === 'left' ? 'right-0' : 'left-0'
+        } ${isResizing ? 'bg-blue-500 w-1.5' : ''}`}
+        onMouseDown={() => setIsResizing(true)}
+      />
+    </div>
   );
 }

@@ -1,0 +1,39 @@
+MAMA-MIA: A large-scale multi-institution MRI-based breast cancer dataset
+
+This context file provides supplemental information for the Scholar Agent.
+
+STUDY OVERVIEW:
+- Dataset Name: MAMA-MIA (Multi-institutional Annotated Mammography Images for AI)
+- Modality: Dynamic Contrast-Enhanced MRI (DCE-MRI)
+- Subjects: 1,506 patients from multiple institutions
+- Annotations: Breast tumor segmentation masks, clinical metadata
+
+METHODOLOGY:
+1. Data Acquisition: DCE-MRI scans collected from multiple institutions
+2. Preprocessing: DICOM to NIfTI conversion, intensity normalization
+3. Annotation: Expert radiologist segmentation of breast tumors
+4. Model Training: 2D and 3D U-Net architectures for segmentation
+5. Evaluation: Dice coefficient, Hausdorff distance
+
+KEY TOOLS:
+- dcm2niix: DICOM to NIfTI conversion
+- nnU-Net: Self-configuring U-Net framework
+- SimpleITK: Image processing library
+- PyTorch: Deep learning framework
+
+DATA FORMATS:
+- Input: DICOM series (application/dicom)
+- Intermediate: NIfTI volumes (application/x-nifti)
+- Output: Binary segmentation masks (application/x-nifti)
+
+PIPELINE STEPS:
+1. DICOM Export → NIfTI Conversion (dcm2niix)
+2. Preprocessing → Intensity Normalization
+3. Inference → U-Net Segmentation
+4. Post-processing → Mask Refinement
+5. Evaluation → Dice Score Calculation
+
+EXPECTED OUTPUTS:
+- Segmentation masks for each patient
+- Performance metrics (Dice, Hausdorff)
+- Visualization overlays

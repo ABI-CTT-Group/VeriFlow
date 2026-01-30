@@ -1,2 +1,39 @@
-.agent/skills/flow-interview/SKILL.md
-.agent/skills/flow-interview/questions.md
+# Node modules
+node_modules/
+
+# Build output
+dist/
+backend/__pycache__/
+*.pyc
+*.pyo
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Docker volumes (local)
+postgres-data/
+minio-data/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.coverage
+
+# Python virtual environment
+venv/
+.venv/
+
+# AI Agent
+.agent/
