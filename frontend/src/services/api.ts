@@ -1,7 +1,8 @@
 import axios from 'axios'
 
 const api = axios.create({
-    baseURL: 'http://localhost:8000/api/v1', // Adjust per your backend setup
+    // Use relative path to leverage Vite proxy (dev) and Nginx proxy (prod)
+    baseURL: '/api/v1',
     headers: {
         'Content-Type': 'application/json'
     }

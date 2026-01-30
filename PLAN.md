@@ -438,6 +438,10 @@ Ensure the Vue 3 frontend **visually matches the React UI reference**. Focus on:
   - [x] loadingMessage state for context
   - [x] Loading spinners in UploadModule ("Load Demo" button)
   - [x] Loading spinners in DatasetNavigationModule (export button)
+- [x] Dockerize Frontend
+  - [x] Create multi-stage Dockerfile (Node.js build + Nginx serve)
+  - [x] Create nginx.conf for SPA routing
+  - [x] Add frontend service to docker-compose.yml
 
 #### Developer Tasks
 - [ ] Complete walkthrough of demo flow
