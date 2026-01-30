@@ -17,7 +17,9 @@ export interface UploadResponse {
 
 export interface HierarchyResponse {
     upload_id: string
+    status: string
     hierarchy: any
+    confidence_scores?: any
 }
 
 export interface WorkflowResponse {
@@ -48,6 +50,10 @@ export const endpoints = {
         })
     },
 
+    // Stage 6: Load pre-loaded example (MAMA-MIA demo)
+    loadExample: (exampleName: string = 'mama-mia') =>
+        api.post<UploadResponse>('/publications/load-example', { example_name: exampleName }),
+
     getStudyDesign: (uploadId: string) =>
         api.get<HierarchyResponse>(`/study-design/${uploadId}`),
 
@@ -77,6 +83,10 @@ export const endpoints = {
 
     getResults: (executionId: string, nodeId?: string) =>
         api.get(`/executions/${executionId}/results`, { params: { node_id: nodeId } }),
+
+    // Stage 6: Export execution as SDS ZIP
+    exportExecution: (executionId: string) =>
+        api.get(`/executions/${executionId}/export`, { responseType: 'blob' }),
 
     // Viewers
     getSourceSnippet: (sourceId: string) =>

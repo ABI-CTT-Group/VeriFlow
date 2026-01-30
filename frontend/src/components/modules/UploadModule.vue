@@ -4,21 +4,25 @@
  * Ported from: planning/UI/src/components/UploadModule.tsx
  * 
  * Drag-and-drop file upload with expand/collapse functionality.
+ * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
 import { ref, computed } from 'vue'
-import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-vue-next'
+import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker } from 'lucide-vue-next'
 
 interface Props {
   hasUploadedFiles?: boolean
+  isLoading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   hasUploadedFiles: false,
+  isLoading: false,
 })
 
 const emit = defineEmits<{
   pdfUpload: [pdfUrl: string]
   collapseLeftPanel: []
+  loadDemo: []
 }>()
 
 const files = ref<string[]>([])
@@ -134,6 +138,30 @@ function removeFile(index: number) {
         </p>
         <p class="text-xs text-slate-400 mt-1">PDF, ZIP, or code repositories</p>
       </div>
+
+      <!-- Divider with "or" -->
+      <div class="flex items-center gap-3">
+        <div class="flex-1 border-t border-slate-200"></div>
+        <span class="text-xs text-slate-400">or</span>
+        <div class="flex-1 border-t border-slate-200"></div>
+      </div>
+
+      <!-- Load Demo Button -->
+      <button
+        @click="emit('loadDemo')"
+        :disabled="props.isLoading"
+        :class="[
+          'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
+          props.isLoading 
+            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 shadow-md hover:shadow-lg'
+        ]"
+      >
+        <Loader2 v-if="props.isLoading" class="w-4 h-4 animate-spin" />
+        <Beaker v-else class="w-4 h-4" />
+        <span>{{ props.isLoading ? 'Loading...' : 'Load MAMA-MIA Demo' }}</span>
+      </button>
+      <p class="text-xs text-slate-400 text-center">Pre-loaded MRI segmentation example</p>
 
       <!-- Uploaded files list -->
       <div v-if="files.length > 0" class="space-y-2">

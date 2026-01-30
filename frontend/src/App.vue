@@ -38,12 +38,14 @@ const {
   hasUploadedFiles,
   viewerPdfUrl,
   isViewerVisible,
+  isLoading,
   isRightPanelCollapsed: isDatasetNavCollapsed // Map store name to component local name preference
 } = storeToRefs(store)
 
 const {
   assembleWorkflow,
   runWorkflow,
+  loadExample,
   // toggleRightPanel,
   // toggleConsole,
   // updateNodeStatus
@@ -81,6 +83,11 @@ function handlePdfUpload(pdfUrl: string) {
   // For now, syncing the emitted url to store.
   store.uploadedPdfUrl = pdfUrl
   store.hasUploadedFiles = true
+}
+
+// Stage 6: Load MAMA-MIA Demo
+function handleLoadDemo() {
+  loadExample('mama-mia')
 }
 
 function handleAssembleClick() {
@@ -170,7 +177,9 @@ watch(isDatasetNavCollapsed, (val) => {
           <UploadModule 
             @pdf-upload="handlePdfUpload"
             @collapse-left-panel="isLeftPanelCollapsed = true"
+            @load-demo="handleLoadDemo"
             :has-uploaded-files="hasUploadedFiles"
+            :is-loading="isLoading"
           />
           <StudyDesignModule 
             :selected-assay="selectedAssay"

@@ -8,6 +8,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Node, Edge } from '@vue-flow/core'
+import { endpoints } from '../services/api'
 
 // Types per SPEC.md Section 3
 export interface ConfidenceScore {
@@ -90,6 +91,11 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const viewerPdfUrl = ref<string | null>(null)
     const isViewerVisible = ref(false)
 
+    // Stage 6: Loading states and error handling
+    const isLoading = ref(false)
+    const loadingMessage = ref<string | null>(null)
+    const error = ref<string | null>(null)
+
     // Computed
     const graph = computed(() => ({
         nodes: nodes.value,
@@ -101,28 +107,126 @@ export const useWorkflowStore = defineStore('workflow', () => {
         uploadId.value = id
         uploadedPdfUrl.value = pdfUrl
         hasUploadedFiles.value = true
-        // Trigger study design fetch (mocked for now)
+        // Trigger study design fetch
         fetchStudyDesign(id)
     }
 
+    // Stage 6: Load pre-loaded MAMA-MIA example
+    async function loadExample(exampleName: string = 'mama-mia') {
+        isLoading.value = true
+        loadingMessage.value = `Loading ${exampleName.toUpperCase()} demo...`
+        error.value = null
+
+        try {
+            const response = await endpoints.loadExample(exampleName)
+            const data = response.data
+
+            uploadId.value = data.upload_id
+            uploadedPdfUrl.value = null // No actual PDF for pre-loaded examples
+            hasUploadedFiles.value = true
+
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                message: `Loaded pre-configured ${exampleName.toUpperCase()} example`
+            })
+
+            // Fetch study design for the loaded example
+            await fetchStudyDesignFromApi(data.upload_id)
+
+        } catch (err: any) {
+            error.value = err.response?.data?.detail || err.message || 'Failed to load example'
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: `Failed to load example: ${error.value}`
+            })
+        } finally {
+            isLoading.value = false
+            loadingMessage.value = null
+        }
+    }
+
     async function fetchStudyDesign(id: string) {
-        console.log('Fetching study design for:', id)
-        // Mock hierarchy
-        hierarchy.value = {
-            identifier: 'inv_1',
-            title: 'Automated Tumor Detection',
-            description: 'Investigation description',
-            studies: [{
-                identifier: 'study_1',
-                title: 'MRI-based Segmentation',
-                description: 'Study description',
-                assays: [{
-                    identifier: 'assay_1',
-                    filename: 'U-Net Training',
-                    measurementType: { term: 'MRI' },
-                    technologyType: { term: 'Imaging' }
+        // Try API first, fallback to mock
+        try {
+            await fetchStudyDesignFromApi(id)
+        } catch (err) {
+            console.log('API fetch failed, using mock data')
+            // Mock hierarchy
+            hierarchy.value = {
+                identifier: 'inv_1',
+                title: 'Automated Tumor Detection',
+                description: 'Investigation description',
+                studies: [{
+                    identifier: 'study_1',
+                    title: 'MRI-based Segmentation',
+                    description: 'Study description',
+                    assays: [{
+                        identifier: 'assay_1',
+                        filename: 'U-Net Training',
+                        measurementType: { term: 'MRI' },
+                        technologyType: { term: 'Imaging' }
+                    }]
                 }]
-            }]
+            } as any
+        }
+    }
+
+    // Fetch study design from API
+    async function fetchStudyDesignFromApi(id: string) {
+        isLoading.value = true
+        loadingMessage.value = 'Fetching study design...'
+
+        try {
+            const response = await endpoints.getStudyDesign(id)
+            const data = response.data
+
+            if (data.status === 'completed' && data.hierarchy) {
+                // Set hierarchy from API response
+                const inv = data.hierarchy.investigation
+                hierarchy.value = {
+                    identifier: inv.id || 'inv_1',
+                    title: inv.title || 'Unknown Investigation',
+                    description: inv.description || '',
+                    studies: (inv.studies || []).map((study: any) => ({
+                        identifier: study.id || 'study_1',
+                        title: study.title || 'Unknown Study',
+                        description: study.description || '',
+                        assays: (study.assays || []).map((assay: any) => ({
+                            identifier: assay.id,
+                            filename: assay.name || 'Unknown Assay',
+                            name: assay.name,
+                            description: assay.description,
+                            steps: assay.steps,
+                            measurementType: { term: assay.measurement_type || 'Unknown' },
+                            technologyType: { term: assay.technology_type || 'Unknown' }
+                        }))
+                    }))
+                }
+
+                // Set confidence scores
+                if (data.confidence_scores) {
+                    confidenceScores.value = data.confidence_scores as any
+                }
+
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Study design loaded: ${hierarchy.value.title}`
+                })
+            } else if (data.status === 'processing') {
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: 'Study design is still being processed...'
+                })
+            } else if (data.status === 'error') {
+                throw new Error('Study design extraction failed')
+            }
+        } finally {
+            isLoading.value = false
+            loadingMessage.value = null
         }
     }
 
@@ -299,6 +403,53 @@ export const useWorkflowStore = defineStore('workflow', () => {
         isConsoleCollapsed.value = !isConsoleCollapsed.value
     }
 
+    // Stage 6: Export execution results as SDS ZIP
+    async function exportResults() {
+        if (!executionId.value) {
+            error.value = 'No execution to export'
+            return
+        }
+
+        isLoading.value = true
+        loadingMessage.value = 'Generating export...'
+
+        try {
+            const response = await endpoints.exportExecution(executionId.value)
+
+            // Create download link
+            const blob = new Blob([response.data as any], { type: 'application/zip' })
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `veriflow_export_${executionId.value}.zip`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                message: `Exported results to veriflow_export_${executionId.value}.zip`
+            })
+        } catch (err: any) {
+            error.value = err.response?.data?.detail || err.message || 'Failed to export'
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: `Export failed: ${error.value}`
+            })
+        } finally {
+            isLoading.value = false
+            loadingMessage.value = null
+        }
+    }
+
+    // Clear error
+    function clearError() {
+        error.value = null
+    }
+
     function reset() {
         uploadId.value = null
         uploadedPdfUrl.value = null
@@ -343,6 +494,9 @@ export const useWorkflowStore = defineStore('workflow', () => {
         consoleHeight,
         viewerPdfUrl,
         isViewerVisible,
+        isLoading,
+        loadingMessage,
+        error,
 
         // Computed
         graph,
@@ -361,5 +515,9 @@ export const useWorkflowStore = defineStore('workflow', () => {
         toggleRightPanel,
         toggleConsole,
         reset,
+        loadExample,
+        fetchStudyDesignFromApi,
+        exportResults,
+        clearError,
     }
 })

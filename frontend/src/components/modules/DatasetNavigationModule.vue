@@ -4,11 +4,19 @@
  * Ported from: planning/UI/src/components/DatasetNavigationModule.tsx
  * 
  * File tree viewer for SDS-structured datasets with file preview.
+ * Stage 6: Added SDS export functionality.
  */
 import { ref, computed } from 'vue'
-import { Eye, Download, Edit, Image } from 'lucide-vue-next'
+import { Eye, Download, Edit, Image, Loader2, Package } from 'lucide-vue-next'
 import ResizablePanel from '../layout/ResizablePanel.vue'
 import FileTreeNode from './FileTreeNode.vue'
+import { useWorkflowStore } from '../../stores/workflow'
+import { storeToRefs } from 'pinia'
+
+// Store
+const store = useWorkflowStore()
+const { executionId, isLoading, isWorkflowRunning } = storeToRefs(store)
+const { exportResults } = store
 
 interface Props {
   selectedNode?: any
@@ -202,6 +210,15 @@ const activePlugin = computed(() => {
 function handleFileClick(node: FileNode) {
   selectedFile.value = node.name
 }
+
+// Stage 6: Computed for export button states
+const hasExecutionResults = computed(() => {
+  return !!executionId.value && !isWorkflowRunning.value
+})
+
+function handleExportResults() {
+  exportResults()
+}
 </script>
 
 <template>
@@ -269,16 +286,34 @@ function handleFileClick(node: FileNode) {
     <!-- Export Section -->
     <div class="border-t border-slate-200 p-3 flex-shrink-0 bg-white">
       <div class="space-y-2">
-        <button class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors">
+        <button 
+          @click="handleExportResults"
+          :disabled="!hasExecutionResults || isLoading"
+          :class="[
+            'w-full flex items-center justify-center gap-2 px-4 py-2 text-sm rounded transition-colors',
+            hasExecutionResults && !isLoading
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          ]"
+        >
+          <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin" />
+          <Package v-else class="w-4 h-4" />
+          {{ isLoading ? 'Generating Export...' : 'Export Execution Results' }}
+        </button>
+        <button 
+          :disabled="!props.selectedDatasetId"
+          :class="[
+            'w-full flex items-center justify-center gap-2 px-4 py-2 text-sm rounded transition-colors',
+            props.selectedDatasetId
+              ? 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+              : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+          ]"
+        >
           <Download class="w-4 h-4" />
           Export Selected Data Object
         </button>
-        <button class="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm rounded hover:bg-slate-50 transition-colors">
-          <Download class="w-4 h-4" />
-          Export All Data Objects
-        </button>
         <p class="text-xs text-slate-400 text-center mt-2">
-          Exports are packaged in SDS format
+          Exports are packaged in SDS format with manifest.xlsx
         </p>
       </div>
     </div>

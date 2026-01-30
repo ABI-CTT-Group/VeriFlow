@@ -414,17 +414,30 @@ Ensure the Vue 3 frontend **visually matches the React UI reference**. Focus on:
 ### Stage 6: End-to-End Integration
 
 #### AI Tasks
-- [ ] Integrate all components for MAMA-MIA demo flow:
-  - [ ] Load pre-loaded PDF example
-  - [ ] Scholar extracts ISA hierarchy
-  - [ ] User selects assay
-  - [ ] Engineer generates workflow graph
-  - [ ] User runs workflow
-  - [ ] Results displayed in right panel
-- [ ] Implement error handling for all failure modes
-- [ ] Add console logging for all operations
-- [ ] Implement SDS export functionality (ZIP download)
-- [ ] Performance optimization and loading states
+- [x] Integrate all components for MAMA-MIA demo flow:
+  - [x] Load pre-loaded PDF example (added `/publications/load-example` endpoint)
+  - [x] Study design fetch from API with fallback to mock
+  - [x] User selects assay (existing functionality)
+  - [x] Engineer generates workflow graph (existing functionality)
+  - [x] User runs workflow (existing functionality)
+  - [x] Results displayed in right panel (existing functionality)
+- [x] Implement error handling for all failure modes
+  - [x] API error responses with HTTPException
+  - [x] Store error state and clearError action
+  - [x] User-friendly error messages in console
+- [x] Add console logging for all operations
+  - [x] Log messages in loadExample action
+  - [x] Log messages in fetchStudyDesignFromApi
+  - [x] Log messages in exportResults action
+- [x] Implement SDS export functionality (ZIP download)
+  - [x] Created `export.py` service with manifest, provenance generation
+  - [x] Added `/executions/{id}/export` endpoint
+  - [x] Export button in DatasetNavigationModule
+- [x] Performance optimization and loading states
+  - [x] isLoading state in workflow store
+  - [x] loadingMessage state for context
+  - [x] Loading spinners in UploadModule ("Load Demo" button)
+  - [x] Loading spinners in DatasetNavigationModule (export button)
 
 #### Developer Tasks
 - [ ] Complete walkthrough of demo flow

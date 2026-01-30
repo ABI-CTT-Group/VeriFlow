@@ -8,7 +8,7 @@
  */
 import { ref, computed, watch, onMounted } from 'vue'
 import { 
-  Database, Beaker, Box, ChevronLeft, ChevronRight, ChevronDown, 
+  Database, Beaker, Box, ChevronRight, ChevronDown, 
   ExternalLink, Minimize2 
 } from 'lucide-vue-next'
 
@@ -309,7 +309,7 @@ onMounted(() => {
     <div class="flex-1 overflow-auto">
       
       <!-- Helper for SECTION -->
-      <template v-for="(section, sIdx) in [
+      <template v-for="section in [
         { title: 'Input Measurements', id: 'input-measurements', items: inputMeasurements, icon: Database, color: 'text-blue-600' },
         { title: 'Output Measurements', id: 'output-measurements', items: outputMeasurements, icon: Database, color: 'text-blue-600' },
         { title: 'Tools', id: 'tools', items: tools, icon: Beaker, color: 'text-purple-600' },

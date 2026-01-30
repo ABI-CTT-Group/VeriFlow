@@ -6,7 +6,10 @@ Per PLAN.md Stage 2/4 and SPEC.md Section 5.2
 
 import uuid
 import asyncio
+import json
 from io import BytesIO
+from pathlib import Path
+from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from typing import Optional
 
@@ -209,21 +212,48 @@ async def get_study_design(upload_id: str):
     except Exception:
         pass
     
-    # Stage 4: Check if we have Scholar Agent result
-    if SCHOLAR_AVAILABLE and upload_id in _upload_cache:
+    # Check if this is a pre-loaded example (prioritize preloaded data)
+    if upload_id in _upload_cache:
         cache_entry = _upload_cache[upload_id]
         status = cache_entry.get("status", "processing")
         
-        if status == "completed" and cache_entry.get("result"):
-            result = cache_entry["result"]
-            hierarchy_response = scholar_agent.build_hierarchy_response(result, upload_id)
-            
+        # Handle pre-loaded examples directly
+        if cache_entry.get("is_preloaded") and status == "completed":
+            result = cache_entry.get("result", {})
             return StudyDesignResponse(
                 upload_id=upload_id,
                 status="completed",
-                hierarchy=hierarchy_response.get("hierarchy"),
-                confidence_scores=hierarchy_response.get("confidence_scores"),
+                hierarchy={"investigation": result.get("isa_json", {})},
+                confidence_scores={
+                    "upload_id": upload_id,
+                    "generated_at": datetime.utcnow().isoformat() + "Z",
+                    "scores": result.get("confidence_scores", {}),
+                },
             )
+        
+        # Stage 4: Handle Scholar Agent results
+        if status == "completed" and cache_entry.get("result"):
+            result = cache_entry["result"]
+            if SCHOLAR_AVAILABLE:
+                hierarchy_response = scholar_agent.build_hierarchy_response(result, upload_id)
+                return StudyDesignResponse(
+                    upload_id=upload_id,
+                    status="completed",
+                    hierarchy=hierarchy_response.get("hierarchy"),
+                    confidence_scores=hierarchy_response.get("confidence_scores"),
+                )
+            else:
+                # If Scholar not available but we have result, use it directly
+                return StudyDesignResponse(
+                    upload_id=upload_id,
+                    status="completed",
+                    hierarchy={"investigation": result.get("isa_json", {})},
+                    confidence_scores={
+                        "upload_id": upload_id,
+                        "generated_at": datetime.utcnow().isoformat() + "Z",
+                        "scores": result.get("confidence_scores", {}),
+                    },
+                )
         elif status == "error":
             return StudyDesignResponse(
                 upload_id=upload_id,
@@ -323,3 +353,86 @@ async def update_node_property(node_id: str, request: PropertyUpdateRequest):
         "updated": True,
         "message": "Property updated (Stage 4 will implement full persistence)",
     }
+
+
+# Request model for load-example
+class LoadExampleRequest(BaseModel):
+    """Request to load a pre-loaded example."""
+    example_name: str = "mama-mia"
+
+
+@router.post("/publications/load-example", response_model=UploadResponse)
+async def load_example(request: LoadExampleRequest):
+    """
+    Load a pre-loaded example without file upload.
+    
+    Per PLAN.md Stage 6:
+    - Loads ground truth ISA-JSON from backend/examples/{example_name}/
+    - Returns upload_id with pre-populated ISA hierarchy
+    - Used for MAMA-MIA demo flow
+    """
+    example_name = request.example_name
+    
+    # Determine example directory path
+    # backend/examples/mama-mia/
+    examples_dir = Path(__file__).parent.parent.parent / "examples" / example_name
+    ground_truth_path = examples_dir / "ground_truth_isa.json"
+    context_path = examples_dir / "context.txt"
+    
+    if not ground_truth_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Example '{example_name}' not found. Available examples: mama-mia"
+        )
+    
+    # Generate unique upload ID
+    upload_id = f"pub_{uuid.uuid4().hex[:12]}"
+    
+    # Load ground truth ISA-JSON
+    try:
+        with open(ground_truth_path, 'r', encoding='utf-8') as f:
+            ground_truth = json.load(f)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load ground truth: {str(e)}"
+        )
+    
+    # Load context file if exists
+    context_content = None
+    if context_path.exists():
+        try:
+            with open(context_path, 'r', encoding='utf-8') as f:
+                context_content = f.read()
+        except Exception:
+            pass
+    
+    # Store in cache with immediate completion status
+    _upload_cache[upload_id] = {
+        "pdf_text": context_content or "[Pre-loaded example - no PDF text]",
+        "context_content": context_content,
+        "status": "completed",
+        "result": {
+            "isa_json": ground_truth.get("investigation", {}),
+            "confidence_scores": ground_truth.get("confidence_scores", {}),
+            "identified_tools": ground_truth.get("identified_tools", []),
+            "identified_models": ground_truth.get("identified_models", []),
+            "identified_measurements": ground_truth.get("identified_measurements", []),
+        },
+        "is_preloaded": True,
+    }
+    
+    # Create agent session (optional)
+    try:
+        session = await db_service.create_session(upload_id)
+        session_id = session.session_id
+    except Exception:
+        session_id = f"sess_{uuid.uuid4().hex[:12]}"
+    
+    return UploadResponse(
+        upload_id=upload_id,
+        filename=f"{example_name}_example.pdf",
+        status="completed",
+        message=f"Loaded pre-configured {example_name.upper()} example with ground truth ISA hierarchy.",
+        session_id=session_id,
+    )
