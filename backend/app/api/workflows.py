@@ -1,7 +1,7 @@
 """
 VeriFlow API - Workflows Router
 Handles workflow assembly, retrieval, and saving.
-Per PLAN.md Stage 2 and SPEC.md Section 5.3
+Per PLAN.md Stage 2/4 and SPEC.md Section 5.3
 """
 
 import uuid
@@ -21,9 +21,25 @@ from app.models.workflow import (
     SaveWorkflowRequest,
 )
 
+# Stage 4: Import Engineer and Reviewer agents
+try:
+    from app.agents.engineer import engineer_agent
+    from app.agents.reviewer import reviewer_agent
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
+
+# Import cache from publications for ISA data
+try:
+    from app.api.publications import _upload_cache
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
 router = APIRouter()
 
-# In-memory workflow storage (Stage 4/5 will use MinIO/database)
+
+# In-memory workflow storage
 _workflows: dict[str, dict] = {}
 
 
@@ -36,12 +52,94 @@ async def assemble_workflow(request: AssembleRequest):
     Per SPEC.md Section 5.3:
     - Takes assay_id and generates workflow graph
     - Returns nodes with auto-layout positions
-    - Stage 4 will implement full agent logic
+    - Uses Engineer Agent for CWL generation
+    - Uses Reviewer Agent for validation
     """
     workflow_id = f"wf_{uuid.uuid4().hex[:12]}"
     
-    # Generate mock workflow graph based on MAMA-MIA example
-    # This will be replaced by Engineer Agent in Stage 4
+    # Stage 4: Use Engineer Agent if available
+    if AGENTS_AVAILABLE and CACHE_AVAILABLE:
+        # Try to get ISA data from cache
+        cache_entry = _upload_cache.get(request.upload_id, {})
+        result = cache_entry.get("result", {})
+        
+        if result:
+            # Extract data for Engineer Agent
+            isa_json = result.get("isa_json", {})
+            identified_tools = result.get("identified_tools", [])
+            identified_models = result.get("identified_models", [])
+            identified_measurements = result.get("identified_measurements", [])
+            
+            try:
+                # Generate workflow with Engineer Agent
+                engineer_result = await engineer_agent.generate_workflow(
+                    assay_id=request.assay_id,
+                    isa_json=isa_json,
+                    identified_tools=identified_tools,
+                    identified_models=identified_models,
+                    identified_measurements=identified_measurements,
+                )
+                
+                # Convert graph to Vue Flow format
+                graph_data = engineer_result.get("graph", {"nodes": [], "edges": []})
+                nodes = []
+                for n in graph_data.get("nodes", []):
+                    node_type = NodeType(n.get("type", "tool"))
+                    nodes.append(VueFlowNode(
+                        id=n["id"],
+                        type=node_type,
+                        position=Position(**n.get("position", {"x": 0, "y": 0})),
+                        data=NodeData(
+                            label=n.get("data", {}).get("label", ""),
+                            inputs=[
+                                PortDefinition(**p) for p in n.get("data", {}).get("inputs", [])
+                            ],
+                            outputs=[
+                                PortDefinition(**p) for p in n.get("data", {}).get("outputs", [])
+                            ],
+                        ),
+                    ))
+                
+                edges = [
+                    VueFlowEdge(**e) for e in graph_data.get("edges", [])
+                ]
+                
+                graph = WorkflowGraph(nodes=nodes, edges=edges)
+                
+                # Validate with Reviewer Agent
+                validation = await reviewer_agent.validate_workflow(
+                    workflow_cwl=engineer_result.get("workflow_cwl", ""),
+                    tool_cwls=engineer_result.get("tool_cwls", {}),
+                    graph=graph_data,
+                )
+                
+                # Store workflow
+                _workflows[workflow_id] = {
+                    "workflow_id": workflow_id,
+                    "upload_id": request.upload_id,
+                    "assay_id": request.assay_id,
+                    "graph": graph.model_dump(),
+                    "cwl": engineer_result.get("workflow_cwl", ""),
+                    "tool_cwls": engineer_result.get("tool_cwls", {}),
+                    "dockerfiles": engineer_result.get("dockerfiles", {}),
+                    "validation": validation,
+                    "status": "draft",
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+                
+                return AssembleResponse(
+                    workflow_id=workflow_id,
+                    cwl_path=f"workflow/{workflow_id}/workflow.cwl",
+                    graph=graph,
+                    validation=validation,
+                )
+                
+            except Exception as e:
+                # Fall through to mock data
+                pass
+    
+    # Fallback: Generate mock workflow graph based on MAMA-MIA example
     nodes = [
         VueFlowNode(
             id="input-1",

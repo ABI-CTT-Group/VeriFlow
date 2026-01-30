@@ -1,0 +1,189 @@
+{
+    "investigation": {
+        "id": "inv_1",
+        "title": "MAMA-MIA: Multi-institutional Annotated Mammography Images for AI",
+        "description": "A large-scale multi-institution MRI-based breast cancer dataset for developing and validating AI-based tumor segmentation models.",
+        "properties": [
+            {
+                "id": "inv-title",
+                "name": "Title",
+                "value": "MAMA-MIA: Multi-institutional Annotated Mammography Images for AI",
+                "source_page": 1,
+                "source_text": "MAMA-MIA: A large-scale multi-institution MRI-based breast cancer dataset",
+                "confidence": 98
+            },
+            {
+                "id": "inv-modality",
+                "name": "Modality",
+                "value": "DCE-MRI",
+                "source_page": 2,
+                "source_text": "Dynamic Contrast-Enhanced MRI (DCE-MRI)",
+                "confidence": 95
+            }
+        ],
+        "studies": [
+            {
+                "id": "study_1",
+                "title": "Breast Cancer Segmentation Study",
+                "description": "Multi-institutional study for breast tumor segmentation using DCE-MRI scans.",
+                "properties": [
+                    {
+                        "id": "study-subjects",
+                        "name": "Number of Subjects",
+                        "value": "1,506 patients",
+                        "source_page": 3,
+                        "source_text": "1,506 patients from multiple institutions",
+                        "confidence": 96
+                    },
+                    {
+                        "id": "study-institutions",
+                        "name": "Institutions",
+                        "value": "Multiple institutions",
+                        "source_page": 3,
+                        "source_text": "multi-institutional dataset",
+                        "confidence": 85
+                    }
+                ],
+                "assays": [
+                    {
+                        "id": "assay_1",
+                        "name": "U-Net Training Pipeline",
+                        "description": "Training pipeline for breast tumor segmentation using 2D and 3D U-Net architectures.",
+                        "measurement_type": "segmentation",
+                        "technology_type": "deep learning",
+                        "steps": [
+                            {
+                                "id": "step_1",
+                                "name": "DICOM to NIfTI Conversion",
+                                "description": "Convert DICOM series to NIfTI format using dcm2niix"
+                            },
+                            {
+                                "id": "step_2",
+                                "name": "Intensity Normalization",
+                                "description": "Normalize image intensities for consistency across institutions"
+                            },
+                            {
+                                "id": "step_3",
+                                "name": "U-Net Training",
+                                "description": "Train 2D and 3D U-Net models on annotated data"
+                            },
+                            {
+                                "id": "step_4",
+                                "name": "Evaluation",
+                                "description": "Evaluate using Dice coefficient and Hausdorff distance"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "assay_2",
+                        "name": "Inference Pipeline",
+                        "description": "Apply trained models to new patient scans for tumor segmentation.",
+                        "measurement_type": "segmentation",
+                        "technology_type": "deep learning inference",
+                        "steps": [
+                            {
+                                "id": "step_1",
+                                "name": "Load Pre-trained Model",
+                                "description": "Load trained U-Net weights"
+                            },
+                            {
+                                "id": "step_2",
+                                "name": "Preprocess Input",
+                                "description": "Convert and normalize input scan"
+                            },
+                            {
+                                "id": "step_3",
+                                "name": "Run Inference",
+                                "description": "Generate segmentation mask"
+                            },
+                            {
+                                "id": "step_4",
+                                "name": "Post-process",
+                                "description": "Refine mask and generate visualization"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "confidence_scores": {
+        "inv-title": {
+            "value": 98,
+            "source_page": 1,
+            "source_text": "MAMA-MIA: A large-scale multi-institution MRI-based breast cancer dataset"
+        },
+        "inv-modality": {
+            "value": 95,
+            "source_page": 2,
+            "source_text": "Dynamic Contrast-Enhanced MRI (DCE-MRI)"
+        },
+        "study-subjects": {
+            "value": 96,
+            "source_page": 3,
+            "source_text": "1,506 patients from multiple institutions"
+        },
+        "study-institutions": {
+            "value": 85,
+            "source_page": 3,
+            "source_text": "multi-institutional dataset"
+        }
+    },
+    "identified_tools": [
+        {
+            "id": "tool_1",
+            "name": "dcm2niix",
+            "description": "DICOM to NIfTI converter",
+            "source_url": "https://github.com/rordenlab/dcm2niix",
+            "confidence": 95
+        },
+        {
+            "id": "tool_2",
+            "name": "nnU-Net",
+            "description": "Self-configuring U-Net framework for biomedical image segmentation",
+            "source_url": "https://github.com/MIC-DKFZ/nnUNet",
+            "confidence": 90
+        },
+        {
+            "id": "tool_3",
+            "name": "SimpleITK",
+            "description": "Image processing library for medical imaging",
+            "source_url": "https://simpleitk.org/",
+            "confidence": 85
+        }
+    ],
+    "identified_models": [
+        {
+            "id": "model_1",
+            "name": "2D U-Net",
+            "architecture": "U-Net",
+            "pretrained": false,
+            "source_url": null,
+            "confidence": 92
+        },
+        {
+            "id": "model_2",
+            "name": "3D U-Net",
+            "architecture": "U-Net 3D",
+            "pretrained": false,
+            "source_url": null,
+            "confidence": 88
+        }
+    ],
+    "identified_measurements": [
+        {
+            "id": "measurement_1",
+            "name": "DCE-MRI Scans",
+            "data_type": "DCE-MRI",
+            "format": "DICOM",
+            "confidence": 97
+        },
+        {
+            "id": "measurement_2",
+            "name": "Segmentation Masks",
+            "data_type": "Binary Mask",
+            "format": "NIfTI",
+            "confidence": 94
+        }
+    ]
+}

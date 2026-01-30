@@ -1,12 +1,13 @@
 """
 VeriFlow API - Publications Router
 Handles PDF upload and study design extraction.
-Per PLAN.md Stage 2 and SPEC.md Section 5.2
+Per PLAN.md Stage 2/4 and SPEC.md Section 5.2
 """
 
 import uuid
+import asyncio
 from io import BytesIO
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from typing import Optional
 
 from app.models.isa import (
@@ -16,9 +17,16 @@ from app.models.isa import (
     PropertyItem,
 )
 from app.models.sds import ConfidenceScores, ConfidenceScoreItem
-from app.models.session import AgentSession
+from app.models.session import AgentSession, Message, AgentType, MessageRole
 from app.services.minio_client import minio_service
 from app.services.database import db_service
+
+# Stage 4: Import Scholar Agent
+try:
+    from app.agents.scholar import scholar_agent
+    SCHOLAR_AVAILABLE = True
+except ImportError:
+    SCHOLAR_AVAILABLE = False
 
 router = APIRouter()
 
@@ -52,6 +60,7 @@ class PropertyUpdateRequest(BaseModel):
 
 @router.post("/publications/upload", response_model=UploadResponse)
 async def upload_publication(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     context_file: Optional[UploadFile] = File(None),
 ):
@@ -62,6 +71,7 @@ async def upload_publication(
     Per SPEC.md Section 5.2:
     - Stores file in MinIO
     - Creates agent session
+    - Triggers Scholar Agent in background
     - Returns upload_id for subsequent operations
     """
     # Generate unique upload ID
@@ -85,15 +95,17 @@ async def upload_publication(
     
     # Store context file if provided
     context_path = None
+    context_content = None
     if context_file:
-        context_content = await context_file.read()
+        context_bytes = await context_file.read()
+        context_content = context_bytes.decode('utf-8', errors='ignore')
         context_object_name = f"uploads/{upload_id}/{context_file.filename}"
         minio_service.upload_file(
             bucket=minio_service.MEASUREMENTS_BUCKET,
             object_name=context_object_name,
-            file_data=BytesIO(context_content),
+            file_data=BytesIO(context_bytes),
             content_type=context_file.content_type or "text/plain",
-            length=len(context_content),
+            length=len(context_bytes),
         )
         context_path = context_object_name
     
@@ -105,13 +117,79 @@ async def upload_publication(
         # If database is not available, continue without session
         session_id = f"sess_{uuid.uuid4().hex[:12]}"
     
+    # Stage 4: Trigger Scholar Agent in background if available
+    if SCHOLAR_AVAILABLE:
+        # Extract text from PDF
+        try:
+            pdf_text = scholar_agent.extract_text_from_pdf(file_content)
+            # Store extracted text for analysis
+            _upload_cache[upload_id] = {
+                "pdf_text": pdf_text,
+                "context_content": context_content,
+                "status": "processing",
+                "result": None,
+            }
+            # Queue background analysis
+            background_tasks.add_task(
+                _process_publication_async,
+                upload_id,
+                pdf_text,
+                context_content,
+                session_id,
+            )
+        except Exception as e:
+            _upload_cache[upload_id] = {
+                "pdf_text": None,
+                "context_content": context_content,
+                "status": "error",
+                "error": str(e),
+                "result": None,
+            }
+    
     return UploadResponse(
         upload_id=upload_id,
         filename=file.filename or "unknown.pdf",
         status="processing",
-        message="Scholar Agent analyzing... (Stage 4 will implement full agent logic)",
+        message="Scholar Agent analyzing publication...",
         session_id=session_id,
     )
+
+
+# Cache for upload processing results
+_upload_cache: dict[str, dict] = {}
+
+
+async def _process_publication_async(
+    upload_id: str,
+    pdf_text: str,
+    context_content: Optional[str],
+    session_id: str,
+):
+    """Background task to process publication with Scholar Agent."""
+    try:
+        result = await scholar_agent.analyze_publication(
+            pdf_text=pdf_text,
+            context_content=context_content,
+            upload_id=upload_id,
+        )
+        
+        _upload_cache[upload_id]["status"] = "completed"
+        _upload_cache[upload_id]["result"] = result
+        
+        # Store conversation message in database
+        try:
+            message = Message(
+                role=MessageRole.ASSISTANT,
+                content=f"Extracted ISA hierarchy from publication. Found {len(result.get('identified_tools', []))} tools, {len(result.get('identified_models', []))} models.",
+                agent=AgentType.SCHOLAR,
+            )
+            await db_service.add_message(session_id, message)
+        except Exception:
+            pass  # Continue even if DB is unavailable
+            
+    except Exception as e:
+        _upload_cache[upload_id]["status"] = "error"
+        _upload_cache[upload_id]["error"] = str(e)
 
 
 @router.get("/study-design/{upload_id}", response_model=StudyDesignResponse)
@@ -131,8 +209,37 @@ async def get_study_design(upload_id: str):
     except Exception:
         pass
     
-    # For MVP, return mock data until Stage 4 (Agent Integration)
-    # The Scholar Agent will populate this in Stage 4
+    # Stage 4: Check if we have Scholar Agent result
+    if SCHOLAR_AVAILABLE and upload_id in _upload_cache:
+        cache_entry = _upload_cache[upload_id]
+        status = cache_entry.get("status", "processing")
+        
+        if status == "completed" and cache_entry.get("result"):
+            result = cache_entry["result"]
+            hierarchy_response = scholar_agent.build_hierarchy_response(result, upload_id)
+            
+            return StudyDesignResponse(
+                upload_id=upload_id,
+                status="completed",
+                hierarchy=hierarchy_response.get("hierarchy"),
+                confidence_scores=hierarchy_response.get("confidence_scores"),
+            )
+        elif status == "error":
+            return StudyDesignResponse(
+                upload_id=upload_id,
+                status="error",
+                hierarchy=None,
+                confidence_scores=None,
+            )
+        elif status == "processing":
+            return StudyDesignResponse(
+                upload_id=upload_id,
+                status="processing",
+                hierarchy=None,
+                confidence_scores=None,
+            )
+    
+    # Fallback: Return mock data for demo purposes
     mock_hierarchy = {
         "investigation": {
             "id": "inv_1",

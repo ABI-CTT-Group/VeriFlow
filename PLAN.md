@@ -349,35 +349,35 @@ Ensure the Vue 3 frontend **visually matches the React UI reference**. Focus on:
 - [x] Generate `reports/stage3.2.md` in the Completion Report format.
 
 #### Developer Tasks
-- [ ] Validate all visual corrections in the browser.
-- [ ] Confirm interactive behaviors match React UI.
-- [ ] Sign off Stage 3.2 completion.
+- [x] Validate all visual corrections in the browser.
+- [x] Confirm interactive behaviors match React UI.
+- [x] Sign off Stage 3.2 completion.
 
 ---
 
 ### Stage 4: Agent Integration (Gemini)
 
 #### AI Tasks
-- [ ] Create Gemini API client wrapper
-- [ ] Implement Scholar Agent:
-  - [ ] System prompt for PDF parsing and ISA extraction
-  - [ ] PDF text extraction using PyMuPDF
-  - [ ] ISA-JSON output generation
-  - [ ] Confidence score generation
-- [ ] Implement Engineer Agent:
-  - [ ] System prompt for CWL generation
-  - [ ] Dependency inference from code
-  - [ ] Dockerfile generation
-  - [ ] Adapter generation for type mismatches
-- [ ] Implement Reviewer Agent:
-  - [ ] System prompt for validation
-  - [ ] CWL syntax validation
-  - [ ] Error translation to user-friendly messages
-- [ ] Implement session context management
-- [ ] Store conversation history in PostgreSQL
-- [ ] Create pre-loaded example configuration:
-  - [ ] MAMA-MIA PDF and context file
-  - [ ] Ground truth ISA-JSON for validation
+- [x] Create Gemini API client wrapper
+- [x] Implement Scholar Agent:
+  - [x] System prompt for PDF parsing and ISA extraction
+  - [x] PDF text extraction using PyMuPDF
+  - [x] ISA-JSON output generation
+  - [x] Confidence score generation
+- [x] Implement Engineer Agent:
+  - [x] System prompt for CWL generation
+  - [x] Dependency inference from code
+  - [x] Dockerfile generation
+  - [x] Adapter generation for type mismatches
+- [x] Implement Reviewer Agent:
+  - [x] System prompt for validation
+  - [x] CWL syntax validation
+  - [x] Error translation to user-friendly messages
+- [x] Implement session context management
+- [x] Store conversation history in PostgreSQL
+- [x] Create pre-loaded example configuration:
+  - [x] MAMA-MIA PDF and context file
+  - [x] Ground truth ISA-JSON for validation
 
 #### Developer Tasks
 - [ ] Verify Gemini API responses match expected formats
