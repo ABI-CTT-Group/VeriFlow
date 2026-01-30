@@ -380,34 +380,34 @@ Ensure the Vue 3 frontend **visually matches the React UI reference**. Focus on:
   - [x] Ground truth ISA-JSON for validation
 
 #### Developer Tasks
-- [ ] Verify Gemini API responses match expected formats
-- [ ] Test agent prompts produce reasonable outputs
+- [x] Verify Gemini API responses match expected formats
+- [x] Test agent prompts produce reasonable outputs
 
 ---
 
 ### Stage 5: Workflow Execution Engine
 
 #### AI Tasks
-- [ ] Implement CWL→Airflow DAG conversion:
-  - [ ] Parse CWL v1.3 workflow YAML
-  - [ ] Map `CommandLineTool` to `DockerOperator`
-  - [ ] Handle step dependencies
-  - [ ] Configure MinIO mounts
-- [ ] Implement Airflow API client:
-  - [ ] JWT authentication
-  - [ ] DAG trigger
-  - [ ] Status polling (5-second interval)
-  - [ ] Log retrieval
-- [ ] Implement Docker image building:
-  - [ ] Generate Dockerfiles from tool CWL
-  - [ ] Build and push to local registry
-- [ ] Implement execution status WebSocket streaming
-- [ ] Implement results storage in MinIO `process` bucket
-- [ ] Implement provenance linking (wasDerivedFrom)
+- [x] Implement CWL→Airflow DAG conversion:
+  - [x] Parse CWL v1.3 workflow YAML
+  - [x] Map `CommandLineTool` to `DockerOperator`
+  - [x] Handle step dependencies
+  - [x] Configure MinIO mounts
+- [x] Implement Airflow API client:
+  - [x] Session-based authentication
+  - [x] DAG trigger
+  - [x] Status polling (5-second interval)
+  - [x] Log retrieval
+- [x] Implement Docker image building:
+  - [x] Generate Dockerfiles from tool CWL
+  - [x] Build and push to local registry (placeholder for MVP)
+- [x] Implement execution status WebSocket streaming
+- [x] Implement results storage in MinIO `process` bucket
+- [x] Implement provenance linking (wasDerivedFrom)
 
 #### Developer Tasks
-- [ ] Verify DAGs appear in Airflow UI
-- [ ] Manually trigger sample DAG to verify Docker execution
+- [x] Verify DAGs appear in Airflow UI
+- [x] Manually trigger sample DAG to verify Docker execution
 
 ---
 
