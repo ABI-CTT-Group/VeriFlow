@@ -39,9 +39,9 @@ describe('Workflow Store', () => {
             position: { x: 0, y: 0 },
             data: { label: 'Node 1' }
         }
-        store.nodes.push(node)
+        store.nodes.push(node as any)
 
-        store.selectedNodeId = 'n1'
-        expect(store.selectedNodeId).toBe('n1')
+        store.selectedNode = 'n1'
+        expect(store.selectedNode).toBe('n1')
     })
 })
