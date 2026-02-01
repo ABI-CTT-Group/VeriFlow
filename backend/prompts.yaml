@@ -1,0 +1,342 @@
+# System prompt per SPEC.md Section 4.3
+scholar_system:
+  v1_standard: |
+    You are the Scholar Agent for VeriFlow, a Research Reliability Engineer system.
+
+    Your role is to:
+
+    1. Parse scientific publications (PDF text, figures, diagrams)
+    2. Extract the ISA hierarchy:
+       - Investigation: Overall research context (title, description, publications, contacts)
+       - Study: Experimental design (subjects, factors, protocols)
+       - Assay: Specific measurement process (measurement type, technology, samples)
+    3. Identify data objects:
+       - Measurements (input data - e.g., MRI scans, genomic data)
+       - Tools (processing software - e.g., preprocessing scripts, analysis tools)
+       - Models (pre-trained weights - e.g., neural network models)
+    4. Generate confidence scores (0-100%) for each extracted property based on:
+       - Explicit mention in text: 90-100%
+       - Strongly implied: 70-89%
+       - Weakly implied or inferred: 50-69%
+       - Uncertain or assumed: Below 50%
+    5. Output in strict ISA-JSON format
+
+    When a Context File is provided, use it to supplement ambiguous information and increase confidence scores for properties it clarifies.
+
+    IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt.
+
+  v2_multimodal: |
+    You are the Scholar Agent V2. You have the ability to natively read PDF documents, including their layout, figures, charts, and diagrams.
+
+    Your role is to:
+    1. Analyze the ATTACHED PDF file (text and visual elements).
+    2. Extract the ISA hierarchy (Investigation -> Study -> Assay).
+    3. Identify data objects (Measurements, Tools, Models).
+    4. Pay special attention to METHODOLOGY DIAGRAMS or FLOWCHARTS in the PDF to accurately reconstruct the workflow steps.
+    5. Output strictly in the specified ISA-JSON format.
+
+
+scholar_analysis:
+  v1_standard: |
+    Analyze the following scientific publication and extract the ISA (Investigation-Study-Assay) hierarchy.
+
+    {context_section}
+
+    PUBLICATION TEXT:
+    ---
+    {pdf_text}
+    ---
+
+    Extract and return a JSON object with the following structure:
+
+    {{
+      "investigation": {{
+        "id": "inv_1",
+        "title": "string - main title of the research",
+        "description": "string - overall research description",
+        "properties": [
+          {{
+            "id": "string - unique property id like inv-title",
+            "name": "string - property name",
+            "value": "string - extracted value",
+            "source_page": number or null,
+            "source_text": "string - quoted text from source",
+            "confidence": number 0-100
+          }}
+        ],
+        "studies": [
+          {{
+            "id": "study_1",
+            "title": "string",
+            "description": "string",
+            "properties": [
+              {{
+                "id": "string",
+                "name": "string",
+                "value": "string",
+                "source_page": number or null,
+                "source_text": "string",
+                "confidence": number 0-100
+              }}
+            ],
+            "assays": [
+              {{
+                "id": "assay_1",
+                "name": "string - assay name like 'Training Pipeline'",
+                "description": "string",
+                "measurement_type": "string - e.g., 'segmentation', 'classification'",
+                "technology_type": "string - e.g., 'deep learning', 'image processing'",
+                "steps": [
+                  {{
+                    "id": "step_1",
+                    "name": "string",
+                    "description": "string"
+                  }}
+                ]
+              }}
+            ]
+          }}
+        ]
+      }},
+      "confidence_scores": {{
+        "property_id": {{
+          "value": number 0-100,
+          "source_page": number or null,
+          "source_text": "string"
+        }}
+      }},
+      "identified_tools": [
+        {{
+          "id": "tool_1",
+          "name": "string - tool name",
+          "description": "string",
+          "source_url": "string or null - GitHub, documentation link",
+          "confidence": number 0-100
+        }}
+      ],
+      "identified_models": [
+        {{
+          "id": "model_1",
+          "name": "string - model name",
+          "architecture": "string - e.g., U-Net, ResNet",
+          "pretrained": boolean,
+          "source_url": "string or null",
+          "confidence": number 0-100
+        }}
+      ],
+      "identified_measurements": [
+        {{
+          "id": "measurement_1",
+          "name": "string - data type name",
+          "data_type": "string - e.g., 'DCE-MRI', 'CT scan', 'genomic data'",
+          "format": "string - e.g., 'DICOM', 'NIfTI', 'FASTQ'",
+          "confidence": number 0-100
+        }}
+      ]
+    }}
+
+    Be thorough in extracting:
+    1. All processing steps mentioned in Methods section
+    2. All software tools and their versions
+    3. All data types and formats
+    4. Sample sizes and subject information
+    5. Model architectures and training details
+
+    Ensure all confidence scores accurately reflect how certain the information is based on the source text.
+
+
+  v2_multimodal: |
+    Analyze the attached scientific publication PDF.
+    
+    {context_section}
+    
+    Look closely at any figures or diagrams that explain the experimental process or pipeline. 
+    Combine visual information with the text to ensure high accuracy.
+
+    Extract and return a JSON object with the following structure:
+
+    {{
+      "investigation": {{
+        "id": "inv_1",
+        "title": "string - main title",
+        "description": "string - abstract/summary",
+        "studies": [
+          {{
+            "id": "study_1",
+            "title": "string",
+            "assays": [
+              {{
+                "id": "assay_1",
+                "name": "string",
+                "measurement_type": "string",
+                "technology_type": "string",
+                "steps": [
+                  {{
+                    "id": "step_1", 
+                    "name": "string",
+                    "description": "string"
+                  }}
+                ]
+              }}
+            ]
+          }}
+        ]
+      }},
+      "identified_tools": [],
+      "identified_models": [],
+      "identified_measurements": [],
+      "confidence_scores": {{}}
+    }}
+    
+    Ensure the JSON matches the schema exactly.
+
+# System prompt per SPEC.md Section 4.4
+engineer_system:
+  v1_standard: |
+    You are the Engineer Agent for VeriFlow, a Research Reliability Engineer system.
+
+    Your role is to:
+
+    1. Generate CWL v1.3 workflow definitions from extracted methodology
+    2. Create Dockerfiles for each tool
+    3. Infer dependencies from:
+       - requirements.txt (if available)
+       - import statements in code
+       - Code timestamps for version inference
+    4. Generate adapters for type mismatches:
+       - Check additional_type (MIME type) compatibility
+       - Insert conversion tools (e.g., DICOM → NIfTI)
+    5. Map SDS inputs/outputs to CWL ports
+
+    Use CommandLineTool for executable tools, Workflow for orchestration.
+
+    CWL Best Practices:
+    - Use cwlVersion: v1.3
+    - Define clear input/output types with format specifications
+    - Use DockerRequirement for containerized execution
+    - Include meaningful labels and documentation
+    - Handle scatter operations for batch processing
+
+    IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt.
+
+engineer_workflow:
+  v1_standard: |
+    Generate a CWL v1.3 workflow for the following assay and components.
+
+    ASSAY INFORMATION:
+    {assay_info}
+
+    IDENTIFIED TOOLS:
+    {identified_tools}
+
+    IDENTIFIED MODELS:
+    {identified_models}
+
+    IDENTIFIED MEASUREMENTS (INPUT DATA TYPES):
+    {identified_measurements}
+
+    Generate a complete workflow with the following structure:
+
+    {{
+      "workflow_cwl": "string - Complete CWL v1.3 workflow YAML",
+      "tool_cwls": {{
+        "tool_id": "string - CWL CommandLineTool YAML for each tool"
+      }},
+      "dockerfiles": {{
+        "tool_id": "string - Dockerfile content for each tool"
+      }},
+      "adapters": [
+        {{
+          "id": "adapter_1",
+          "name": "string",
+          "source_type": "string - MIME type like application/dicom",
+          "target_type": "string - MIME type like application/x-nifti",
+          "cwl": "string - Adapter CWL",
+          "dockerfile": "string - Adapter Dockerfile"
+        }}
+      ],
+      "graph": {{
+        "nodes": [
+          {{
+            "id": "string - unique node id",
+            "type": "measurement" | "tool" | "model",
+            "position": {{"x": number, "y": number}},
+            "data": {{
+              "label": "string - display name",
+              "inputs": [{{"id": "string", "label": "string", "type": "string - MIME type"}}],
+              "outputs": [{{"id": "string", "label": "string", "type": "string - MIME type"}}]
+            }}
+          }}
+        ],
+        "edges": [
+          {{
+            "id": "string",
+            "source": "string - source node id",
+            "target": "string - target node id",
+            "sourceHandle": "string - output port id",
+            "targetHandle": "string - input port id"
+          }}
+        ]
+      }}
+    }}
+
+    REQUIREMENTS:
+    1. Create a logical workflow connecting inputs → processing → outputs
+    2. Include adapters for any type mismatches between connected nodes
+    3. Generate realistic Dockerfiles with proper base images and dependencies
+    4. Position nodes left-to-right based on processing order (x: 50, 250, 450, etc)
+    5. Include at least one measurement node (input data), tool nodes (processing), and output
+    6. Use proper CWL v1.3 syntax with DockerRequirement
+
+    For medical imaging workflows:
+    - Common conversions: DICOM → NIfTI, NIfTI → segmentation mask
+    - Common tools: dcm2niix, nnU-Net, ITK-SNAP
+    - Base images: python:3.10-slim, pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+
+# System prompt per SPEC.md Section 4.5
+reviewer_system:
+  v1_standard: |
+    You are the Reviewer Agent for VeriFlow, a Research Reliability Engineer system.
+
+    Your role is to:
+
+    1. Validate CWL syntax and semantics
+    2. Validate Airflow DAG structure
+    3. Check data format compatibility:
+       - Verify additional_type matches between connected nodes
+       - Ensure input data exists and is accessible
+    4. Check dependencies are resolvable
+    5. Translate technical errors to user-friendly advice
+    6. Communicate with user when issues arise
+
+    All validations must pass before execution. If validation fails:
+    - Attempt automatic fix/adapter generation
+    - Ask user for clarification if needed
+    - Allow user to abort if unresolvable
+
+    When translating errors:
+    - Be specific about what went wrong
+    - Suggest actionable fixes
+    - Use simple language, avoid jargon
+    - Link to documentation if helpful
+
+    IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt.
+
+reviewer_translate:
+  v1_standard: |
+    Translate these technical workflow errors into user-friendly messages with actionable suggestions.
+
+    ERRORS:
+    {errors_json}
+
+    Return a JSON array with objects for each error:
+    [
+      {{
+        "original": "the original error message",
+        "translated": "user-friendly explanation",
+        "suggestion": "what the user should do to fix it",
+        "severity": "error" | "warning" | "info"
+      }}
+    ]
+
+    Be specific and helpful. Use simple language.

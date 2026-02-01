@@ -16,34 +16,11 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import fitz  # PyMuPDF
 
-from app.services.gemini_client import get_gemini_client
+
 from app.services.minio_client import minio_service
-
-
-# System prompt per SPEC.md Section 4.3
-SCHOLAR_SYSTEM_PROMPT = """You are the Scholar Agent for VeriFlow, a Research Reliability Engineer system.
-
-Your role is to:
-
-1. Parse scientific publications (PDF text, figures, diagrams)
-2. Extract the ISA hierarchy:
-   - Investigation: Overall research context (title, description, publications, contacts)
-   - Study: Experimental design (subjects, factors, protocols)
-   - Assay: Specific measurement process (measurement type, technology, samples)
-3. Identify data objects:
-   - Measurements (input data - e.g., MRI scans, genomic data)
-   - Tools (processing software - e.g., preprocessing scripts, analysis tools)
-   - Models (pre-trained weights - e.g., neural network models)
-4. Generate confidence scores (0-100%) for each extracted property based on:
-   - Explicit mention in text: 90-100%
-   - Strongly implied: 70-89%
-   - Weakly implied or inferred: 50-69%
-   - Uncertain or assumed: Below 50%
-5. Output in strict ISA-JSON format
-
-When a Context File is provided, use it to supplement ambiguous information and increase confidence scores for properties it clarifies.
-
-IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt."""
+from app.services.gemini_client import get_gemini_client
+from app.config import config
+from app.services.prompt_manager import prompt_manager
 
 
 class ScholarAgent:
@@ -57,7 +34,12 @@ class ScholarAgent:
     def __init__(self):
         """Initialize Scholar Agent with Gemini client."""
         self.gemini = get_gemini_client()
-    
+        # Load Scholar specific configuration
+        self.agent_config = config.get_agent_config("scholar")
+        self.prompt_version = self.agent_config.get("default_prompt_version", "v1_standard")
+        self.model_name = self.agent_config.get("default_model", "gemini-2.5-pro")    
+
+
     def extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
         """
         Extract text content from PDF using PyMuPDF.
@@ -115,14 +97,20 @@ class ScholarAgent:
             - identified_models: List of identified ML models
             - identified_measurements: List of identified data types
         """
-        # Build the prompt
+        # Retrieve System Prompt from PromptManager
+        system_instruction = prompt_manager.get_prompt("scholar_system", self.prompt_version)
+
+        # Build the Task Prompt
         prompt = self._build_analysis_prompt(pdf_text, context_content)
         
         # Generate response using Gemini
         try:
+            # Note: We are using the system instruction loaded from prompts.yaml.
+            # While the GeminiClient auto-selects a model, in a full implementation 
+            # you might extend the client to accept self.model_name here if needed.
             response = self.gemini.generate_json(
                 prompt=prompt,
-                system_instruction=SCHOLAR_SYSTEM_PROMPT,
+                system_instruction=system_instruction,
                 temperature=0.3,  # Lower for consistent structured output
             )
             
@@ -161,112 +149,15 @@ CONTEXT FILE (Use this to supplement ambiguous information):
 {context_content}
 ---
 """
+        # Retrieve the raw prompt template from YAML
+        raw_template = prompt_manager.get_prompt("scholar_analysis", self.prompt_version)
         
-        prompt = f"""Analyze the following scientific publication and extract the ISA (Investigation-Study-Assay) hierarchy.
-
-{context_section}
-
-PUBLICATION TEXT:
----
-{pdf_text}
----
-
-Extract and return a JSON object with the following structure:
-
-{{
-  "investigation": {{
-    "id": "inv_1",
-    "title": "string - main title of the research",
-    "description": "string - overall research description",
-    "properties": [
-      {{
-        "id": "string - unique property id like inv-title",
-        "name": "string - property name",
-        "value": "string - extracted value",
-        "source_page": number or null,
-        "source_text": "string - quoted text from source",
-        "confidence": number 0-100
-      }}
-    ],
-    "studies": [
-      {{
-        "id": "study_1",
-        "title": "string",
-        "description": "string",
-        "properties": [
-          {{
-            "id": "string",
-            "name": "string",
-            "value": "string",
-            "source_page": number or null,
-            "source_text": "string",
-            "confidence": number 0-100
-          }}
-        ],
-        "assays": [
-          {{
-            "id": "assay_1",
-            "name": "string - assay name like 'Training Pipeline'",
-            "description": "string",
-            "measurement_type": "string - e.g., 'segmentation', 'classification'",
-            "technology_type": "string - e.g., 'deep learning', 'image processing'",
-            "steps": [
-              {{
-                "id": "step_1",
-                "name": "string",
-                "description": "string"
-              }}
-            ]
-          }}
-        ]
-      }}
-    ]
-  }},
-  "confidence_scores": {{
-    "property_id": {{
-      "value": number 0-100,
-      "source_page": number or null,
-      "source_text": "string"
-    }}
-  }},
-  "identified_tools": [
-    {{
-      "id": "tool_1",
-      "name": "string - tool name",
-      "description": "string",
-      "source_url": "string or null - GitHub, documentation link",
-      "confidence": number 0-100
-    }}
-  ],
-  "identified_models": [
-    {{
-      "id": "model_1",
-      "name": "string - model name",
-      "architecture": "string - e.g., U-Net, ResNet",
-      "pretrained": boolean,
-      "source_url": "string or null",
-      "confidence": number 0-100
-    }}
-  ],
-  "identified_measurements": [
-    {{
-      "id": "measurement_1",
-      "name": "string - data type name",
-      "data_type": "string - e.g., 'DCE-MRI', 'CT scan', 'genomic data'",
-      "format": "string - e.g., 'DICOM', 'NIfTI', 'FASTQ'",
-      "confidence": number 0-100
-    }}
-  ]
-}}
-
-Be thorough in extracting:
-1. All processing steps mentioned in Methods section
-2. All software tools and their versions
-3. All data types and formats
-4. Sample sizes and subject information
-5. Model architectures and training details
-
-Ensure all confidence scores accurately reflect how certain the information is based on the source text."""
+        # Format the template with the dynamic data
+        # The JSON schema braces in YAML should be double-escaped {{ }} to survive this .format()
+        prompt = raw_template.format(
+            context_section=context_section,
+            pdf_text=pdf_text
+        )
         
         return prompt
     

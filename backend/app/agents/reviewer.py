@@ -19,34 +19,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from app.services.gemini_client import get_gemini_client
-
-
-# System prompt per SPEC.md Section 4.5
-REVIEWER_SYSTEM_PROMPT = """You are the Reviewer Agent for VeriFlow, a Research Reliability Engineer system.
-
-Your role is to:
-
-1. Validate CWL syntax and semantics
-2. Validate Airflow DAG structure
-3. Check data format compatibility:
-   - Verify additional_type matches between connected nodes
-   - Ensure input data exists and is accessible
-4. Check dependencies are resolvable
-5. Translate technical errors to user-friendly advice
-6. Communicate with user when issues arise
-
-All validations must pass before execution. If validation fails:
-- Attempt automatic fix/adapter generation
-- Ask user for clarification if needed
-- Allow user to abort if unresolvable
-
-When translating errors:
-- Be specific about what went wrong
-- Suggest actionable fixes
-- Use simple language, avoid jargon
-- Link to documentation if helpful
-
-IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt."""
+from app.config import config
+from app.services.prompt_manager import prompt_manager
 
 
 class ReviewerAgent:
@@ -60,7 +34,11 @@ class ReviewerAgent:
     def __init__(self):
         """Initialize Reviewer Agent with Gemini client."""
         self.gemini = get_gemini_client()
-    
+        # Load Reviewer specific configuration
+        self.agent_config = config.get_agent_config("reviewer")
+        self.prompt_version = self.agent_config.get("default_prompt_version", "v1_standard")
+        self.model_name = self.agent_config.get("default_model", "gemini-2.5-pro")
+
     async def validate_workflow(
         self,
         workflow_cwl: str,
@@ -319,26 +297,16 @@ class ReviewerAgent:
         
         # Use Gemini to translate errors
         try:
-            prompt = f"""Translate these technical workflow errors into user-friendly messages with actionable suggestions.
-
-ERRORS:
-{json.dumps(errors, indent=2)}
-
-Return a JSON array with objects for each error:
-[
-  {{
-    "original": "the original error message",
-    "translated": "user-friendly explanation",
-    "suggestion": "what the user should do to fix it",
-    "severity": "error" | "warning" | "info"
-  }}
-]
-
-Be specific and helpful. Use simple language."""
+            # Retrieve System Prompt
+            system_instruction = prompt_manager.get_prompt("reviewer_system", self.prompt_version)
+            
+            # Retrieve and Format Translation Prompt
+            raw_prompt = prompt_manager.get_prompt("reviewer_translate", self.prompt_version)
+            prompt = raw_prompt.format(errors_json=json.dumps(errors, indent=2))
             
             response = self.gemini.generate_json(
                 prompt=prompt,
-                system_instruction=REVIEWER_SYSTEM_PROMPT,
+                system_instruction=system_instruction,
                 temperature=0.3,
             )
             

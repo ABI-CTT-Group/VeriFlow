@@ -15,34 +15,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from app.services.gemini_client import get_gemini_client
-
-
-# System prompt per SPEC.md Section 4.4
-ENGINEER_SYSTEM_PROMPT = """You are the Engineer Agent for VeriFlow, a Research Reliability Engineer system.
-
-Your role is to:
-
-1. Generate CWL v1.3 workflow definitions from extracted methodology
-2. Create Dockerfiles for each tool
-3. Infer dependencies from:
-   - requirements.txt (if available)
-   - import statements in code
-   - Code timestamps for version inference
-4. Generate adapters for type mismatches:
-   - Check additional_type (MIME type) compatibility
-   - Insert conversion tools (e.g., DICOM → NIfTI)
-5. Map SDS inputs/outputs to CWL ports
-
-Use CommandLineTool for executable tools, Workflow for orchestration.
-
-CWL Best Practices:
-- Use cwlVersion: v1.3
-- Define clear input/output types with format specifications
-- Use DockerRequirement for containerized execution
-- Include meaningful labels and documentation
-- Handle scatter operations for batch processing
-
-IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt."""
+from app.config import config
+from app.services.prompt_manager import prompt_manager
 
 
 class EngineerAgent:
@@ -56,6 +30,10 @@ class EngineerAgent:
     def __init__(self):
         """Initialize Engineer Agent with Gemini client."""
         self.gemini = get_gemini_client()
+        # Load Engineer specific configuration
+        self.agent_config = config.get_agent_config("engineer")
+        self.prompt_version = self.agent_config.get("default_prompt_version", "v1_standard")
+        self.model_name = self.agent_config.get("default_model", "gemini-2.5-pro")
     
     async def generate_workflow(
         self,
@@ -88,10 +66,13 @@ class EngineerAgent:
             assay_id, isa_json, identified_tools, identified_models, identified_measurements
         )
         
+        # Retrieve System Prompt
+        system_instruction = prompt_manager.get_prompt("engineer_system", self.prompt_version)        
+
         try:
             response = self.gemini.generate_json(
                 prompt=prompt,
-                system_instruction=ENGINEER_SYSTEM_PROMPT,
+                system_instruction=system_instruction,
                 temperature=0.3,
             )
             
@@ -115,79 +96,18 @@ class EngineerAgent:
         
         # Find the target assay
         assay_info = self._find_assay(isa_json, assay_id)
+
+        # Retrieve the raw prompt template
+        raw_template = prompt_manager.get_prompt("engineer_workflow", self.prompt_version)
         
-        prompt = f"""Generate a CWL v1.3 workflow for the following assay and components.
+        # Format the template
+        prompt = raw_template.format(
+            assay_info=json.dumps(assay_info, indent=2),
+            identified_tools=json.dumps(identified_tools, indent=2),
+            identified_models=json.dumps(identified_models, indent=2),
+            identified_measurements=json.dumps(identified_measurements, indent=2)
+        )
 
-ASSAY INFORMATION:
-{json.dumps(assay_info, indent=2)}
-
-IDENTIFIED TOOLS:
-{json.dumps(identified_tools, indent=2)}
-
-IDENTIFIED MODELS:
-{json.dumps(identified_models, indent=2)}
-
-IDENTIFIED MEASUREMENTS (INPUT DATA TYPES):
-{json.dumps(identified_measurements, indent=2)}
-
-Generate a complete workflow with the following structure:
-
-{{
-  "workflow_cwl": "string - Complete CWL v1.3 workflow YAML",
-  "tool_cwls": {{
-    "tool_id": "string - CWL CommandLineTool YAML for each tool"
-  }},
-  "dockerfiles": {{
-    "tool_id": "string - Dockerfile content for each tool"
-  }},
-  "adapters": [
-    {{
-      "id": "adapter_1",
-      "name": "string",
-      "source_type": "string - MIME type like application/dicom",
-      "target_type": "string - MIME type like application/x-nifti",
-      "cwl": "string - Adapter CWL",
-      "dockerfile": "string - Adapter Dockerfile"
-    }}
-  ],
-  "graph": {{
-    "nodes": [
-      {{
-        "id": "string - unique node id",
-        "type": "measurement" | "tool" | "model",
-        "position": {{"x": number, "y": number}},
-        "data": {{
-          "label": "string - display name",
-          "inputs": [{{"id": "string", "label": "string", "type": "string - MIME type"}}],
-          "outputs": [{{"id": "string", "label": "string", "type": "string - MIME type"}}]
-        }}
-      }}
-    ],
-    "edges": [
-      {{
-        "id": "string",
-        "source": "string - source node id",
-        "target": "string - target node id",
-        "sourceHandle": "string - output port id",
-        "targetHandle": "string - input port id"
-      }}
-    ]
-  }}
-}}
-
-REQUIREMENTS:
-1. Create a logical workflow connecting inputs → processing → outputs
-2. Include adapters for any type mismatches between connected nodes
-3. Generate realistic Dockerfiles with proper base images and dependencies
-4. Position nodes left-to-right based on processing order (x: 50, 250, 450, etc)
-5. Include at least one measurement node (input data), tool nodes (processing), and output
-6. Use proper CWL v1.3 syntax with DockerRequirement
-
-For medical imaging workflows:
-- Common conversions: DICOM → NIfTI, NIfTI → segmentation mask
-- Common tools: dcm2niix, nnU-Net, ITK-SNAP
-- Base images: python:3.10-slim, pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime"""
-        
         return prompt
     
     def _find_assay(self, isa_json: Dict[str, Any], assay_id: str) -> Dict[str, Any]:

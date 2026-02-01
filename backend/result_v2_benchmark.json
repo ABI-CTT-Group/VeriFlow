@@ -1,0 +1,114 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "This resource presents the MAMA-MIA dataset, a multicenter collection of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI (DCE-MRI) cases of breast cancer, featuring expert annotations of primary tumors and non-mass-enhanced regions. The data was sourced from four collections in The Cancer Imaging Archive (TCIA). The dataset includes 49 harmonized clinical and demographic variables, expert-corrected segmentations (derived from preliminary deep learning segmentations verified by 16 experts), and pre-trained weights for a baseline nnU-Net model. It is designed to serve as a benchmark for developing and validating advanced deep learning models for breast cancer diagnostics and treatment response prediction.",
+    "studies": [
+      {
+        "id": "study_1",
+        "title": "Creation and Validation of the MAMA-MIA Breast Cancer DCE-MRI Dataset",
+        "assays": [
+          {
+            "id": "assay_1",
+            "name": "DCE-MRI Data Collection and Harmonization",
+            "measurement_type": "Imaging Data Acquisition (DCE-MRI)",
+            "technology_type": "Magnetic Resonance Imaging (MRI)",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Data Collection from TCIA",
+                "description": "Collect pre-treatment T1-weighted DCE-MRI cases from four public TCIA collections: I-SPY1, I-SPY2, NACT-Pilot, and Duke-Breast-Cancer-MRI (2193 initial cases)."
+              },
+              {
+                "id": "step_2",
+                "name": "Case Selection based on Clinical Data Availability",
+                "description": "Filter cases to include only pre-treatment DCE-MRI sequences (timepoint T0) and exclude cases lacking information on Pathologic Complete Response (pCR) to Neoadjuvant Chemotherapy (NAC) or survival status (2191 cases remaining)."
+              },
+              {
+                "id": "step_3",
+                "name": "Expert Quality Control for Image Inclusion",
+                "description": "Experts performed quality control, excluding cases without sufficient contrast enhancement or those with artifacts that significantly impeded accurate cancer segmentation (1506 final cases)."
+              },
+              {
+                "id": "step_4",
+                "name": "Data Harmonization",
+                "description": "Consolidate and harmonize 21 clinical variables (including pCR), 6 demographic variables, and 22 imaging parameters (including acquisition times) across the four collections into a single table."
+              },
+              {
+                "id": "step_5",
+                "name": "Image Orientation Standardization",
+                "description": "Standardize image orientation: Axial MRIs reoriented to the LAS (left-anterior-superior) coordinate system, and sagittal MRIs reoriented to the PSR (posterior-superior-right) coordinate system."
+              }
+            ]
+          },
+          {
+            "id": "assay_2",
+            "name": "Tumor Segmentation and Expert Quality Control",
+            "measurement_type": "Segmentation Annotation",
+            "technology_type": "Deep Learning Assisted Manual Annotation",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Volume of Interest (VOI) Selection",
+                "description": "Define a 3D rectangular bounding box (VOI) manually drawn to encompass the entire enhanced region, often guided by the Functional Tumor Volume (FTV) derived from Signal Enhancement Ratio (SER) and Percent Enhancement (PE) images."
+              },
+              {
+                "id": "step_2",
+                "name": "Preliminary Automatic Segmentation Generation",
+                "description": "A nnU-Net model, pre-trained on external expert segmentations (DUKE and TCGA-BRCA), was used to produce preliminary automatic segmentations for all 1506 cases within the defined VOIs."
+              },
+              {
+                "id": "step_3",
+                "name": "Visual Quality Control Assessment",
+                "description": "Two expert breast radiologists visually assessed all 1506 preliminary automatic segmentations using a GUI, categorizing them into four quality categories: Good, Acceptable, Poor, or Missed."
+              },
+              {
+                "id": "step_4",
+                "name": "Expert Manual Correction and Verification",
+                "description": "Sixteen breast cancer experts manually corrected and verified all 1506 preliminary automatic segmentations (in a blinded manner regarding the quality category) to create the final expert segmentations of primary tumors and non-mass enhanced areas, following strict guidelines."
+              },
+              {
+                "id": "step_5",
+                "name": "Baseline Model Training",
+                "description": "A vanilla nnU-Net tumor segmentation model was trained using the final 1506 expert segmentations of the primary tumors, providing pre-trained weights as a resource."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "confidence_scores": {
+    "structure": 1.0,
+    "workflow_detail": 0.95,
+    "data_object_extraction": 0.95
+  },
+  "identified_tools": [
+    "The Cancer Imaging Archive (TCIA)",
+    "nnU-Net (Deep Learning Framework)",
+    "Mango viewer (Manual Correction Tool)",
+    "pycad Python library (DICOM to NIfTI transformation)",
+    "seg-metrics 1.2.7 Python library (Metric computation)",
+    "SimpleITK (Medical Imaging Processing)"
+  ],
+  "identified_models": [
+    "nnU-Net Segmentation Model (Preliminary)",
+    "Baseline nnU-Net model (Trained on expert segmentations)"
+  ],
+  "identified_measurements": [
+    "Dynamic Contrast-Enhanced MRI (DCE-MRI)",
+    "Tumor Segmentation (Expert and Automatic)",
+    "Pathological Complete Response (pCR)",
+    "Survival Status",
+    "Functional Tumor Volume (FTV)",
+    "Dice Similarity Coefficient (DSC)",
+    "Hausdorff Distance (HD)",
+    "Cohen's Kappa (Inter-rater agreement)"
+  ],
+  "metadata": {
+    "upload_id": "bench_v2_001",
+    "generated_at": "2026-02-01T00:16:27.220449",
+    "agent": "scholar_v2",
+    "mode": "multimodal"
+  }
+}
