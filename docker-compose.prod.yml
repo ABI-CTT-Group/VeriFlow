@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://veriflow:${POSTGRES_PASSWORD}@postgres:5432/veriflow
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
@@ -39,13 +39,13 @@ services:
     container_name: veriflow-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=veriflow
+      - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=veriflow
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U veriflow" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,6 +73,11 @@ services:
     depends_on:
       - minio
     restart: "no"
+    env_file:
+      - .env
+    environment:
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
     entrypoint: >
       /bin/sh -c " sleep 5; mc alias set veriflow http://minio:9000 $${MINIO_ACCESS_KEY} $${MINIO_SECRET_KEY}; mc mb --ignore-existing veriflow/measurements; mc mb --ignore-existing veriflow/workflow; mc mb --ignore-existing veriflow/workflow-tool; mc mb --ignore-existing veriflow/process; echo 'Buckets created successfully'; exit 0; "
     networks:
@@ -83,9 +88,11 @@ services:
     image: apache/airflow:2.8.0
     container_name: veriflow-airflow-webserver
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://veriflow:${POSTGRES_PASSWORD}@postgres:5432/veriflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
@@ -115,9 +122,11 @@ services:
     image: apache/airflow:2.8.0
     container_name: veriflow-airflow-scheduler
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://veriflow:${POSTGRES_PASSWORD}@postgres:5432/veriflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:

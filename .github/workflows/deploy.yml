@@ -92,6 +92,7 @@ jobs:
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         env:
+          # Strip 'v' prefix from tag to match Docker image tags (e.g., v0.1.0 -> 0.1.0)
           APP_VERSION: ${{ github.event.release.tag_name }}
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -102,7 +103,8 @@ jobs:
           script: |
             cd ${{ secrets.SERVER_PATH }}
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            export APP_VERSION=$APP_VERSION
+            # Strip 'v' prefix from APP_VERSION to match image tags
+            export APP_VERSION=${APP_VERSION#v}
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
