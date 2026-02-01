@@ -1,14 +1,11 @@
-version: '3.8'
-
 services:
   # FastAPI Backend
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/abi-ctt-group/veriflow/backend:${APP_VERSION:-latest}
     container_name: veriflow-backend
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - MINIO_ENDPOINT=minio:9000
@@ -21,19 +18,14 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-    volumes:
-      - ./backend:/app
-    # Enable hot-reload for development
-    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
     networks:
       - veriflow-network
 
   # Vue Frontend
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/abi-ctt-group/veriflow/frontend:${APP_VERSION:-latest}
     container_name: veriflow-frontend
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
@@ -45,15 +37,13 @@ services:
   postgres:
     image: postgres:15
     container_name: veriflow-postgres
-    ports:
-      - "5432:5432"
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 10s
@@ -66,9 +56,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: veriflow-minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    restart: unless-stopped
     environment:
       - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
       - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
@@ -84,6 +72,9 @@ services:
     container_name: veriflow-minio-init
     depends_on:
       - minio
+    restart: "no"
+    env_file:
+      - .env
     environment:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
@@ -96,8 +87,9 @@ services:
   airflow-webserver:
     image: apache/airflow:2.8.0
     container_name: veriflow-airflow-webserver
-    ports:
-      - "8080:8080"
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -110,7 +102,7 @@ services:
       - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USERNAME}
       - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD}
     volumes:
-      - ./dags:/opt/airflow/dags
+      - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
     depends_on:
       postgres:
@@ -129,13 +121,16 @@ services:
   airflow-scheduler:
     image: apache/airflow:2.8.0
     container_name: veriflow-airflow-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:
-      - ./dags:/opt/airflow/dags
+      - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
     depends_on:
       airflow-webserver:
@@ -147,6 +142,7 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  airflow-dags:
   airflow-logs:
 
 
