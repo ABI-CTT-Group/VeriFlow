@@ -1,0 +1,147 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. We present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA). A deep learning model was trained to produce preliminary segmentations for the remaining cases, which were subsequently corrected and verified by 16 breast cancer experts. The dataset also includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model.",
+    "studies": [
+      {
+        "id": "study_mama_mia",
+        "title": "MAMA-MIA Dataset Construction and Harmonization",
+        "assays": [
+          {
+            "id": "assay_data_collection",
+            "name": "Data Collection and Harmonization",
+            "measurement_type": "Imaging Data Acquisition and Curation",
+            "technology_type": "DCE-MRI",
+            "steps": [
+              {
+                "id": "step_1_collection",
+                "name": "Initial Data Collection",
+                "description": "Collected pre-treatment T1-weighted DCE-MRI cases from four public collections in TCIA (I-SPY1, I-SPY2, NACT-Pilot, Duke-Breast-Cancer-MRI), sourcing a total of 2193 cases."
+              },
+              {
+                "id": "step_2_selection",
+                "name": "Selection Criteria Application",
+                "description": "Applied selection criteria: 1) DCE-MRI series acquired before NAC treatment started (timepoint T0). 2) Cases with available clinical data on treatment response (pCR) or survival status. 3) Expert quality control to exclude cases without sufficient contrast enhancement or with artifacts impeding segmentation. Resulted in 1506 included cases."
+              },
+              {
+                "id": "step_3_harmonization",
+                "name": "Data Harmonization",
+                "description": "Consolidated and harmonized clinical and imaging data into a single table, including 21 clinical variables, 6 demographic variables, and 22 imaging parameters. Standardized folder structure and image orientation (Axial to LAS, Sagittal to PSR)."
+              }
+            ]
+          },
+          {
+            "id": "assay_segmentation_generation",
+            "name": "Expert Segmentation Generation",
+            "measurement_type": "Image Segmentation",
+            "technology_type": "Deep Learning Model + Expert Correction",
+            "steps": [
+              {
+                "id": "step_4_prelim_seg",
+                "name": "Preliminary Automatic Segmentation Training and Inference",
+                "description": "Trained an nnU-Net model on 331 existing expert segmentations (from DUKE and TCGA-BRCA) to produce preliminary segmentations for the remaining cases. Preprocessing included cropping to VOI and resampling to 1x1x1 mm\u00b3 isotropic spacing."
+              },
+              {
+                "id": "step_5_quality_control",
+                "name": "Visual Quality Control of Preliminary Segmentations",
+                "description": "Two expert radiologists visually inspected the preliminary automatic segmentations on 2D slices (axial, sagittal, coronal) from the first post-contrast image and categorized them as Good, Acceptable, Poor, or Missed."
+              },
+              {
+                "id": "step_6_expert_correction",
+                "name": "Expert Manual Correction",
+                "description": "16 experts manually corrected, inspected, and verified the preliminary automatic segmentations for 1095 missing cases (plus 411 existing expert segmentations were also reviewed). Experts were instructed to segment only the primary lesion within the Volume of Interest (VOI), defined as a 3D rectangular box encompassing the entire enhanced region."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "identified_tools": [
+      {
+        "name": "nnU-Net",
+        "description": "Deep learning framework used for training the preliminary automatic tumor segmentation model and for which pre-trained weights are provided.",
+        "type": "Software/Algorithm"
+      },
+      {
+        "name": "Mango viewer",
+        "description": "Tool selected by experts to correct the automatic segmentations.",
+        "type": "Software/Viewer"
+      },
+      {
+        "name": "pycad",
+        "description": "Python library used to transform original DICOM images from TCIA to NIfTI format.",
+        "type": "Software/Library"
+      },
+      {
+        "name": "seg-metrics 1.2.7",
+        "description": "Python library used to compute metrics like Dice coefficient and 95% Hausdorff Distance.",
+        "type": "Software/Library"
+      },
+      {
+        "name": "nibabel",
+        "description": "Software used for processing medical imaging data, aligned with orientation standardization decisions.",
+        "type": "Software/Library"
+      },
+      {
+        "name": "SimpleITK",
+        "description": "Software used for processing medical imaging data, aligned with orientation standardization decisions.",
+        "type": "Software/Library"
+      }
+    ],
+    "identified_models": [
+      {
+        "name": "Baseline nnU-Net tumor segmentation model (pre-trained weights)",
+        "description": "A vanilla nnU-Net model trained on the 1506 expert segmentations of primary tumors for inference or fine-tuning.",
+        "type": "Machine Learning Model"
+      }
+    ],
+    "identified_measurements": [
+      {
+        "name": "Primary Tumor Segmentation Mask",
+        "description": "Expert-corrected 3D segmentation mask for the primary lesion in pre-treatment DCE-MRI.",
+        "type": "Segmentation Mask"
+      },
+      {
+        "name": "Non-Mass-Enhanced Region Segmentation Mask",
+        "description": "Expert-corrected 3D segmentation mask for non-mass-enhanced areas.",
+        "type": "Segmentation Mask"
+      },
+      {
+        "name": "Functional Tumor Volume (FTV)",
+        "description": "Tumor volume derived by filtering percent enhancement (PE) and signal enhancement ratio (SER) images, used as input for preliminary automatic segmentation.",
+        "type": "Volumetric Measurement"
+      },
+      {
+        "name": "Volume of Interest (VOI)",
+        "description": "3D rectangular box manually drawn to encompass the entire enhanced region.",
+        "type": "Bounding Box/Region of Interest"
+      },
+      {
+        "name": "Dice Similarity Coefficient (DSC)",
+        "description": "Metric used to evaluate segmentation quality between automatic and expert segmentations.",
+        "type": "Image Quality Metric"
+      },
+      {
+        "name": "95 percentile Hausdorff Distance (HD)",
+        "description": "Metric used to evaluate segmentation alignment between automatic and expert segmentations.",
+        "type": "Image Quality Metric"
+      }
+    ],
+    "confidence_scores": {
+      "Data_Integration": "High",
+      "Segmentation_Extraction": "High (due to explicit workflow description and figures)",
+      "Metadata_Extraction": "High (detailed tables provided)"
+    }
+  },
+  "confidence_scores": {},
+  "identified_tools": [],
+  "identified_models": [],
+  "identified_measurements": [],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-flash-lite-latest",
+    "generated_at": "2026-02-02T04:07:51.890376",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}

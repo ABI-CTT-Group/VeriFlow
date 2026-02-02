@@ -1,0 +1,91 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "This study presents the MAMA-MIA dataset, a multicenter collection of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI (DCE-MRI) cases. The dataset integrates data from four TCIA collections (DUKE, ISPY1, ISPY2, NACT) and provides expert-corrected segmentations of primary tumors and non-mass-enhanced regions, along with 49 harmonized clinical and demographic variables.",
+    "studies": [
+      {
+        "id": "study_1",
+        "title": "MAMA-MIA Dataset Development and Validation",
+        "assays": [
+          {
+            "id": "assay_1",
+            "name": "Breast Cancer Tumor Segmentation Workflow",
+            "measurement_type": "Tumor Segmentation",
+            "technology_type": "Magnetic Resonance Imaging (MRI)",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Data Collection",
+                "description": "Sourcing 1506 pre-treatment T1-weighted DCE-MRI cases from four public collections in The Cancer Imaging Archive (TCIA): DUKE, ISPY1, ISPY2, and NACT."
+              },
+              {
+                "id": "step_2",
+                "name": "Data Harmonization",
+                "description": "Consolidation of 21 clinical variables, 6 demographic variables, and 22 imaging parameters into a standardized format; reorientation of axial MRIs to LAS and sagittal MRIs to PSR coordinate systems."
+              },
+              {
+                "id": "step_3",
+                "name": "Preliminary Automatic Segmentation",
+                "description": "Generation of initial tumor masks using an nnU-Net model trained on 331 expert-validated cases from DUKE and TCGA-BRCA."
+              },
+              {
+                "id": "step_4",
+                "name": "Visual Quality Control",
+                "description": "Two expert radiologists visually assessed all preliminary automatic segmentations, categorizing them as Good, Acceptable, Poor, or Missed."
+              },
+              {
+                "id": "step_5",
+                "name": "Expert Manual Correction",
+                "description": "16 breast cancer experts manually corrected and verified all 1506 segmentations using the Mango viewer, following specific guidelines for primary tumor delineation."
+              },
+              {
+                "id": "step_6",
+                "name": "Dataset Standardization",
+                "description": "Standardization of folder structure and file naming (NIfTI format) to support plug-and-play AI training and easy retrieval."
+              },
+              {
+                "id": "step_7",
+                "name": "Baseline Model Training",
+                "description": "Training a vanilla nnU-Net tumor segmentation model on the final 1506 expert-corrected segmentations over 1000 epochs."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "confidence_scores": {
+    "investigation_extraction": 0.99,
+    "hierarchy_reconstruction": 0.98,
+    "workflow_steps_accuracy": 0.97,
+    "tool_identification": 0.95
+  },
+  "identified_tools": [
+    "The Cancer Imaging Archive (TCIA)",
+    "nnU-Net",
+    "nibabel",
+    "SimpleITK",
+    "Mango viewer",
+    "pycad",
+    "seg-metrics"
+  ],
+  "identified_models": [
+    "nnU-Net segmentation model",
+    "MedSAM",
+    "SAM"
+  ],
+  "identified_measurements": [
+    "T1-weighted dynamic contrast-enhanced MRI (DCE-MRI)",
+    "Dice Similarity Coefficient (DSC)",
+    "95% Hausdorff Distance (HD)",
+    "Functional Tumor Volume (FTV)",
+    "Pathological Complete Response (pCR)"
+  ],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-3-flash-preview",
+    "generated_at": "2026-02-02T04:23:22.731734",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}

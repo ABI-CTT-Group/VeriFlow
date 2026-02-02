@@ -1,0 +1,147 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "This study presents a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases for breast cancer research. The dataset includes expert annotations of primary tumors and non-mass-enhanced regions. To create this resource, imaging data from four collections in The Cancer Imaging Archive (TCIA) were integrated. A deep learning model was trained to generate preliminary segmentations, which were subsequently corrected and verified by 16 breast cancer experts. The dataset also includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model. This resource addresses a critical gap in publicly available breast cancer datasets, enabling the development, validation, and benchmarking of advanced deep learning models for breast cancer diagnostics, treatment response prediction, and personalized care.",
+    "studies": [
+      {
+        "id": "study_1",
+        "title": "MAMA-MIA Dataset Creation and Annotation Workflow",
+        "assays": [
+          {
+            "id": "assay_1",
+            "name": "DCE-MRI Data Collection, Harmonization, and Segmentation",
+            "measurement_type": "DCE-MRI",
+            "technology_type": "Magnetic Resonance Imaging",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Data Collection from Public Repositories",
+                "description": "DCE-MRI cases were collected from four public collections available on TCIA: I-SPY1/ACRIN 6657 trial (ISPY1), I-SPY2/ACRIN 6698 trial (ISPY2), NACT-Pilot (NACT), and Duke-Breast-Cancer-MRI (DUKE). A total of 1506 cases were initially sourced."
+              },
+              {
+                "id": "step_2",
+                "name": "Case Selection based on Clinical Criteria",
+                "description": "Cases were filtered based on specific criteria: 1) pre-treatment DCE-MRI acquired at diagnosis before Neoadjuvant Chemotherapy (NAC) started, 2) availability of clinical data including Pathologic Complete Response (pCR) to NAC or five-year survival information, and 3) quality control by experts to exclude cases without sufficient contrast enhancement or with artifacts impeding accurate segmentation."
+              },
+              {
+                "id": "step_3",
+                "name": "Data Harmonization and Standardization",
+                "description": "Clinical and imaging data from the selected cases were consolidated and harmonized into a single table. This included standardizing 21 clinical variables, 6 demographic variables, and 22 imaging parameters. The dataset folder structure was standardized for easy retrieval, and image orientation was standardized to LAS (left-anterior-superior) for axial MRIs and PSR (posterior-superior-right) for sagittal MRIs."
+              },
+              {
+                "id": "step_4",
+                "name": "Preliminary Automatic Segmentation Generation",
+                "description": "A standard state-of-the-art deep learning model (nnU-Net) was trained using private expert segmentations from DUKE and TCGA-BRCA collections (331 cases total). This model was used to generate preliminary automatic segmentations for all 1506 cases in the MAMA-MIA dataset."
+              },
+              {
+                "id": "step_5",
+                "name": "Visual Quality Control of Preliminary Segmentations",
+                "description": "Two expert breast radiologists visually assessed the quality of the preliminary automatic segmentations using an in-house graphical user interface (GUI). Segmentations were categorized into four quality categories: Good, Acceptable, Poor, or Missed. This assessment was used to stratify cases for manual correction and to develop quality control mechanisms."
+              },
+              {
+                "id": "step_6",
+                "name": "Expert Manual Correction of Segmentations",
+                "description": "Sixteen breast cancer experts (radiologists, surgical oncologist, medical physicist) manually corrected the preliminary automatic segmentations for the 1095 cases that lacked initial expert segmentations. The corrections were performed on the first post-contrast phase using the Mango viewer tool, following specific guidelines to segment only the primary tumor and exclude healthy tissue or artifacts."
+              },
+              {
+                "id": "step_7",
+                "name": "Final Dataset Assembly and Model Training",
+                "description": "The final MAMA-MIA dataset was assembled, including the harmonized clinical and imaging data, train/test splits, preliminary automatic segmentation quality scores, images, and expert-corrected segmentations. Pre-trained weights for a baseline nnU-Net model, trained on the 1506 expert segmentations, were also provided as an additional contribution."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "confidence_scores": {
+    "investigation": 5,
+    "studies": 5,
+    "assays": 5,
+    "steps": 5,
+    "identified_tools": 5,
+    "identified_models": 5,
+    "identified_measurements": 5
+  },
+  "identified_tools": [
+    {
+      "name": "nnU-Net",
+      "description": "Deep learning framework used to generate preliminary automatic segmentations and train the baseline segmentation model."
+    },
+    {
+      "name": "Mango viewer",
+      "description": "Tool used by experts for manual correction of automatic segmentations."
+    },
+    {
+      "name": "TCIA (The Cancer Imaging Archive)",
+      "description": "Public repository where the source DCE-MRI collections (ISPY1, ISPY2, DUKE, NACT) are available."
+    },
+    {
+      "name": "Jupyter notebooks",
+      "description": "Provided scripts for data filtering, visualization, and preprocessing."
+    },
+    {
+      "name": "pandas library",
+      "description": "Python library used for filtering and visualizing clinical and imaging data."
+    },
+    {
+      "name": "matplotlib library",
+      "description": "Python library used for plotting MRI images and segmentation contours."
+    },
+    {
+      "name": "pycad Python library",
+      "description": "Python library used to transform original DICOM images from TCIA to NIfTI format."
+    },
+    {
+      "name": "seg-metrics Python library",
+      "description": "Python library used to compute metrics such as Dice coefficient and 95% Hausdorff Distance."
+    }
+  ],
+  "identified_models": [
+    {
+      "name": "nnU-Net segmentation model",
+      "description": "A baseline tumor segmentation model trained on the 1506 expert segmentations of the MAMA-MIA dataset, with pre-trained weights provided as part of the resource."
+    }
+  ],
+  "identified_measurements": [
+    {
+      "name": "DCE-MRI",
+      "description": "Dynamic Contrast-Enhanced Magnetic Resonance Imaging scans of breast cancer patients."
+    },
+    {
+      "name": "Expert Segmentation",
+      "description": "Manual annotations of primary tumors and non-mass-enhanced regions performed by breast cancer experts."
+    },
+    {
+      "name": "Automatic Segmentation",
+      "description": "Preliminary segmentations generated by the nnU-Net deep learning model."
+    },
+    {
+      "name": "Clinical Variables",
+      "description": "Data including pathological complete response (pCR) to NAC, survival status, tumor subtype, and other patient characteristics."
+    },
+    {
+      "name": "Demographic Variables",
+      "description": "Patient information such as age and ethnicity."
+    },
+    {
+      "name": "Imaging Parameters",
+      "description": "Acquisition details including magnetic field strength, acquisition plane, scanner manufacturer, slice thickness, and pixel spacing."
+    },
+    {
+      "name": "Dice Similarity Coefficient (DSC)",
+      "description": "Metric used to quantify agreement between automatic and expert segmentations."
+    },
+    {
+      "name": "Hausdorff Distance (HD)",
+      "description": "Metric used to quantify alignment between automatic and expert segmentations."
+    }
+  ],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-robotics-er-1.5-preview",
+    "generated_at": "2026-02-02T04:28:22.273800",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. To address this, we present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA), where only 163 cases with expert segmentations were initially available. To facilitate the annotation process, a deep learning model was trained to produce preliminary segmentations for the remaining cases. These were subsequently corrected and verified by 16 breast cancer experts (averaging 9 years of experience), creating a fully annotated dataset. Additionally, the dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model trained on the annotated data. This resource addresses a critical gap in publicly available breast cancer datasets, enabling the development, validation, and benchmarking of advanced deep learning models, thus driving progress in breast cancer diagnostics, treatment response prediction, and personalized care.",
+    "studies": [
+      {
+        "id": "study_1",
+        "title": "MAMA-MIA Dataset",
+        "assays": [
+          {
+            "id": "assay_1",
+            "name": "DCE-MRI Image Acquisition and Segmentation",
+            "measurement_type": "Image Segmentation",
+            "technology_type": "MRI",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Data Collection",
+                "description": "Collection of pre-treatment T1-weighted DCE-MRI cases from four different collections in TCIA: DUKE, ISPY1, ISPY2, and NACT. A total of 1506 cases were sourced."
+              },
+              {
+                "id": "step_2",
+                "name": "Data Harmonization",
+                "description": "Consolidation and harmonization of clinical and imaging data into a single table, including 21 clinical variables, 6 demographic variables, and 22 imaging parameters. Standardization of folder structure and naming for easy retrieval."
+              },
+              {
+                "id": "step_3",
+                "name": "Preliminary Segmentation",
+                "description": "A deep learning model (nnU-Net) was trained to produce preliminary segmentations for the primary tumors and non-mass-enhanced regions. The training dataset comprised 331 expert-validated segmentations from DUKE and TCGA-BRCA collections. Preprocessing steps included cropping to the VOI and resampling to 1x1x1 mm\u00b3 isotropic pixel spacing. Data augmentation involved adding a 25% pixel margin to the VOI and applying random flipping."
+              },
+              {
+                "id": "step_4",
+                "name": "Expert Correction and Verification",
+                "description": "16 breast cancer experts manually corrected, inspected, and verified the preliminary segmentations. Guidelines for segmentation included segmenting only the primary tumor, avoiding healthy tissue in non-mass enhanced cases, excluding tissue markers, including tumor necrosis, and not including intra-mammary lymph nodes. The Mango viewer was used for corrections."
+              },
+              {
+                "id": "step_5",
+                "name": "Quality Control",
+                "description": "Two expert radiologists evaluated the quality of the preliminary automatic segmentations using a graphical user interface (GUI). Cases were categorized as Good, Acceptable, Poor, or Missed. All cases, including those rated as Good, were sent for manual correction in a blinded approach."
+              },
+              {
+                "id": "step_6",
+                "name": "Dataset Preparation for Analysis",
+                "description": "No additional preprocessing steps such as bias field correction, image normalization, or voxel resampling were applied to the final dataset to preserve image resolution and potentially affect model performance. Researchers can tailor these procedures to their use cases."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "confidence_scores": {},
+  "identified_tools": [
+    {
+      "id": "tool_1",
+      "name": "nnU-Net",
+      "description": "A deep learning framework used for automatic segmentation."
+    },
+    {
+      "id": "tool_2",
+      "name": "Mango viewer",
+      "description": "A tool selected for manual correction of segmentations."
+    },
+    {
+      "id": "tool_3",
+      "name": "pycad",
+      "description": "Python library used to transform DICOM images to NIfTI format."
+    },
+    {
+      "id": "tool_4",
+      "name": "seg-metrics",
+      "description": "Python library used to compute Dice coefficient and 95% Hausdorff Distance."
+    }
+  ],
+  "identified_models": [
+    {
+      "id": "model_1",
+      "name": "nnU-Net Segmentation Model",
+      "description": "A baseline nnU-Net model trained on the 1506 expert segmentations of primary tumors. Pre-trained weights are provided."
+    }
+  ],
+  "identified_measurements": [
+    {
+      "id": "measurement_1",
+      "name": "Primary Tumor Segmentation",
+      "description": "Expert-corrected segmentations of primary tumors."
+    },
+    {
+      "id": "measurement_2",
+      "name": "Non-mass-enhanced Region Segmentation",
+      "description": "Expert-corrected segmentations of non-mass-enhanced regions."
+    },
+    {
+      "id": "measurement_3",
+      "name": "Clinical and Demographic Variables",
+      "description": "49 harmonized clinical and demographic variables, including age, ethnicity, BMI, implants, bilateral cancer, multifocal cancer, tumor subtype, and pCR."
+    },
+    {
+      "id": "measurement_4",
+      "name": "Imaging Parameters",
+      "description": "22 imaging parameters, including acquisition plane, magnetic field strength, fat suppression, scanner manufacturer and model, image matrix, number of phases, number of slices, slice thickness, and pixel spacing."
+    },
+    {
+      "id": "measurement_5",
+      "name": "Preliminary Automatic Segmentation Quality Scores",
+      "description": "Quality scores assigned by two expert radiologists to preliminary automatic segmentations."
+    },
+    {
+      "id": "measurement_6",
+      "name": "Dice Similarity Coefficient (DSC)",
+      "description": "Metric used to evaluate segmentation accuracy."
+    },
+    {
+      "id": "measurement_7",
+      "name": "Hausdorff Distance (HD)",
+      "description": "Metric used to evaluate segmentation accuracy."
+    }
+  ],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-2.5-flash-lite",
+    "generated_at": "2026-02-02T04:12:13.973446",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}

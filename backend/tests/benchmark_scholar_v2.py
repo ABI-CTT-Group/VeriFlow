@@ -13,7 +13,8 @@ async def run_multimodal_benchmark():
     # 1. Setup V2 Agent
     agent = ScholarAgentV2()
     
-    pdf_path = r"tests\mamamiaworkflow.pdf"
+    # pdf_path = r"tests\mamamiaworkflow.pdf"
+    pdf_path = r"tests\978-3-031-94562-5_34.pdf"
     
     if not os.path.exists(pdf_path):
         print(f"Error: {pdf_path} not found. Please place it in this directory.")
@@ -74,7 +75,7 @@ async def run_multimodal_benchmark():
                 else:
                     print(f" - [Unknown Format]: {str(t)}")
 
-            out_file = f"result_v2_benchmark.json"
+            out_file = f"result_978-3-031-94562-5_34_benchmark.json"
             with open(out_file, "w") as f:
                 json.dump(output, f, indent=2)
             print(f"\nSaved full output to {out_file}")

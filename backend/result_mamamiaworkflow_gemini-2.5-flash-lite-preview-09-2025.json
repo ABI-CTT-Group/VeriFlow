@@ -1,0 +1,158 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. We present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA). A deep learning model was trained to produce preliminary segmentations for the remaining cases, which were subsequently corrected and verified by 16 breast cancer experts. The resource includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model.",
+    "studies": [
+      {
+        "id": "study_mama_mia",
+        "title": "MAMA-MIA Dataset Curation and Harmonization",
+        "assays": [
+          {
+            "id": "assay_data_collection",
+            "name": "Data Collection and Harmonization",
+            "measurement_type": "Imaging Data Curation",
+            "technology_type": "DCE-MRI Acquisition",
+            "steps": [
+              {
+                "id": "step_1_collect",
+                "name": "Data Collection from TCIA",
+                "description": "Collected pre-treatment T1-weighted DCE-MRI cases from four public collections in TCIA: I-SPY1 (171 cases), I-SPY2 (980 cases), NACT-Pilot (64 cases), and Duke-Breast-Cancer-MRI (291 cases), totaling 1506 cases after exclusion criteria (e.g., lack of clinical outcome data, poor contrast enhancement, artifacts)."
+              },
+              {
+                "id": "step_2_harmonize_clinical",
+                "name": "Harmonization of Clinical and Imaging Data",
+                "description": "Consolidated and harmonized clinical and imaging data into a single table, including 21 clinical variables, 6 demographic variables, and 22 imaging parameters. Standardized naming and folder structure for all sequences."
+              },
+              {
+                "id": "step_3_standardize_orientation",
+                "name": "Image Orientation Standardization",
+                "description": "Axial MRIs were reoriented to the LAS (left-anterior-superior) coordinate system, while sagittal MRIs were reoriented to the PSR (posterior-superior-right) coordinate system."
+              }
+            ]
+          },
+          {
+            "id": "assay_segmentation_pipeline",
+            "name": "Expert Segmentation Generation",
+            "measurement_type": "Image Segmentation",
+            "technology_type": "Deep Learning Model + Expert Correction",
+            "steps": [
+              {
+                "id": "step_4_prelim_segmentation",
+                "name": "Preliminary Automatic Segmentation",
+                "description": "Trained a baseline nnU-Net model on 331 existing expert segmentations (from DUKE and TCGA-BRCA) to produce preliminary segmentations for the 1506 MAMA-MIA cases. Preprocessing included cropping to VOI and resampling to 1x1x1 mm\u00b3 isotropic pixel spacing."
+              },
+              {
+                "id": "step_5_quality_control",
+                "name": "Visual Quality Control of Automatic Segmentations",
+                "description": "Two expert breast radiologists visually inspected the preliminary automatic segmentations on 2D slices (axial, sagittal, coronal) from the first post-contrast image and categorized them as Good, Acceptable, Poor, or Missed. This step was blinded to the experts performing corrections."
+              },
+              {
+                "id": "step_6_expert_correction",
+                "name": "Expert Manual Correction",
+                "description": "16 experts manually corrected, inspected, and verified the preliminary automatic segmentations for 1095 missing cases (plus 411 existing expert segmentations were also reviewed). Experts segmented the primary tumor in the first post-contrast phase using the Mango viewer tool, following specific guidelines (e.g., segmenting only the primary lesion, excluding lymph nodes)."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "identified_tools": [
+      {
+        "name": "nnU-Net",
+        "description": "A standard state-of-the-art deep learning model used to produce preliminary segmentations and for which pre-trained weights were shared.",
+        "type": "Segmentation Framework"
+      },
+      {
+        "name": "Mango viewer",
+        "description": "The tool selected for experts to correct the automatic segmentations.",
+        "type": "Annotation/Visualization Software"
+      },
+      {
+        "name": "pycad",
+        "description": "Python library used to transform original DICOM images from TCIA to NIfTI format.",
+        "type": "Data Conversion Tool"
+      },
+      {
+        "name": "seg-metrics 1.2.7",
+        "description": "Python library used to compute metrics like Dice coefficient and 95% Hausdorff Distance.",
+        "type": "Metrics Calculation Tool"
+      },
+      {
+        "name": "matplotlib",
+        "description": "Used for plotting MRI images in Jupyter notebooks.",
+        "type": "Visualization Library"
+      },
+      {
+        "name": "pandas",
+        "description": "Used for filtering and visualizing clinical and imaging data.",
+        "type": "Data Manipulation Library"
+      }
+    ],
+    "identified_models": [
+      {
+        "name": "Baseline nnU-Net Model (Pre-trained Weights)",
+        "description": "A vanilla nnU-Net model trained on the 1506 expert segmentations of primary tumors for transfer learning and benchmarking.",
+        "type": "Segmentation Model"
+      },
+      {
+        "name": "Preliminary Segmentation Model",
+        "description": "Model trained on 331 segmentations (DUKE and TCGA-BRCA) used to generate initial segmentations for expert correction.",
+        "type": "Segmentation Model"
+      }
+    ],
+    "identified_measurements": [
+      {
+        "name": "Expert Primary Tumor Segmentations",
+        "description": "1506 expert-corrected 3D segmentations of the primary lesion in pre-treatment DCE-MRI (first post-contrast phase).",
+        "type": "Segmentation Mask"
+      },
+      {
+        "name": "Preliminary Automatic Segmentations",
+        "description": "Initial segmentations generated by the nnU-Net model before expert correction.",
+        "type": "Segmentation Mask"
+      },
+      {
+        "name": "Expert Quality Scores",
+        "description": "Categorical quality assessment (Good, Acceptable, Poor, Missed) assigned by two expert radiologists to the preliminary automatic segmentations.",
+        "type": "Quality Metric"
+      },
+      {
+        "name": "Dice Similarity Coefficient (DSC)",
+        "description": "Calculated between automatic and expert segmentations.",
+        "type": "Segmentation Similarity Metric"
+      },
+      {
+        "name": "95 percentile Hausdorff Distance (HD)",
+        "description": "Calculated between automatic and expert segmentations.",
+        "type": "Segmentation Boundary Metric"
+      },
+      {
+        "name": "Functional Tumor Volume (FTV)",
+        "description": "Volume derived from SER and PE images, used as an approximate VOI/segmentation for comparison against expert segmentation.",
+        "type": "Volumetric Measurement"
+      },
+      {
+        "name": "Harmonized Clinical and Demographic Variables",
+        "description": "21 clinical, 6 demographic, and 22 imaging parameters for all 1506 cases.",
+        "type": "Metadata"
+      }
+    ],
+    "confidence_scores": {
+      "Data_Collection": "High",
+      "Harmonization": "High",
+      "Segmentation_Quality_Control": "High (Validated by Cohen's Kappa analysis)",
+      "Expert_Correction_Consistency": "Moderate (Cohen's Kappa 0.39 for 4 categories, improved to 0.53 for binary)"
+    }
+  },
+  "confidence_scores": {},
+  "identified_tools": [],
+  "identified_models": [],
+  "identified_measurements": [],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-2.5-flash-lite-preview-09-2025",
+    "generated_at": "2026-02-02T04:18:55.513028",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}

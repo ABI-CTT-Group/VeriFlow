@@ -10,20 +10,18 @@ from app.services.prompt_manager import prompt_manager
 class ScholarAgentV2:
     """
     Scholar Agent V2 (Multimodal).
-    
-    analyzes PDFs directly using Gemini's native vision capabilities
-    rather than extracting text first.
+    Delegates caching and uploading logic to the smart client.
     """
     
     def __init__(self):
         self.client = MultiModalGeminiClient()
         self.agent_config = config.get_agent_config("scholar")
-        # Use a new default version or fallback to standard
         self.prompt_version = "v2_multimodal" 
         
-        # Override client model if config specifies
+        # Apply config overrides if present
         cfg_model = self.agent_config.get("default_model")
         if cfg_model:
+            # Note: Client will still validate if this model exists
             self.client.model_name = cfg_model
 
     async def analyze_publication(
@@ -33,42 +31,35 @@ class ScholarAgentV2:
         upload_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Analyze a publication PDF file directly.
+        Analyze a publication PDF file directly using smart caching.
         """
         if not os.path.exists(pdf_path):
              return {"error": f"File not found: {pdf_path}", "isa_json": None}
 
         try:
-            # 1. Upload PDF
-            pdf_file = self.client.upload_file(pdf_path, mime_type="application/pdf")
-            
-            # 2. Get Prompts
-            # Note: We use the *same* system prompt key if the instruction hasn't changed, 
-            # or a new V2 key if we want specific visual instructions.
+            # 1. Retrieve Prompts
             system_instruction = prompt_manager.get_prompt("scholar_system", self.prompt_version)
             analysis_prompt_tmpl = prompt_manager.get_prompt("scholar_analysis", self.prompt_version)
             
-            # 3. Format text part of the prompt
-            # We no longer inject {pdf_text}, just context.
+            # 2. Format the Text Prompt
             task_text = analysis_prompt_tmpl.format(
                 context_section=f"Context Notes: {context_content}" if context_content else ""
             )
             
-            # 4. Construct Multimodal Payload
-            # Order: [File Object, Text Instruction]
-            contents = [pdf_file, task_text]
-            
-            # 5. Generate
-            response_json = self.client.generate_json(
-                contents=contents,
+            # 3. Call Smart Client (Handles Hash -> Cache -> Upload -> Generate)
+            # This implements Option B: It won't upload if the hash matches a cache entry.
+            response_json = self.client.analyze_file(
+                file_path=pdf_path,
+                prompt=task_text,
                 system_instruction=system_instruction,
                 temperature=0.2
             )
             
-            # 6. Wrap result
+            # 4. Format Output
             return self._format_output(response_json, upload_id)
 
         except Exception as e:
+            # Fallback structure
             return {
                 "error": str(e),
                 "isa_json": None,
@@ -90,6 +81,6 @@ class ScholarAgentV2:
                 "upload_id": upload_id,
                 "generated_at": datetime.utcnow().isoformat(),
                 "agent": "scholar_v2",
-                "mode": "multimodal"
+                "mode": "multimodal_cached"
             }
         }

@@ -1,0 +1,95 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "An Open-Source End-to-End Pipeline for Generating 3D+t Biventricular Meshes from Cardiac Magnetic Resonance Imaging",
+    "description": "This paper presents a new open-source, end-to-end pipeline for generating structured 3D+t biventricular meshes of the heart across the entire cardiac cycle from Cardiac Magnetic Resonance (CMR) data. The pipeline comprises view classification, segmentation of the left and right ventricular chambers and myocardium, contour generation, and model fitting in a fully automated sequence. The use of 3D U-Nets (2D+t segmentation) was explored and found to increase the temporal coherence of resulting meshes compared to 2D U-Nets when evaluated on 10 test cases.",
+    "studies": [
+      {
+        "id": "study_1",
+        "title": "Development and Evaluation of a 3D+t Biventricular Meshing Pipeline using CMR Data",
+        "assays": [
+          {
+            "id": "assay_1",
+            "name": "End-to-End Pipeline for 3D+t Biventricular Mesh Generation and Temporal Coherence Evaluation",
+            "measurement_type": "Cardiac Morphology and Kinematics Quantification",
+            "technology_type": "Deep Learning and Diffeomorphic Registration Pipeline (CMR Imaging)",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Data Preparation and View Classification Labeling",
+                "description": "CMR series from 200 UK Biobank and 160 CARDIOHANCE cases were manually reviewed and divided into 10 view classes (SAX, 2ch, 3ch, 4ch, 2ch-RT, RVOT, RVOT-T, LVOT, SAX-atria, Other) by a single expert observer."
+              },
+              {
+                "id": "step_2",
+                "name": "View Classification Model Training",
+                "description": "A convolutional neural network based on the ResNet50 architecture was trained for 50 epochs using a cross-entropy loss function and Adam optimiser to automatically predict the view of a CMR image series. Data was split 80/10/10 for training, validation, and testing."
+              },
+              {
+                "id": "step_3",
+                "name": "Segmentation Ground Truth Label Generation (Overfitting Approach)",
+                "description": "100 cases were manually segmented at End-Diastole (ED) and End-Systole (ES) frames. A default 2D nnU-Net model was deliberately overfit (750 epochs) to these ED/ES labels for each view, and then applied to predict segmentations for all other frames. Predictions were manually corrected if disconnected segmentations occurred."
+              },
+              {
+                "id": "step_4",
+                "name": "Generating 2D+t Reference Segmentations",
+                "description": "The corrected segmentation predictions across the entire cardiac cycle were concatenated along the time dimension to form new 2D+t reference segmentations (ground truth labels)."
+              },
+              {
+                "id": "step_5",
+                "name": "2D+t Segmentation Model Training (3D nnU-Net)",
+                "description": "Default 3D nnU-Net models were trained for 500 epochs using the 2D+t reference segmentations with single-fold cross-validation (90/10 training/testing split)."
+              },
+              {
+                "id": "step_6",
+                "name": "End-to-End Pipeline Execution: View Classification and Segmentation",
+                "description": "Raw CMR DICOM images were input. The View Classification model automatically labeled the view. The 2D+t segmentation model was applied to generate labels for cardiac structures (LV/RV blood pool, LV/RV myocardium, LA/RA blood pool, Aorta, Pulmonary artery) for each frame."
+              },
+              {
+                "id": "step_7",
+                "name": "Contour Generation and Mesh Fitting",
+                "description": "Contour sets (endocardial, epicardial borders, and key landmarks) were generated from the segmentations. Time-varying biventricular meshes (epicardial, LV endocardial, RV endocardial) were fitted to these contour sets using an iterative diffeomorphic registration algorithm, refining a multi-class subdivision surface template mesh."
+              },
+              {
+                "id": "step_8",
+                "name": "Evaluation of Temporal Coherence",
+                "description": "Volumes and masses for the LV and RV were calculated from the generated biventricular meshes. Temporal coherence was evaluated by calculating the smoothness of volume-time traces (L2 norm of residuals between original and low-pass filtered traces) and the consistency of mass-time traces (L2 norm of residuals between trace and average mass)."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "confidence_scores": {},
+  "identified_tools": [
+    "Cardiac Magnetic Resonance (CMR) Imaging",
+    "ResNet50 (CNN Architecture)",
+    "nnU-Net (Deep Learning Framework)",
+    "Adam optimiser",
+    "Iterative Diffeomorphic Registration Algorithm",
+    "Low-pass filter"
+  ],
+  "identified_models": [
+    "View Classification Model (ResNet50 based CNN)",
+    "2D nnU-Net Segmentation Model",
+    "2D+t nnU-Net Segmentation Model (3D U-Net)",
+    "Multi-class subdivision surface template mesh"
+  ],
+  "identified_measurements": [
+    "View Prediction Performance (True Positive Rate, False Positive Rate, True Negative Rate, False Negative Rate, F-score)",
+    "Segmentation Performance (Dice coefficient)",
+    "LV Volume",
+    "RV Volume",
+    "LV Mass",
+    "RV Mass",
+    "Temporal Coherence (Smoothness of volume-time traces)",
+    "Temporal Coherence (Consistency of mass-time traces)",
+    "Processing Time"
+  ],
+  "metadata": {
+    "upload_id": "bench_v2_001",
+    "generated_at": "2026-02-01T01:33:30.098231",
+    "agent": "scholar_v2",
+    "mode": "multimodal"
+  }
+}

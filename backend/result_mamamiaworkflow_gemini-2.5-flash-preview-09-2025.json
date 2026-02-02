@@ -1,0 +1,124 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "This resource presents the MAMA-MIA multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA). Preliminary segmentations were generated using a deep learning model and subsequently corrected and verified by 16 breast cancer experts. The dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model, addressing a critical gap in publicly available breast cancer datasets for benchmarking advanced deep learning models.",
+    "studies": [
+      {
+        "id": "study_1",
+        "title": "Creation and Harmonization of the MAMA-MIA Breast Cancer DCE-MRI Dataset",
+        "assays": [
+          {
+            "id": "assay_1",
+            "name": "Dynamic Contrast-Enhanced Magnetic Resonance Imaging (DCE-MRI) Segmentation Workflow",
+            "measurement_type": "Segmentation and Clinical Data Acquisition",
+            "technology_type": "Magnetic Resonance Imaging (MRI)",
+            "steps": [
+              {
+                "id": "step_1",
+                "name": "Data Collection from Public Sources",
+                "description": "Gather all available open-access DCE-MRI studies of breast cancer patients who underwent Neoadjuvant Chemotherapy (NAC) treatment from four TCIA collections (I-SPY1, I-SPY2, NACT, DUKE), sourcing a total of 2193 cases."
+              },
+              {
+                "id": "step_2",
+                "name": "Pre-treatment DCE-MRI Selection",
+                "description": "Select only DCE-MRI series acquired at the time of diagnosis and before NAC treatment started (timepoint T0)."
+              },
+              {
+                "id": "step_3",
+                "name": "Clinical Data Filtering",
+                "description": "Exclude cases lacking information on treatment response, specifically Pathologic Complete Response (pCR) to NAC or five-year survival status."
+              },
+              {
+                "id": "step_4",
+                "name": "Initial Expert Quality Control (QC)",
+                "description": "Experts discarded cases without sufficient contrast enhancement or those with artifacts that significantly impeded accurate cancer segmentation, resulting in the final 1506 cases for the MAMA-MIA dataset."
+              },
+              {
+                "id": "step_5",
+                "name": "Data Harmonization and Consolidation",
+                "description": "Consolidate and harmonize clinical (21 variables, including pCR) and imaging data (22 parameters) across the four collections into a single table, along with 6 demographic variables."
+              },
+              {
+                "id": "step_6",
+                "name": "Image Orientation Standardization",
+                "description": "Standardize image orientation: Axial MRIs were reoriented to the LAS (left-anterior-superior) coordinate system, and sagittal MRIs were reoriented to the PSR (posterior-superior-right) coordinate system."
+              },
+              {
+                "id": "step_7",
+                "name": "Volume of Interest (VOI) Definition",
+                "description": "Define the 3D rectangular Volume of Interest (VOI) manually to encompass the entire enhanced region (primary tumor or non-mass-enhanced area). If analysis masks (FTV) were unavailable, an approximate VOI was created using filtering steps applied to SER and PE images."
+              },
+              {
+                "id": "step_8",
+                "name": "Preliminary Segmentation Model Training",
+                "description": "A standard state-of-the-art nnU-Net deep learning model was trained using 331 expert-validated segmentations from DUKE and TCGA-BRCA collections to generate preliminary annotations."
+              },
+              {
+                "id": "step_9",
+                "name": "Preliminary Automatic Segmentation Generation",
+                "description": "The trained nnU-Net model produced preliminary segmentations for the 1506 cases. Images were cropped to the VOI and resampled to 1 x 1 x 1 mm\u00b3 isotropic pixel spacing prior to segmentation."
+              },
+              {
+                "id": "step_10",
+                "name": "Visual Quality Control of Preliminary Segmentations",
+                "description": "Two expert breast radiologists visually assessed all 1506 preliminary automatic segmentations using a GUI, categorizing them into four quality categories: Good, Acceptable, Poor, or Missed."
+              },
+              {
+                "id": "step_11",
+                "name": "Expert Manual Correction and Verification",
+                "description": "A total of 16 experts manually corrected, inspected, and verified all 1506 preliminary automatic segmentations (especially the 1095 missing cases) using the Mango viewer, resulting in the final expert segmentations of primary tumors and non-mass-enhanced areas."
+              },
+              {
+                "id": "step_12",
+                "name": "Folder Structure Standardization",
+                "description": "The dataset folder structure was standardized for easy retrieval and harmonized to support plug-and-play AI training, including separate folders for images, expert segmentations, and automatic segmentations."
+              },
+              {
+                "id": "step_13",
+                "name": "Baseline Segmentation Model Training and Weight Release",
+                "description": "Pre-trained weights of a baseline nnU-Net tumor segmentation model were generated by training the model on the 1506 final expert segmentations using 5-fold cross-validation, z-scoring, and isotropic resampling."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "confidence_scores": {},
+  "identified_tools": [
+    "TCIA (The Cancer Imaging Archive)",
+    "nnU-Net (Segmentation Framework)",
+    "GUI (Graphical User Interface)",
+    "Mango viewer",
+    "pandas library",
+    "matplotlib",
+    "pycad Python library",
+    "seg-metrics 1.2.7 Python library",
+    "nibabel",
+    "SimpleITK"
+  ],
+  "identified_models": [
+    "nnU-Net Segmentation Model (Preliminary)",
+    "Baseline nnU-Net Tumor Segmentation Model"
+  ],
+  "identified_measurements": [
+    "DCE-MRI (Dynamic Contrast-Enhanced Magnetic Resonance Imaging)",
+    "T1-weighted DCE-MRI",
+    "Expert Segmentations (Primary tumors and non-mass-enhanced regions)",
+    "Preliminary Automatic Segmentations",
+    "Clinical Variables (e.g., pCR, survival status)",
+    "Demographic Variables (e.g., age, ethnicity)",
+    "Imaging Parameters (e.g., acquisition times, slice thickness)",
+    "Functional Tumor Volume (FTV)",
+    "Dice Similarity Coefficient (DSC)",
+    "95 percentile Hausdorff Distance (HD)",
+    "Cohen's Kappa"
+  ],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-2.5-flash-preview-09-2025",
+    "generated_at": "2026-02-02T04:16:42.931713",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}

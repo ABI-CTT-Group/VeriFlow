@@ -1,0 +1,51 @@
+{
+  "isa_json": {
+    "id": "inv_1",
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. To address this, we present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA), where only 163 cases with expert segmentations were initially available. To facilitate the annotation process, a deep learning model was trained to produce preliminary segmentations for the remaining cases. These were subsequently corrected and verified by 16 breast cancer experts (averaging 9 years of experience), creating a fully annotated dataset. Additionally, the dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model trained on the annotated data. This resource addresses a critical gap in publicly available breast cancer datasets, enabling the development, validation, and benchmarking of advanced deep learning models, thus driving progress in breast cancer diagnostics, treatment response prediction, and personalized care."
+  },
+  "confidence_scores": {
+    "investigation": 5,
+    "studies": 5,
+    "assays": 5,
+    "steps": 5,
+    "identified_tools": 4,
+    "identified_models": 4,
+    "identified_measurements": 5
+  },
+  "identified_tools": [
+    "The Cancer Imaging Archive (TCIA)",
+    "nnU-Net framework",
+    "Mango viewer",
+    "pandas library",
+    "matplotlib",
+    "pycad Python library",
+    "seg-metrics Python library",
+    "nibabel",
+    "SimpleITK"
+  ],
+  "identified_models": [
+    "Deep learning model (nnU-Net) for preliminary segmentations",
+    "Baseline nnU-Net model trained on expert segmentations"
+  ],
+  "identified_measurements": [
+    "T1-weighted dynamic contrast-enhanced MRI (DCE-MRI)",
+    "Expert annotations of primary tumors",
+    "Expert annotations of non-mass-enhanced regions",
+    "Clinical variables (e.g., pathological complete response (pCR), survival status, tumor subtype)",
+    "Demographic variables (e.g., age, ethnicity, BMI)",
+    "Imaging parameters (e.g., acquisition plane, magnetic field strength, fat suppression, scanner manufacturer/model, image matrix, number of phases, number of slices, slice thickness, pixel spacing)",
+    "Segmentation quality scores (Good, Acceptable, Poor, Missed)",
+    "Dice Similarity Coefficient (DSC)",
+    "95 percentile Hausdorff Distance (HD)",
+    "Functional Tumor Volume (FTV)",
+    "Percent Enhancement (PE) image",
+    "Signal Enhancement Ratio (SER) image"
+  ],
+  "metadata": {
+    "upload_id": "bench_mamamiaworkflow_gemini-2.5-flash",
+    "generated_at": "2026-02-02T03:44:22.482737",
+    "agent": "scholar_v2",
+    "mode": "multimodal_cached"
+  }
+}
