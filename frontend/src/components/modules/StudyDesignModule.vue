@@ -173,7 +173,7 @@ const hoverClass = 'hover:bg-slate-50'
 
     <!-- Tree View -->
     <template v-if="hasUploadedFiles">
-      <div class="px-3 py-3 space-y-1 border-b border-slate-200 overflow-auto flex-shrink-0">
+      <div class="px-3 py-3 space-y-1 border-b border-slate-200 overflow-auto flex-1 min-h-0">
         <div class="space-y-1">
           <!-- Paper -->
           <div
