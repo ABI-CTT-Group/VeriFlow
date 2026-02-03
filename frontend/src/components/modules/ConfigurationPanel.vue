@@ -5,8 +5,8 @@
  * 
  * Settings dropdown with general options and plugin management.
  */
-import { ref } from 'vue'
-import { Settings, X, Plus, Trash2 } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
+import { Settings, X, Plus, Trash2, Key } from 'lucide-vue-next'
 
 interface Props {
   defaultViewerPlugin?: string
@@ -50,6 +50,46 @@ function togglePlugin(id: string) {
 function removePlugin(id: string) {
   plugins.value = plugins.value.filter(p => p.id !== id)
 }
+
+// --- Gemini API Key Logic ---
+const showApiKeyModal = ref(false)
+const geminiApiKey = ref('')
+
+onMounted(() => {
+  const storedKey = localStorage.getItem('GEMINI_API_KEY')
+  if (storedKey) {
+    geminiApiKey.value = storedKey
+  }
+})
+
+async function saveApiKey() {
+  if (!geminiApiKey.value.trim()) return
+
+  // 1. Save to localStorage
+  localStorage.setItem('GEMINI_API_KEY', geminiApiKey.value)
+
+  // 2. Send to Backend
+  try {
+    const response = await fetch('http://localhost:8000/api/v1/settings/gemini-key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: geminiApiKey.value })
+    })
+
+    if (!response.ok) {
+      console.error('Failed to send API Key to backend')
+    } else {
+      console.log('API Key sent to backend successfully')
+    }
+  } catch (error) {
+    console.error('Error sending API Key to backend:', error)
+  }
+
+  showApiKeyModal.value = false
+}
+
 </script>
 
 <template>
@@ -138,6 +178,21 @@ function removePlugin(id: string) {
                 </label>
               </div>
             </div>
+
+            <!-- Gemini API Key Configuration -->
+            <div class="pt-3 border-t border-slate-200">
+              <label class="text-sm font-medium text-slate-700 block mb-2">
+                Gemini API Configuration
+              </label>
+              <button
+                @click="showApiKeyModal = true"
+                class="flex items-center gap-2 px-3 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors w-full justify-center"
+              >
+                <Key class="w-4 h-4" />
+                Configure Gemini API Key
+              </button>
+            </div>
+
 
             <!-- Workflow Options -->
             <div class="pt-3 border-t border-slate-200">
@@ -244,5 +299,73 @@ function removePlugin(id: string) {
         </div>
       </div>
     </template>
+
+    <!-- Gemini API Key Modal -->
+    <template v-if="showApiKeyModal">
+      <!-- Backdrop -->
+      <div 
+        class="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+        @click="showApiKeyModal = false"
+      >
+        <!-- Card Panel -->
+        <div 
+          class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden relative"
+          @click.stop
+        >
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <h3 class="font-semibold text-slate-900 flex items-center gap-2">
+              <Key class="w-5 h-5 text-blue-600" />
+              Enter Gemini API Key
+            </h3>
+            <button 
+              @click="showApiKeyModal = false"
+              class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100"
+            >
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">
+                API Key
+              </label>
+              <input
+                v-model="geminiApiKey"
+                type="password"
+                placeholder="AIza..."
+                class="w-full px-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
+              />
+            </div>
+
+            <!-- Disclaimer -->
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p class="text-xs text-amber-800 leading-relaxed">
+                <strong>Security & Privacy Notice</strong>: Your Gemini API Key is stored exclusively within your browser's secure local storage and is <strong>never</strong> persisted on our backend servers. The system utilizes your key solely for the purpose of authenticating your requests with the Gemini API.
+              </p>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+            <button
+              @click="showApiKeyModal = false"
+              class="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              @click="saveApiKey"
+              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200 transition-all active:scale-95"
+            >
+              Save API Key
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
   </div>
 </template>
