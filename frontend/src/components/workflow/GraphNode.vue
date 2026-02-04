@@ -127,6 +127,7 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
           >
             <!-- Input Port Circle -->
             <div
+              :id="`port-input-${node.id}-${input.id}`"
               class="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
               @mouseup="handlePortMouseUp(input.id, 'input')"
             />
@@ -168,6 +169,7 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
           <!-- Simple Input -->
           <div v-else class="flex items-center gap-2">
             <div
+              :id="`port-input-${node.id}-${input.id}`"
               class="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
               @mouseup="handlePortMouseUp(input.id, 'input')"
             />
@@ -228,6 +230,7 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
             </div>
             <!-- Output Port Circle -->
             <div
+              :id="`port-output-${node.id}-${output.id}`"
               class="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
               @mousedown="handlePortMouseDown(output.id, 'output', $event)"
             />
@@ -239,6 +242,7 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
               {{ output.label }}
             </div>
             <div
+              :id="`port-output-${node.id}-${output.id}`"
               class="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
               @mousedown="handlePortMouseDown(output.id, 'output', $event)"
             />

@@ -55,4 +55,30 @@ Standard browser scrollbars were visible, detracting from the desired "premium/c
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+## 4. Workflow Connection Alignment, Deletion, and Routing
+
+### Issue
+1.  **Alignment**: Connection lines were anchoring to arbitrary offsets rather than the visualization ports on the nodes, causing them to float disconnectedly.
+2.  **Deletion**: Users could not delete connections because connection lines were not capturing pointer events.
+3.  **Routing/Crossing**: Connection lines would cross or loop unsightly when nodes were placed close together horizontally.
+
+### Solution
+**Files**: 
+- `frontend/src/components/workflow/GraphNode.vue`
+- `frontend/src/components/workflow/ConnectionLine.vue`
+- `frontend/src/components/workflow/WorkflowAssemblerModule.vue`
+
+**Changes**:
+1.  **Alignment**: Implemented DOM-based positioning. Added unique IDs to node ports and updated the parent component to calculate start/end coordinates based on the actual DOM element positions.
+2.  **Deletion**: Added `pointer-events-auto` to the `ConnectionLine` SVG group to ensure click events are captured.
+3.  **Routing**: Implemented adaptive Bezier control point offsets based on the horizontal distance between nodes.
+
+```typescript
+// frontend/src/components/workflow/ConnectionLine.vue
+const distX = props.endX - props.startX
+// Adaptive offset prevents huge loops when nodes are close
+const controlPointOffset = Math.max(Math.min(distX / 2, 100), 20) 
+const pathD = `M ${props.startX} ${props.startY} C ${props.startX + controlPointOffset} ${props.startY}, ...`
+```
 ```

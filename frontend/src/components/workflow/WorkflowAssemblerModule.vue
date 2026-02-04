@@ -170,22 +170,34 @@ function onDrop(event: DragEvent) {
 
 // Helper to get connection line coordinates from Edge
 function getConnectionCoords(edge: Edge) {
+  if (!canvasRef.value) return null
+  
   const sourceNode = nodes.value.find(n => n.id === edge.source)
   const targetNode = nodes.value.find(n => n.id === edge.target)
   if (!sourceNode || !targetNode) return null
   
-  // Adapt to Vue Flow structure (node.data)
-  const sourceNodeData = sourceNode.data
-  const targetNodeData = targetNode.data
+  // Try to find DOM elements for ports
+  const sourcePortId = `port-output-${edge.source}-${edge.sourceHandle}`
+  const targetPortId = `port-input-${edge.target}-${edge.targetHandle}`
   
-  const sourcePort = (sourceNodeData as any).outputs?.find((p: any) => p.id === edge.sourceHandle)
-  const targetPort = (targetNodeData as any).inputs?.find((p: any) => p.id === edge.targetHandle)
-  if (!sourcePort || !targetPort) return null
-
-  const sourcePortIndex = (sourceNodeData as any).outputs?.indexOf(sourcePort) || 0
-  const targetPortIndex = (targetNodeData as any).inputs?.indexOf(targetPort) || 0
-
-  return { sourceNode, targetNode, sourcePortIndex, targetPortIndex }
+  const sourceEl = canvasRef.value.querySelector(`#${sourcePortId}`)
+  const targetEl = canvasRef.value.querySelector(`#${targetPortId}`)
+  
+  if (sourceEl && targetEl) {
+    const canvasRect = canvasRef.value.getBoundingClientRect()
+    const sourceRect = sourceEl.getBoundingClientRect()
+    const targetRect = targetEl.getBoundingClientRect()
+    
+    return {
+      startX: sourceRect.left - canvasRect.left + sourceRect.width / 2,
+      startY: sourceRect.top - canvasRect.top + sourceRect.height / 2,
+      endX: targetRect.left - canvasRect.left + targetRect.width / 2,
+      endY: targetRect.top - canvasRect.top + targetRect.height / 2
+    }
+  }
+  
+  // Fallback if DOM not ready (should generally not happen for rendered connections)
+  return null
 }
 </script>
 
@@ -319,10 +331,10 @@ function getConnectionCoords(edge: Edge) {
               <ConnectionLine
                 v-if="getConnectionCoords(edge)"
                 :id="edge.id"
-                :source-node="getConnectionCoords(edge)!.sourceNode"
-                :target-node="getConnectionCoords(edge)!.targetNode"
-                :source-port-index="getConnectionCoords(edge)!.sourcePortIndex"
-                :target-port-index="getConnectionCoords(edge)!.targetPortIndex"
+                :start-x="getConnectionCoords(edge)!.startX"
+                :start-y="getConnectionCoords(edge)!.startY"
+                :end-x="getConnectionCoords(edge)!.endX"
+                :end-y="getConnectionCoords(edge)!.endY"
                 @delete="handleDeleteConnection"
               />
             </template>
@@ -332,17 +344,26 @@ function getConnectionCoords(edge: Edge) {
               v-if="dragConnection"
               :d="(() => {
                 const sourceNode = nodes.find(n => n.id === dragConnection!.sourceNodeId);
-                const sourcePort = (sourceNode?.data as any)?.outputs?.find((p: any) => p.id === dragConnection!.sourcePortId);
-                if (!sourceNode || !sourcePort) return '';
+                if (!sourceNode) return '';
+
+                let startX = 0;
+                let startY = 0;
+
+                // Try to find the specific port element
+                const portEl = canvasRef?.querySelector(`#port-output-${dragConnection!.sourceNodeId}-${dragConnection!.sourcePortId}`);
                 
-                const sourcePortIndex = (sourceNode.data as any).outputs?.indexOf(sourcePort) || 0;
-                // Calculations matching GraphNode size and port layout
-                // Node width: 280, Header ~50, Port height ~40 (approx based on layout)
-                // Source port is absolute positioned right side (-right-6)
-                // But GraphNode inputs/outputs are in Body.
-                // React code uses: startX = sourceNode.x + 280; startY = sourceNode.y + 70 + index * 28;
-                const startX = sourceNode.position.x + 280;
-                const startY = sourceNode.position.y + 70 + sourcePortIndex * 28;
+                if (portEl && canvasRef) {
+                  const portRect = portEl.getBoundingClientRect();
+                  const canvasRect = canvasRef.getBoundingClientRect();
+                  startX = portRect.left - canvasRect.left + portRect.width / 2;
+                  startY = portRect.top - canvasRect.top + portRect.height / 2;
+                } else {
+                   // Fallback calculation if DOM element not ready yet
+                  const sourcePort = (sourceNode?.data as any)?.outputs?.find((p: any) => p.id === dragConnection!.sourcePortId);
+                  const sourcePortIndex = (sourceNode.data as any).outputs?.indexOf(sourcePort) || 0;
+                  startX = sourceNode.position.x + 280;
+                  startY = sourceNode.position.y + 70 + sourcePortIndex * 28;
+                }
                 
                 return `M ${startX} ${startY} C ${startX + 100} ${startY}, ${dragConnection.x - 100} ${dragConnection.y}, ${dragConnection.x} ${dragConnection.y}`;
               })()"

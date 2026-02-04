@@ -8,10 +8,10 @@
 
 interface Props {
   id: string
-  sourceNode: any
-  targetNode: any
-  sourcePortIndex: number
-  targetPortIndex: number
+  startX: number
+  startY: number
+  endX: number
+  endY: number
 }
 
 const props = defineProps<Props>()
@@ -19,17 +19,16 @@ const emit = defineEmits<{
   delete: [connectionId: string]
 }>()
 
-// Calculate connection path
-const startX = (props.sourceNode.position?.x ?? props.sourceNode.x) + 280    // Node width
-const startY = (props.sourceNode.position?.y ?? props.sourceNode.y) + 70 + props.sourcePortIndex * 28
-const endX = (props.targetNode.position?.x ?? props.targetNode.x)
-const endY = (props.targetNode.position?.y ?? props.targetNode.y) + 70 + props.targetPortIndex * 28
+// Calculate connection path directly from props
+// Use adaptive control points to avoid crossing when nodes are close
+const distX = props.endX - props.startX
+const controlPointOffset = Math.max(Math.min(distX / 2, 100), 20) 
 
-const pathD = `M ${startX} ${startY} C ${startX + 100} ${startY}, ${endX - 100} ${endY}, ${endX} ${endY}`
+const pathD = `M ${props.startX} ${props.startY} C ${props.startX + controlPointOffset} ${props.startY}, ${props.endX - controlPointOffset} ${props.endY}, ${props.endX} ${props.endY}`
 </script>
 
 <template>
-  <g class="group cursor-pointer" @click="emit('delete', id)">
+  <g class="group cursor-pointer pointer-events-auto" @click="emit('delete', id)">
     <!-- Invisible wider path for easier click detection -->
     <path
       :d="pathD"
