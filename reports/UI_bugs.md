@@ -109,3 +109,46 @@ After refactoring the workflow panel to use the `Vue Flow` library, nodes appear
     border: none !important;
 }
 ```
+
+## 6. Upload Publication Panel Not Closing Automatically
+
+### Issue
+The "Upload Publication" panel remained open even after a file was successfully uploaded or a demo was loaded, requiring the user to manually close it to proceed to the "Review Study Design" step.
+
+### Solution
+**File:** `frontend/src/components/modules/UploadModule.vue`
+**Change:** Added a `watch` effect on the `hasUploadedFiles` prop. When this prop becomes true (indicating files are present), the local component state `isExpanded` is automatically set to `false`.
+
+```typescript
+// frontend/src/components/modules/UploadModule.vue
+watch(() => props.hasUploadedFiles, (hasFiles) => {
+  if (hasFiles) {
+    isExpanded.value = false
+  }
+})
+```
+
+## 7. Assay Properties Panel Not Resizable
+
+### Issue
+The "Review Study Design" panel had a fixed layout (50/50 split) between the Tree View (ISA Hierarchy) and the Property Editor. Users could not adjust the height of the tree view to see more items, which was restrictive for large study designs.
+
+### Solution
+**File:** `frontend/src/components/modules/StudyDesignModule.vue`
+**Change:** Wrapped the Tree View section in a `<ResizablePanel>` component with vertical orientation. This allows users to drag the horizontal divider between the tree view and the property editor to adjust their relative heights.
+
+```vue
+<!-- frontend/src/components/modules/StudyDesignModule.vue -->
+<template>
+  <ResizablePanel
+    orientation="vertical"
+    :default-height="300"
+    :min-height="150"
+    :max-height="600"
+  >
+    <div class="px-3 py-3 space-y-1 overflow-auto h-full">
+      <!-- Tree View Content -->
+    </div>
+  </ResizablePanel>
+</template>
+```

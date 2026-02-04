@@ -11,6 +11,7 @@ import {
   ChevronRight, ChevronDown, ChevronLeft, 
   ExternalLink, X, Plus 
 } from 'lucide-vue-next'
+import ResizablePanel from '../layout/ResizablePanel.vue'
 
 interface Props {
   selectedAssay: string | null
@@ -173,7 +174,13 @@ const hoverClass = 'hover:bg-slate-50'
 
     <!-- Tree View -->
     <template v-if="hasUploadedFiles">
-      <div class="px-3 py-3 space-y-1 border-b border-slate-200 overflow-auto flex-1 min-h-0">
+      <ResizablePanel
+        orientation="vertical"
+        :default-height="300"
+        :min-height="150"
+        :max-height="600"
+      >
+        <div class="px-3 py-3 space-y-1 overflow-auto h-full">
         <div class="space-y-1">
           <!-- Paper -->
           <div
@@ -253,10 +260,11 @@ const hoverClass = 'hover:bg-slate-50'
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </ResizablePanel>
 
       <!-- Property Editor -->
-      <div class="flex-1 overflow-auto border-t border-slate-200">
+      <div class="flex-1 overflow-auto border-slate-200">
         <!-- No selection -->
         <div v-if="!selectedItem" class="p-4 text-center text-slate-400">
           <p class="text-sm">Select an item to edit properties</p>
