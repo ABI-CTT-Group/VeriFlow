@@ -7,7 +7,7 @@
  * Adapted for Vue Flow Custom Edge.
  */
 import { computed } from 'vue'
-import { type EdgeProps, BaseEdge, getBezierPath } from '@vue-flow/core'
+import { type EdgeProps } from '@vue-flow/core'
 
 const props = defineProps<EdgeProps>()
 

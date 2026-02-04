@@ -9,7 +9,7 @@
 import { ref, watch, markRaw } from 'vue'
 import { Play, Square, Download, ChevronLeft } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { VueFlow, useVueFlow, type Node, type Edge, type Connection } from '@vue-flow/core'
+import { VueFlow, type Edge, type Connection } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
