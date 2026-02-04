@@ -82,3 +82,30 @@ const controlPointOffset = Math.max(Math.min(distX / 2, 100), 20)
 const pathD = `M ${props.startX} ${props.startY} C ${props.startX + controlPointOffset} ${props.startY}, ...`
 ```
 ```
+
+## 5. Black Box Visual Artifact on Workflow Nodes
+
+### Issue
+After refactoring the workflow panel to use the `Vue Flow` library, nodes appeared with a black/transparent background box behind or around them, disrupting the visual design. This was caused by default styles from the `Vue Flow` library conflicting with the custom node implementation.
+
+### Solution
+**File:** `frontend/src/style.css`
+**Change:** added global CSS overrides to force `transparent` backgrounds and remove borders/shadows from Vue Flow's internal node wrappers, ensuring only the custom `GraphNode` component's style is visible.
+
+```css
+/* frontend/src/style.css */
+.vue-flow__node {
+  background: transparent !important;
+  border: none !important;
+  width: auto !important;
+  box-shadow: none !important;
+}
+
+.vue-flow__node-default,
+.vue-flow__node-input,
+.vue-flow__node-output,
+.vue-flow__node-group {
+    background: transparent !important;
+    border: none !important;
+}
+```
