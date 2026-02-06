@@ -110,6 +110,7 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -141,6 +142,7 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       airflow-apiserver:
         condition: service_healthy
