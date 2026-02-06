@@ -88,7 +88,7 @@ services:
     build:
       context: ./airflow
       dockerfile: Dockerfile
-    image: veriflow-airflow:3.0.6
+    image: ghcr.io/abi-ctt-group/veriflow/airflow:${APP_VERSION:-latest}
     container_name: veriflow-airflow-apiserver
     restart: unless-stopped
     ports:
@@ -128,7 +128,7 @@ services:
     build:
       context: ./airflow
       dockerfile: Dockerfile
-    image: veriflow-airflow:3.0.6
+    image: ghcr.io/abi-ctt-group/veriflow/airflow:${APP_VERSION:-latest}
     container_name: veriflow-airflow-scheduler
     restart: unless-stopped
     env_file:
