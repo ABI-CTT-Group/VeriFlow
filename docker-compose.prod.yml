@@ -11,7 +11,7 @@ services:
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - AIRFLOW_API_URL=http://airflow-webserver:8080
+      - AIRFLOW_API_URL=http://airflow-apiserver:8080
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       postgres:
@@ -89,7 +89,7 @@ services:
       context: ./airflow
       dockerfile: Dockerfile
     image: veriflow-airflow:3.0.6
-    container_name: veriflow-airflow-webserver
+    container_name: veriflow-airflow-apiserver
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -142,7 +142,7 @@ services:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
     depends_on:
-      airflow-webserver:
+      airflow-apiserver:
         condition: service_healthy
     command: airflow scheduler
     networks:
