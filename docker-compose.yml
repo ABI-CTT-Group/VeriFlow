@@ -93,8 +93,11 @@ services:
       - veriflow-network
 
   # Airflow Webserver
-  airflow-webserver:
-    image: apache/airflow:3.0.6
+  airflow-apiserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    image: veriflow-airflow:3.0.6
     container_name: veriflow-airflow-webserver
     ports:
       - "8080:8080"
@@ -104,6 +107,7 @@ services:
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.session
       - _AIRFLOW_DB_MIGRATE=true
       - _AIRFLOW_WWW_USER_CREATE=true
@@ -127,7 +131,10 @@ services:
 
   # Airflow Scheduler
   airflow-scheduler:
-    image: apache/airflow:3.0.6
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    image: veriflow-airflow:3.0.6
     container_name: veriflow-airflow-scheduler
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
