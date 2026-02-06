@@ -6,7 +6,7 @@
  * Drag-and-drop file upload with expand/collapse functionality.
  * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker } from 'lucide-vue-next'
 
 interface Props {
@@ -30,6 +30,13 @@ const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 // Start collapsed if files have already been uploaded
 const isExpanded = ref(!props.hasUploadedFiles)
+
+// Watch for external updates to files (e.g. loading demo)
+watch(() => props.hasUploadedFiles, (hasFiles) => {
+  if (hasFiles) {
+    isExpanded.value = false
+  }
+})
 
 const fileCountText = computed(() => {
   if (files.value.length > 0) {

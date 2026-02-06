@@ -19,6 +19,7 @@ from app.models.workflow import (
     AssembleRequest,
     AssembleResponse,
     SaveWorkflowRequest,
+    NodeStatus,
 )
 
 # Stage 4: Import Engineer and Reviewer agents
@@ -139,90 +140,123 @@ async def assemble_workflow(request: AssembleRequest):
                 # Fall through to mock data
                 pass
     
-    # Fallback: Generate mock workflow graph based on MAMA-MIA example
+    # Fallback: Generate mock workflow graph based on MAMA-MIA example (matching frontend mock)
     nodes = [
         VueFlowNode(
             id="input-1",
             type=NodeType.MEASUREMENT,
-            position=Position(x=50, y=100),
+            position=Position(x=50, y=50),
             data=NodeData(
-                label="DCE-MRI Scans",
-                status="pending",
-                confidence=97,
-                source_id="src_4",
-                inputs=[],
+                label="Input Measurements",
+                name="Input Measurements",
+                role="input",
+                status=NodeStatus.PENDING,
+                totalSubjects=384,
                 outputs=[
-                    PortDefinition(id="out-dicom", label="DICOM", type="application/dicom"),
+                    PortDefinition(
+                        id="out-0", 
+                        label="MRI Scan", 
+                        type="application/dicom", # Type is required by model but not primarily used by UI mock which had datasetId
+                        datasetId="dce-mri-scans",
+                        sampleId="Subject_001/T1w.nii.gz"
+                    ),
                 ],
             ),
         ),
         VueFlowNode(
             id="tool-1",
             type=NodeType.TOOL,
-            position=Position(x=300, y=100),
+            position=Position(x=45, y=50),
             data=NodeData(
                 label="DICOM to NIfTI",
-                status="pending",
+                name="DICOM to NIfTI",
+                status=NodeStatus.PENDING,
+                confidence=0.95,
                 inputs=[
-                    PortDefinition(id="in-dicom", label="Input", type="application/dicom"),
+                    PortDefinition(id="in-0", label="Raw DICOM"),
                 ],
                 outputs=[
-                    PortDefinition(id="out-nifti", label="Output", type="application/x-nifti"),
+                    PortDefinition(id="out-0", label="NIfTI Volume"),
                 ],
                 docker_image="dcm2niix:latest",
             ),
         ),
         VueFlowNode(
-            id="model-1",
-            type=NodeType.MODEL,
-            position=Position(x=550, y=100),
-            data=NodeData(
-                label="U-Net Weights",
-                status="pending",
-                confidence=85,
-                inputs=[],
-                outputs=[
-                    PortDefinition(id="out-weights", label="Weights", type="application/x-pytorch"),
-                ],
-            ),
-        ),
-        VueFlowNode(
             id="tool-2",
             type=NodeType.TOOL,
-            position=Position(x=550, y=250),
+            position=Position(x=80, y=50),
             data=NodeData(
-                label="U-Net Segmentation",
-                status="pending",
+                label="nnU-Net Segmentation",
+                name="nnU-Net Segmentation",
+                status=NodeStatus.PENDING,
+                confidence=0.88,
                 inputs=[
-                    PortDefinition(id="in-image", label="Image", type="application/x-nifti"),
-                    PortDefinition(id="in-weights", label="Weights", type="application/x-pytorch"),
+                    PortDefinition(id="in-0", label="NIfTI Volume"),
+                    PortDefinition(id="in-1", label="Model Weights"),
                 ],
                 outputs=[
-                    PortDefinition(id="out-mask", label="Mask", type="application/x-nifti"),
+                    PortDefinition(id="out-0", label="Segmentation Mask"),
                 ],
                 docker_image="breast-segmentation:latest",
             ),
         ),
         VueFlowNode(
+            id="model-1",
+            type=NodeType.MODEL,
+            position=Position(x=45, y=320),
+            data=NodeData(
+                label="nnU-Net Pretrained Weights",
+                name="nnU-Net Pretrained Weights",
+                status=NodeStatus.PENDING,
+                outputs=[
+                    PortDefinition(id="out-0", label="Weights"),
+                ],
+            ),
+        ),
+        VueFlowNode(
+            id="tool-3",
+            type=NodeType.TOOL,
+            position=Position(x=115, y=50),
+            data=NodeData(
+                label="Post-processing",
+                name="Post-processing",
+                status=NodeStatus.PENDING,
+                confidence=0.92,
+                inputs=[
+                    PortDefinition(id="in-0", label="Segmentation Mask"),
+                ],
+                outputs=[
+                    PortDefinition(id="out-0", label="Refined Mask"),
+                ],
+            ),
+        ),
+        VueFlowNode(
             id="output-1",
             type=NodeType.MEASUREMENT,
-            position=Position(x=800, y=250),
+            position=Position(x=150, y=50),
             data=NodeData(
-                label="Segmentation Results",
-                status="pending",
+                label="Output Measurements",
+                name="Output Measurements",
+                role="output",
+                status=NodeStatus.PENDING,
                 inputs=[
-                    PortDefinition(id="in-mask", label="Mask", type="application/x-nifti"),
+                    PortDefinition(
+                        id="in-0", 
+                        label="Result",
+                        datasetId="tumor-segmentation", 
+                        sampleId="Subject_001/tumor_mask.nii.gz"
+                    ),
                 ],
-                outputs=[],
             ),
         ),
     ]
     
     edges = [
-        VueFlowEdge(id="e1", source="input-1", target="tool-1", sourceHandle="out-dicom", targetHandle="in-dicom"),
-        VueFlowEdge(id="e2", source="tool-1", target="tool-2", sourceHandle="out-nifti", targetHandle="in-image"),
-        VueFlowEdge(id="e3", source="model-1", target="tool-2", sourceHandle="out-weights", targetHandle="in-weights"),
-        VueFlowEdge(id="e4", source="tool-2", target="output-1", sourceHandle="out-mask", targetHandle="in-mask"),
+        VueFlowEdge(id="conn-1", source="input-1", target="tool-1", sourceHandle="out-0", targetHandle="in-0"),
+        VueFlowEdge(id="conn-2", source="tool-1", target="tool-2", sourceHandle="out-0", targetHandle="in-0"),
+        VueFlowEdge(id="conn-3", source="model-1", target="tool-2", sourceHandle="out-0", targetHandle="in-1"),
+        VueFlowEdge(id="conn-4", source="tool-2", target="tool-3", sourceHandle="out-0", targetHandle="in-0"),
+        VueFlowEdge(id="conn-5", source="tool-3", target="output-1", sourceHandle="out-0", targetHandle="in-0"),
     ]
     
     graph = WorkflowGraph(nodes=nodes, edges=edges)

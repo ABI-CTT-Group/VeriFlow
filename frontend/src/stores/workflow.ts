@@ -9,6 +9,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Node, Edge } from '@vue-flow/core'
 import { endpoints } from '../services/api'
+import { getLayoutedElements } from '../utils/layout'
 
 // Types per SPEC.md Section 3
 export interface ConfidenceScore {
@@ -85,7 +86,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
     // UI state
     const isLeftPanelCollapsed = ref(false)
-    const isRightPanelCollapsed = ref(false)
+    const isRightPanelCollapsed = ref(true)
     const isConsoleCollapsed = ref(true)
     const consoleHeight = ref(200)
     const viewerPdfUrl = ref<string | null>(null)
@@ -240,94 +241,54 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
     async function assembleWorkflow(assayId: string) {
         console.log('Assembling workflow for assay:', assayId)
-        // Mock assembly
-        workflowId.value = `wf_${Date.now()}`
-        isAssembled.value = true
 
-        // Populate with mock nodes (Vue Flow structure)
-        nodes.value = [
-            {
-                id: 'input-1',
-                type: 'measurement',
-                position: { x: 50, y: 50 },
-                data: {
-                    role: 'input',
-                    name: 'Input Measurements',
-                    outputs: [
-                        { id: 'out-0', label: 'MRI Scan', datasetId: 'dce-mri-scans', sampleId: 'Subject_001/T1w.nii.gz' }
-                    ],
-                    totalSubjects: 384
-                }
-            },
-            {
-                id: 'tool-1',
-                type: 'tool',
-                position: { x: 450, y: 50 },
-                data: {
-                    name: 'DICOM to NIfTI',
-                    status: 'completed',
-                    confidence: 0.95,
-                    inputs: [{ id: 'in-0', label: 'Raw DICOM' }],
-                    outputs: [{ id: 'out-0', label: 'NIfTI Volume' }]
-                }
-            },
-            {
-                id: 'tool-2',
-                type: 'tool',
-                position: { x: 800, y: 50 },
-                data: {
-                    name: 'nnU-Net Segmentation',
-                    status: 'running',
-                    confidence: 0.88,
-                    inputs: [
-                        { id: 'in-0', label: 'NIfTI Volume' },
-                        { id: 'in-1', label: 'Model Weights' }
-                    ],
-                    outputs: [{ id: 'out-0', label: 'Segmentation Mask' }]
-                }
-            },
-            {
-                id: 'model-1',
-                type: 'model',
-                position: { x: 450, y: 320 },
-                data: {
-                    name: 'nnU-Net Pretrained Weights',
-                    outputs: [{ id: 'out-0', label: 'Weights' }]
-                }
-            },
-            {
-                id: 'tool-3',
-                type: 'tool',
-                position: { x: 1150, y: 50 },
-                data: {
-                    name: 'Post-processing',
-                    status: 'pending',
-                    confidence: 0.92,
-                    inputs: [{ id: 'in-0', label: 'Segmentation Mask' }],
-                    outputs: [{ id: 'out-0', label: 'Refined Mask' }]
-                }
-            },
-            {
-                id: 'output-1',
-                type: 'measurement',
-                position: { x: 1500, y: 50 },
-                data: {
-                    name: 'Output Measurements',
-                    role: 'output',
-                    inputs: [
-                        { id: 'in-0', label: 'Result', datasetId: 'tumor-segmentation', sampleId: 'Subject_001/tumor_mask.nii.gz' }
-                    ]
-                }
+        isLoading.value = true
+        loadingMessage.value = 'Assembling workflow with AI Agents...'
+        error.value = null
+
+        try {
+            const response = await endpoints.assembleWorkflow(assayId)
+            const data = response.data
+
+            // Update store with graph data from backend
+            workflowId.value = data.workflow_id
+
+            // Map backend VueFlow nodes/edges to store
+            if (data.graph) {
+                const rawNodes = data.graph.nodes || []
+                const rawEdges = data.graph.edges || []
+
+                // Apply Auto-Layout
+                const layouted = getLayoutedElements(rawNodes, rawEdges, 'LR')
+
+                nodes.value = layouted.nodes
+                edges.value = layouted.edges
             }
-        ] as Node[]
 
-        edges.value = [
-            { id: 'conn-1', source: 'input-1', sourceHandle: 'out-0', target: 'tool-1', targetHandle: 'in-0' },
-            { id: 'conn-2', source: 'tool-1', sourceHandle: 'out-0', target: 'tool-2', targetHandle: 'in-0' },
-            { id: 'conn-3', source: 'model-1', sourceHandle: 'out-0', target: 'tool-2', targetHandle: 'in-1' },
-            { id: 'conn-4', source: 'tool-2', sourceHandle: 'out-0', target: 'tool-3', targetHandle: 'in-0' },
-            { id: 'conn-5', source: 'tool-3', sourceHandle: 'out-0', target: 'output-1', targetHandle: 'in-0' }
-        ] as Edge[]
+            isAssembled.value = true
+
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                message: `Workflow assembled successfully: ${data.workflow_id}`
+            })
+
+        } catch (err: any) {
+            console.error('Workflow assembly failed:', err)
+            error.value = err.response?.data?.detail || err.message || 'Failed to assemble workflow'
+
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: `Workflow assembly failed: ${error.value}`
+            })
+
+            // Re-throw if needed, or handle gracefully
+            // For now, we let the UI handle the error state via the error ref
+        } finally {
+            isLoading.value = false
+            loadingMessage.value = null
+        }
     }
 
     function setWorkflow(wfId: string, graphNodes: Node[], graphEdges: Edge[]) {

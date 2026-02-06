@@ -31,14 +31,17 @@ class PortDefinition(BaseModel):
     """Input/Output port definition for nodes."""
     id: str
     label: str
-    type: str  # MIME type or CWL type
+    type: Optional[str] = None  # MIME type or CWL type
+    datasetId: Optional[str] = None
+    sampleId: Optional[str] = None
 
 
 class NodeData(BaseModel):
     """Data payload for a VueFlow node."""
-    label: str
+    name: Optional[str] = None
+    label: Optional[str] = None
     status: Optional[NodeStatus] = None
-    confidence: Optional[int] = Field(None, ge=0, le=100)
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0) # Changed to float for 0.95 etc
     source_id: Optional[str] = None
     inputs: List[PortDefinition] = Field(default_factory=list)
     outputs: List[PortDefinition] = Field(default_factory=list)
@@ -46,6 +49,8 @@ class NodeData(BaseModel):
     description: Optional[str] = None
     docker_image: Optional[str] = None
     cwl_path: Optional[str] = None
+    role: Optional[str] = None
+    totalSubjects: Optional[int] = None
 
 
 class VueFlowNode(BaseModel):
