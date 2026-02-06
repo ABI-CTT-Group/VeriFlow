@@ -114,7 +114,7 @@ services:
       - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USERNAME}
       - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD}
     volumes:
-      - ./dags:/opt/airflow/dags
+      - ./airflow/dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -143,7 +143,7 @@ services:
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
     volumes:
-      - ./dags:/opt/airflow/dags
+      - ./airflow/dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
