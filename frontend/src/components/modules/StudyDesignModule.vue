@@ -176,7 +176,7 @@ const hoverClass = 'hover:bg-slate-50'
     <template v-if="hasUploadedFiles">
       <ResizablePanel
         orientation="vertical"
-        :default-height="300"
+        :default-height="200"
         :min-height="150"
         :max-height="600"
         class="flex flex-col"
