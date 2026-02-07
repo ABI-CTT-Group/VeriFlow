@@ -59,7 +59,7 @@
                                 "type": "File"
                             },
                             {
-                                "name": "pre-trained network",
+                                "name": "pre_trained_network",
                                 "type": "Directory"
                             }
                         ],
