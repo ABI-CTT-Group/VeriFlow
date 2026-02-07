@@ -1,0 +1,155 @@
+  1. Add thinking_level parameter to agent calls
+
+  This is the marquee Gemini 3 feature. You're currently not using it at all. Adding thinking_level to your three agents shows judges you understand and leverage Gemini 3's key differentiator.
+
+  Why it matters: The thinking_level parameter is the flagship Gemini 3 capability. Not using it is like building a GPT-4 app that only uses GPT-3.5 features. It directly addresses "Does the project leverage Google Gemini 3?"
+
+  What to change:
+  - Scholar Agent: thinking_level="high" (complex scientific extraction benefits from deep reasoning)
+  - Engineer Agent: thinking_level="high" (CWL generation is a complex structured task)
+  - Reviewer Agent: thinking_level="medium" for validation, thinking_level="low" for error translation (simpler tasks)
+  - Expose as a configurable parameter in GeminiClient.generate_content() and generate_json()
+
+  ---
+  2. Use Gemini 3's native structured output (response_schema)
+
+  Currently your generate_json() method appends "Respond ONLY with valid JSON" to the prompt and then manually strips markdown fences. Gemini 3 supports native JSON mode with response_mime_type="application/json" and response_schema for guaranteed structured output.
+
+  Why it matters: Your current approach is fragile (regex-based cleanup of markdown fences). Native structured output is deterministic, never fails to parse, and is a key Gemini 3 feature. This simultaneously improves code quality AND demonstrates proper use of the API.
+
+  What to change:
+  - Define Pydantic-compatible schemas for each agent's output (Scholar ISA output, Engineer CWL output, Reviewer validation output)
+  - Pass response_mime_type="application/json" and response_schema in generation config
+  - Remove the hacky markdown-fence stripping code from generate_json()
+  - Remove the "Respond ONLY with valid JSON" prompt appendage
+
+  ---
+  3. Fix the temperature setting (currently 0.3, should be 1.0)
+
+  The https://ai.google.dev/gemini-api/docs/gemini-3 explicitly warns: "Changing the temperature (setting it below 1.0) may lead to unexpected behavior, such as looping or degraded performance." All three of your agents use temperature=0.3.
+
+  Why it matters: This shows judges you read the Gemini 3 documentation. Using non-recommended settings suggests you ported code from an older model without adapting it. With structured output (response_schema) and thinking_level control, you don't need low temperature as a
+  reliability crutch.
+
+  What to change:
+  - Remove all temperature=0.3 overrides, or explicitly set temperature=1.0
+  - Rely on response_schema + thinking_level for output quality instead
+
+  ---
+  4. Implement Thought Signatures for multi-turn conversations
+
+  Your generate_content_with_history() method supports multi-turn conversations, but doesn't handle Gemini 3's thought signatures. The docs state thought signatures are required for function calling and are critical for maintaining reasoning chains.
+
+  Why it matters: This is a Gemini 3-specific feature that directly demonstrates you understand the new model's architecture. It's especially relevant for your Reviewer agent which could have multi-turn fix-suggest-validate loops.
+
+  What to change:
+  - Store and pass back thought_signatures from Gemini responses in conversation history
+  - Update generate_content_with_history() to include signatures in subsequent requests
+  - Use this for the Reviewer agent's iterative validation flow (validate -> suggest fix -> re-validate)
+
+  ---
+  5. Add Grounding with Google Search to the Scholar Agent
+
+  Gemini 3 supports https://ai.google.dev/gemini-api/docs/gemini-3 combined with structured outputs. Your Scholar Agent identifies tools, models, and measurements from papers but can't verify them against real-world sources.
+
+  Why it matters: This is a powerful Gemini 3 feature that makes your app genuinely more capable. Grounding lets the Scholar verify tool URLs, find documentation links, check model architectures against HuggingFace/Papers with Code. It turns confident-sounding hallucinations into
+   verifiable facts -- perfectly aligned with VeriFlow's mission of research reliability.
+
+  What to change:
+  - Enable google_search tool in Scholar agent's tool configuration
+  - Use grounding to verify/enrich identified_tools (validate GitHub URLs, find docs)
+  - Use grounding to validate identified_models (check architecture claims, find model cards)
+  - Display grounding sources/citations in the frontend confidence panel
+
+  ---
+  6. Add API endpoint tests and integration tests
+
+  You have 364 lines of tests for ~7,500 lines of backend code (~4.8% coverage). You have zero API endpoint tests, zero database tests, and zero frontend tests. The existing tests only cover the agents with mocks.
+
+  Why it matters: The criteria asks "Is the code of good quality?" Test coverage is one of the most visible code quality signals. Judges who browse your repo will see the thin tests/ directory.
+
+  What to change:
+  - Add FastAPI TestClient tests for all API endpoints (/publications/upload, /study-design/{id}, /workflows/assemble, /executions)
+  - Add at least a basic integration test that exercises the full upload -> extract -> assemble flow with mocked Gemini
+  - Add a frontend Vitest test for the workflow store
+  - Aim for at least 30-40% coverage on critical paths
+
+  ---
+  7. Remove mock/fallback code paths and make the app functional end-to-end
+
+  Several parts of the app fall back to mock data:
+  - publications.py:294-357 returns hardcoded mock ISA hierarchy when no cache entry exists
+  - executions.py:293-356 runs a _run_mock_execution() with asyncio.sleep simulations
+  - executions.py:438-453 returns mock result files
+  - engineer.py:235-301 has a _generate_fallback_workflow() that creates a fake graph
+  - The property update endpoint (PUT /study-design/nodes/{node_id}/properties) is a no-op
+
+  Why it matters: The criteria explicitly asks "Is the code functional?" Mock execution with asyncio.sleep simulations is not functional code. If judges trigger the demo flow and see canned responses, that's a major scoring hit.
+
+  What to change:
+  - Remove mock data fallbacks from the publications endpoint (return proper errors instead)
+  - Make the execution path work with at least one real Docker container (even if simple)
+  - Or alternatively: make the CWL -> Airflow DAG conversion work end-to-end for the MAMA-MIA example
+  - At minimum, ensure the entire flow from "Load MAMA-MIA" to "View Results" works with real Gemini calls (not mocks)
+
+  ---
+  8. Use Gemini 3 Flash's Agentic Vision for PDF analysis
+
+  Currently your Scholar agent extracts text from PDFs using PyMuPDF (fitz) and sends plain text to Gemini. This completely ignores figures, diagrams, tables, and charts. Gemini 3 Flash's
+  https://blog.google/innovation-and-ai/technology/developers-tools/agentic-vision-gemini-3-flash/ can analyze images with a think-act-observe loop.
+
+  Why it matters: This is the most impressive Gemini 3 feature and would be a major differentiator. Scientific papers communicate critical methodology through figures (architecture diagrams, pipeline flowcharts, data flow diagrams). Extracting workflow structure from figures is
+  far more impressive than text-only extraction. This directly addresses both "Does the project leverage Gemini 3?" and "Innovation/Wow Factor" (30%).
+
+  What to change:
+  - Extract page images from PDFs (PyMuPDF can render pages to images)
+  - Send images + text to Gemini 3 Flash with agentic vision enabled
+  - Have the model analyze architecture diagrams to identify pipeline steps
+  - Use the model's code execution capability to parse flowcharts/diagrams
+  - Show extracted visual analysis in the frontend (highlight which figure informed which workflow step)
+
+  ---
+  9. Implement a real agentic loop (Agent-as-tool-user pattern)
+
+  Your current agents are single-shot: one prompt in, one response out. This doesn't demonstrate the agentic capabilities that Gemini 3 was designed for. A real agentic flow would have agents that use tools, observe results, and iterate.
+
+  Why it matters: Gemini 3 was explicitly designed for agentic workflows. The hackathon page emphasizes this. Single-shot prompting is a Gemini 1.5-era pattern. Implementing tool-use with iterative refinement would show judges you're building a genuinely Gemini 3-native
+  application.
+
+  What to change:
+  - Implement function calling: define tools the agents can call (e.g., validate_cwl, search_pubmed, check_docker_image, lookup_tool_docs)
+  - Engineer Agent: iterative workflow generation -- generate CWL, call validate_cwl tool, observe errors, fix, repeat
+  - Scholar Agent: use search_pubmed tool to verify paper references and cross-check methodology claims
+  - Reviewer Agent: agentic validation loop -- validate, identify issues, attempt auto-fix, re-validate
+  - This naturally uses thought signatures (change #5) across the multi-turn tool-use conversation
+  
+  ---
+  Summary Table
+  ┌─────┬─────────────────────────────────────────────┬──────────────────────────────────────┐
+  │  #  │                   Change                    │                 Why                  │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 1   │ Add thinking_level parameter                │ Flagship Gemini 3 feature            │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 2   │ Native structured output (response_schema)  │ Better code quality + proper API use │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 3   │ Fix temperature to 1.0                      │ Follow official Gemini 3 guidance    │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 4   │ Implement thought signatures                │ Required for Gemini 3 multi-turn     │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 5   │ Grounding with Google Search                │ Verify tools/models against real web │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 6   │ Add proper tests                            │ Code quality signal                  │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 7   │ Remove mocks, make it functional            │ "Is the code functional?"            │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 8   │ Agentic Vision for PDF figures              │ Most impressive Gemini 3 feature     │
+  ├─────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 9   │ Real agentic tool-use loops                 │ What Gemini 3 was built for          │
+  └─────┴─────────────────────────────────────────────┴──────────────────────────────────────┘
+  
+  Sources:
+  - https://ai.google.dev/gemini-api/docs/gemini-3
+  - https://gemini3.devpost.com/
+  - https://blog.google/innovation-and-ai/technology/developers-tools/agentic-vision-gemini-3-flash/
+  - https://blog.google/technology/developers/gemini-3-developers/
+  
