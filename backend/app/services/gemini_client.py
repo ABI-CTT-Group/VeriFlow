@@ -21,9 +21,8 @@ class GeminiClient:
     
     # Model configuration - fallback chain per implementation plan
     PREFERRED_MODELS = [
-        "gemini-2.0-flash",  # Latest available
-        "gemini-1.5-pro",
-        "gemini-1.5-flash",
+        "gemini-3-pro-preview",        
+        "gemini-3-flash-preview"
     ]
     
     # Safety settings - permissive for scientific content
@@ -59,7 +58,7 @@ class GeminiClient:
         try:
             available_models = [m.name for m in genai.list_models()]
             for preferred in self.PREFERRED_MODELS:
-                # Model names are like "models/gemini-1.5-pro"
+                # Model names are like "models/gemini-3-pro"
                 full_name = f"models/{preferred}"
                 if full_name in available_models:
                     return preferred
