@@ -6,8 +6,8 @@
  * Drag-and-drop file upload with expand/collapse functionality.
  * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
-import { ref, computed, watch } from 'vue'
-import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { Upload, File, X, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
 import { endpoints } from '../../services/api'
 import { useWorkflowStore } from '../../stores/workflow'
 import AdditionalInfoModal from './AdditionalInfoModal.vue'
@@ -33,20 +33,11 @@ const store = useWorkflowStore()
 const files = ref<string[]>([])
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-// Start collapsed if files have already been uploaded
-const isExpanded = ref(!props.hasUploadedFiles)
 
 // Additional Info Modal Logic
 const showInfoModal = ref(false)
 const previewPdfUrl = ref('')
 const isDemoMode = ref(false)
-
-// Watch for external updates to files (e.g. loading demo)
-watch(() => props.hasUploadedFiles, (hasFiles) => {
-  if (hasFiles) {
-    isExpanded.value = false
-  }
-})
 
 const fileCountText = computed(() => {
   if (files.value.length > 0) {
@@ -71,7 +62,7 @@ function handleDrop(e: DragEvent) {
           emit('pdfUpload', pdfFile.name)
           
            // Auto-collapse and show modal after PDF upload
-          isExpanded.value = false
+
           isDemoMode.value = false
           showInfoModal.value = true
       }
@@ -80,7 +71,7 @@ function handleDrop(e: DragEvent) {
       const mockPdf = 'breast_cancer_segmentation.pdf'
       files.value.push(mockPdf)
       emit('pdfUpload', mockPdf)
-      isExpanded.value = false
+
       setTimeout(() => { showInfoModal.value = true }, 500)
   }
 }
@@ -119,7 +110,7 @@ function handleFileInput(e: Event) {
     }
     
     // Auto-collapse after file upload
-    isExpanded.value = false
+
   }
 }
 
@@ -203,27 +194,20 @@ function removeFile(index: number) {
         <ChevronLeft class="w-4 h-4" />
       </button>
       
-      <!-- Expand/collapse toggle -->
-      <button
-        @click="isExpanded = !isExpanded"
-        :class="[
-          'flex-1 flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors',
-          isExpanded ? 'border-b border-slate-200' : ''
-        ]"
-      >
+
+      <!-- Static Header -->
+      <div class="flex-1 flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
         <div class="flex items-center gap-2 flex-1">
           <div class="text-left">
             <span class="text-sm font-medium text-slate-700">1. Upload Publication</span>
             <p class="text-xs text-slate-400">{{ fileCountText }}</p>
           </div>
         </div>
-        <ChevronDown v-if="isExpanded" class="w-4 h-4 text-slate-400" />
-        <ChevronRight v-else class="w-4 h-4 text-slate-400" />
-      </button>
+      </div>
     </div>
     
     <!-- Expanded content -->
-    <div v-if="isExpanded" class="p-4 space-y-4">
+    <div class="p-4 space-y-4">
       <!-- Drop zone -->
       <div
         :class="[
