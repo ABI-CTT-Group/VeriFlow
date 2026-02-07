@@ -1,0 +1,73 @@
+{
+    "studyDesign": {
+        "paper": {
+            "id": "root",
+            "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+            "authors": "Smith, J., et al.",
+            "year": "2023",
+            "abstract": "This study presents a novel approach to automated breast cancer segmentation using deep learning techniques on DCE-MRI scans."
+        },
+        "investigation": {
+            "id": "inv-1",
+            "title": "Automated Tumor Detection Investigation",
+            "description": "Investigation of automated deep learning methods for breast tumor detection and segmentation in DCE-MRI images",
+            "submissionDate": "2023-01-15"
+        },
+        "study": {
+            "id": "study-1",
+            "title": "MRI-based Segmentation Study",
+            "description": "Comprehensive study of U-Net based segmentation on breast MRI scans",
+            "numSubjects": 384,
+            "design": "Retrospective cohort study"
+        },
+        "assays": [
+            {
+                "id": "assay-1",
+                "name": "Model Inference Assay",
+                "stepCount": 2,
+                "workflowSteps": [
+                    {
+                        "id": "step-1",
+                        "description": "Converts DICOM to NIfTI",
+                        "tool": {
+                            "id": "tool-1",
+                            "name": "create_nifti"
+                        },
+                        "input": [
+                            {
+                                "name": "dicom_images",
+                                "type": "Directory"
+                            }
+                        ],
+                        "output": [
+                            {
+                                "name": "nifti_image",
+                                "type": "File"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "step-2",
+                        "description": "Run inference",
+                        "tool": {
+                            "id": "tool-2",
+                            "name": "run_inference"
+                        },
+                        "input": [
+                            {
+                                "name": "nifti_image",
+                                "type": "File"
+                            }
+                        ],
+                        "output": [
+                            {
+                                "name": "segmentation",
+                                "type": "File"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}
