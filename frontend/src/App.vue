@@ -19,6 +19,7 @@ import LandingPageOverlay from './components/layout/LandingPageOverlay.vue'
 import UploadModule from './components/modules/UploadModule.vue'
 import StudyDesignModule from './components/modules/StudyDesignModule.vue'
 import ConsoleModule from './components/modules/ConsoleModule.vue'
+import ConsoleInput from './components/modules/ConsoleInput.vue'
 import ConfigurationPanel from './components/modules/ConfigurationPanel.vue'
 import DatasetNavigationModule from './components/modules/DatasetNavigationModule.vue'
 
@@ -302,19 +303,20 @@ watch(isDatasetNavCollapsed, (val) => {
 
     <!-- Bottom Panel - Console -->
     <div 
-      v-if="!isConsoleCollapsed"
-      class="border-t border-slate-200 flex-shrink-0 bg-white relative" 
-      :style="{ height: consoleHeight + 'px' }"
+      class="border-t border-slate-200 flex-shrink-0 bg-white relative flex flex-col" 
+      :style="{ height: isConsoleCollapsed ? 'auto' : consoleHeight + 'px' }"
     >
-      <!-- Resize handle -->
+      <!-- Resize handle (only visible when expanded) -->
       <div
+        v-if="!isConsoleCollapsed"
         @mousedown="handleConsoleMouseDown"
         @touchstart.prevent="handleConsoleMouseDown"
         class="absolute top-0 left-0 right-0 h-4 cursor-ns-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500 -top-2"
       />
-      <div class="h-full flex flex-col overflow-hidden" style="padding-top: 4px">
-        <!-- Header with collapse button -->
-        <div class="px-4 py-2 flex items-center justify-between flex-shrink-0">
+      
+      <div class="flex-1 flex flex-col overflow-hidden min-h-0" :style="{ paddingTop: isConsoleCollapsed ? '0' : '4px' }">
+        <!-- Header -->
+        <div v-if="!isConsoleCollapsed" class="px-4 py-2 flex items-center justify-between flex-shrink-0">
           <div class="flex items-center gap-2">
             <button
               @click="isConsoleCollapsed = true"
@@ -325,24 +327,24 @@ watch(isDatasetNavCollapsed, (val) => {
             <span class="text-sm font-medium text-slate-700">Console</span>
           </div>
         </div>
-        <!-- Content -->
-        <div class="flex-1 overflow-hidden">
+        <div v-else class="h-8 flex-shrink-0 bg-slate-50">
+           <button
+            @click="isConsoleCollapsed = false"
+            class="w-full h-full hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <ChevronUp class="w-4 h-4 text-slate-600" />
+            <span class="text-xs font-medium text-slate-600">Console</span>
+          </button>
+        </div>
+
+        <!-- Content (Messages) -->
+        <div v-show="!isConsoleCollapsed" class="flex-1 overflow-hidden">
           <ConsoleModule />
         </div>
       </div>
-    </div>
-    <div 
-      v-else
-      class="border-t border-slate-200 flex-shrink-0 bg-slate-50" 
-      style="height: 32px"
-    >
-      <button
-        @click="isConsoleCollapsed = false"
-        class="w-full h-full hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
-      >
-        <ChevronUp class="w-4 h-4 text-slate-600" />
-        <span class="text-xs font-medium text-slate-600">Console</span>
-      </button>
+
+      <!-- Input (Always rendered, preserving focus) -->
+      <ConsoleInput />
     </div>
     </div>
   </div>

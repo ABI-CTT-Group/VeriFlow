@@ -7,9 +7,10 @@
  * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
 import { ref, computed, watch } from 'vue'
-import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker, FileText, Plus } from 'lucide-vue-next'
+import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
 import { endpoints } from '../../services/api'
 import { useWorkflowStore } from '../../stores/workflow'
+import AdditionalInfoModal from './AdditionalInfoModal.vue'
 
 interface Props {
   hasUploadedFiles?: boolean
@@ -36,7 +37,9 @@ const isExpanded = ref(!props.hasUploadedFiles)
 
 // Additional Info Modal Logic
 const showInfoModal = ref(false)
-const additionalInfo = ref('')
+const previewPdfUrl = ref('')
+const isDemoMode = ref(false)
+const additionalInfoInput = ref('') // store input if needed, though modal handles its own state mostly
 
 // Watch for external updates to files (e.g. loading demo)
 watch(() => props.hasUploadedFiles, (hasFiles) => {
@@ -55,13 +58,31 @@ const fileCountText = computed(() => {
 function handleDrop(e: DragEvent) {
   e.preventDefault()
   setIsDragging(false)
-  // Mock file handling
-  const mockPdf = 'breast_cancer_segmentation.pdf'
-  files.value.push(mockPdf)
-  emit('pdfUpload', mockPdf)
-  // Auto-collapse and show modal after PDF upload
-  isExpanded.value = false
-  setTimeout(() => { showInfoModal.value = true }, 500)
+  
+  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files)
+      const fileNames = droppedFiles.map(f => f.name)
+      files.value.push(...fileNames)
+      
+      const pdfFile = droppedFiles.find(f => f.name.toLowerCase().endsWith('.pdf'))
+      if (pdfFile) {
+          const objectUrl = URL.createObjectURL(pdfFile)
+          previewPdfUrl.value = objectUrl
+          emit('pdfUpload', pdfFile.name)
+          
+           // Auto-collapse and show modal after PDF upload
+          isExpanded.value = false
+          isDemoMode.value = false
+          showInfoModal.value = true
+      }
+  } else {
+      // Fallback for mock/testing if needed
+      const mockPdf = 'breast_cancer_segmentation.pdf'
+      files.value.push(mockPdf)
+      emit('pdfUpload', mockPdf)
+      isExpanded.value = false
+      setTimeout(() => { showInfoModal.value = true }, 500)
+  }
 }
 
 function handleDragOver(e: DragEvent) {
@@ -81,15 +102,20 @@ function handleFileInput(e: Event) {
   const target = e.target as HTMLInputElement
   const uploadedFiles = target.files
   if (uploadedFiles && uploadedFiles.length > 0) {
-    const fileNames = Array.from(uploadedFiles).map(f => f.name)
+    const fileList = Array.from(uploadedFiles)
+    const fileNames = fileList.map(f => f.name)
     files.value.push(...fileNames)
     
     // Find and notify about PDF
-    const pdfFile = fileNames.find(f => f.toLowerCase().endsWith('.pdf'))
+    const pdfFile = fileList.find(f => f.name.toLowerCase().endsWith('.pdf'))
     if (pdfFile) {
-      emit('pdfUpload', pdfFile)
+      const objectUrl = URL.createObjectURL(pdfFile)
+      previewPdfUrl.value = objectUrl
+      emit('pdfUpload', pdfFile.name)
+      
       // Auto-open modal after PDF upload
-      setTimeout(() => { showInfoModal.value = true }, 500)
+      isDemoMode.value = false
+      showInfoModal.value = true
     }
     
     // Auto-collapse after file upload
@@ -97,20 +123,63 @@ function handleFileInput(e: Event) {
   }
 }
 
-async function handleAdditionalInfoSubmit() {
-  if (!store.uploadId) {
-    console.warn("No upload ID available to attach info")
+function handleLoadDemo() {
+  // Use the exact path requested by the user
+  previewPdfUrl.value = '/A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations.pdf'
+  isDemoMode.value = true
+  showInfoModal.value = true
+}
+
+async function handleModalSubmit(info: string) {
+  // Handle Demo Mode
+  if (isDemoMode.value) {
+    emit('loadDemo')
     showInfoModal.value = false
+    
+    // Expand console automatically
+    if (store.isConsoleCollapsed) {
+      store.isConsoleCollapsed = false
+    }
     return
   }
 
-  try {
-    await endpoints.sendAdditionalInfo(store.uploadId, additionalInfo.value)
-    console.log("Additional info submitted")
-  } catch (error) {
-    console.error("Failed to submit additional info", error)
+  if (!store.uploadId) {
+    console.warn("No upload ID available to attach info")
+    // Use timeout to simulate "waiting for backend to give ID" or just proceed if strictly separate
+    // For now, assume ID might be there or this is a "best effort"
+  }
+
+  // If we have an ID, send it. If not, maybe we should queue it? 
+  // For this Refactor, I'll keep existing logic: try to send if ID exists.
+  if (store.uploadId) {
+      try {
+        await endpoints.sendAdditionalInfo(store.uploadId, info)
+        console.log("Additional info submitted")
+      } catch (error) {
+        console.error("Failed to submit additional info", error)
+      }
+  } else {
+      console.warn("Skipping additional info submission: No uploadId")
+  }
+  
+  showInfoModal.value = false
+  
+  // Expand console automatically
+  if (store.isConsoleCollapsed) {
+    store.isConsoleCollapsed = false
+  }
+}
+
+function handleModalSkip() {
+  if (isDemoMode.value) {
+    emit('loadDemo')
   }
   showInfoModal.value = false
+  
+  // Expand console automatically
+  if (store.isConsoleCollapsed) {
+    store.isConsoleCollapsed = false
+  }
 }
 
 function removeFile(index: number) {
@@ -181,7 +250,7 @@ function removeFile(index: number) {
 
       <!-- Load Demo Button -->
       <button
-        @click="emit('loadDemo')"
+        @click="handleLoadDemo"
         :disabled="props.isLoading"
         :class="[
           'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
@@ -239,72 +308,12 @@ function removeFile(index: number) {
     </div>
   </div>
 
-
-
-    <!-- Additional Info Modal -->
-    <template v-if="showInfoModal">
-      <!-- Backdrop -->
-      <div 
-        class="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-        @click="showInfoModal = false"
-      >
-        <!-- Card Panel -->
-        <div 
-          class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden relative"
-          @click.stop
-        >
-          <!-- Header -->
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <h3 class="font-semibold text-slate-900 flex items-center gap-2">
-              <FileText class="w-5 h-5 text-blue-600" />
-              Add More Information (Optional)
-            </h3>
-            <button 
-              @click="showInfoModal = false"
-              class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100"
-            >
-              <X class="w-5 h-5" />
-            </button>
-          </div>
-
-          <!-- Body -->
-          <div class="p-6 space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">
-                Additional Context
-              </label>
-              <textarea
-                v-model="additionalInfo"
-                rows="4"
-                placeholder="Provide additional guidance to VeriFlow e.g. “Only interested in the workflow that performs inference using a pre-trained network” or “The path to example data can be found here …”."
-                class="w-full px-4 py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow resize-none"
-              ></textarea>
-            </div>
-
-            <!-- Description -->
-            <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <p class="text-xs text-blue-800 leading-relaxed">
-                This information will be used by our AI Agents to better understand your specific requirements and generate more accurate workflows.
-              </p>
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-            <button
-              @click="showInfoModal = false"
-              class="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              Skip
-            </button>
-            <button
-              @click="handleAdditionalInfoSubmit"
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200 transition-all active:scale-95"
-            >
-              Finished
-            </button>
-          </div>
-        </div>
-      </div>
-    </template>
+  <AdditionalInfoModal
+    :is-open="showInfoModal"
+    :pdf-url="previewPdfUrl"
+    :is-demo-mode="isDemoMode"
+    @close="showInfoModal = false"
+    @submit="handleModalSubmit"
+    @skip="handleModalSkip"
+  />
 </template>

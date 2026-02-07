@@ -36,6 +36,7 @@ interface Props {
   isWorkflowRunning?: boolean
   defaultViewerPlugin?: string
   selectedDatasetId?: string | null
+  shouldCollapseViewer?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -48,6 +49,7 @@ const props = withDefaults(defineProps<Props>(), {
   isWorkflowRunning: false,
   defaultViewerPlugin: 'auto',
   selectedDatasetId: null,
+  shouldCollapseViewer: false,
 })
 
 const emit = defineEmits<{
@@ -98,6 +100,12 @@ const vueFlowInstance = ref<any>(null)
 watch(() => props.isViewerVisible, (visible) => {
   if (visible) {
     isViewerCollapsed.value = false
+  }
+})
+
+watch(() => props.shouldCollapseViewer, (shouldCollapse) => {
+  if (shouldCollapse) {
+    isViewerCollapsed.value = true
   }
 })
 
