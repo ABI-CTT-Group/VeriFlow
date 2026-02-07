@@ -371,6 +371,12 @@ watch(isDatasetNavCollapsed, (val) => {
             </button>
             <span class="text-sm font-medium text-slate-700">Console</span>
           </div>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1">
+              <div class="w-2 h-2 rounded-full bg-green-500"></div>
+              <span class="text-xs text-slate-500">All agents active</span>
+            </div>
+          </div>
         </div>
         <div v-else class="h-8 flex-shrink-0 bg-slate-50">
            <button

@@ -6,7 +6,7 @@
  * Real-time log viewer with agent chat interface.
  */
 import { ref, nextTick, onMounted, watch } from 'vue'
-import { Terminal, User, Bot } from 'lucide-vue-next'
+import { User, Bot } from 'lucide-vue-next'
 import { useConsoleStore } from '../../stores/console'
 import { storeToRefs } from 'pinia'
 
@@ -66,18 +66,7 @@ onMounted(() => {
 
 <template>
   <div class="h-full flex flex-col overflow-hidden">
-    <!-- Header -->
-    <div class="px-4 py-2 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
-      <div class="flex items-center gap-2">
-        <Terminal class="w-4 h-4 text-slate-600" />
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="flex items-center gap-1">
-          <div class="w-2 h-2 rounded-full bg-green-500"></div>
-          <span class="text-xs text-slate-500">All agents active</span>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Messages -->
     <div class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs">
