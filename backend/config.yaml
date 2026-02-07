@@ -1,31 +1,35 @@
 # Global Configuration for Agentic System
 
 models:
-  gemini-2.5-pro:
-    api_model_name: "gemini-2.5-flash"
-    temperature: 0.2
-    top_p: 0.95
-    max_output_tokens: 8192
-  
-  gemini-2.0-flash:
-    api_model_name: "gemini-2.5-flash"
-    temperature: 0.2
+  gemini-3-pro:
+    api_model_name: "gemini-3-pro-preview"
+    temperature: 1.0
     top_p: 0.95
     max_output_tokens: 8192
 
-  gemini-2.0-thinking:
-    api_model_name: "gemini-2.5-flash-tts"
-    temperature: 0.7
+  gemini-3-flash:
+    api_model_name: "gemini-3-flash-preview"
+    temperature: 1.0
     top_p: 0.95
     max_output_tokens: 8192
+
+  gemini-3-pro-thinking:
+    api_model_name: "gemini-3-pro-preview"
+    temperature: 1.0
+    top_p: 0.95
+    max_output_tokens: 8192
+    thinking_level: "HIGH"
 
 agents:
   scholar:
-    default_model: "gemini-2.5-pro"
+    default_model: "gemini-3-pro"
     default_prompt_version: "v1_standard"
+    thinking_level: "HIGH"
   engineer:
-    default_model: "gemini-2.5-pro"
+    default_model: "gemini-3-pro"
     default_prompt_version: "v1_standard"
+    thinking_level: "HIGH"
   reviewer:
-    default_model: "gemini-2.5-pro"
+    default_model: "gemini-3-flash"
     default_prompt_version: "v1_standard"
+    thinking_level: "MEDIUM"

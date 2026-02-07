@@ -22,13 +22,15 @@ from app.models.workflow import (
     NodeStatus,
 )
 
-# Stage 4: Import Engineer and Reviewer agents
+# Stage 4: Import Engineer and Reviewer agents (Gemini 3 SDK)
 try:
     from app.agents.engineer import engineer_agent
     from app.agents.reviewer import reviewer_agent
     AGENTS_AVAILABLE = True
-except ImportError:
+except (ImportError, ValueError):
     AGENTS_AVAILABLE = False
+    engineer_agent = None
+    reviewer_agent = None
 
 # Import cache from publications for ISA data
 try:
