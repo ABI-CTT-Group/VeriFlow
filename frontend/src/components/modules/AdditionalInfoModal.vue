@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { FileText, X } from 'lucide-vue-next'
+import { ref, watch, onMounted } from 'vue'
+import { FileText, X, ChevronLeft, ChevronRight, Loader2, Monitor, Smartphone } from 'lucide-vue-next'
+import VuePdfEmbed from 'vue-pdf-embed'
+// Essential: import worker for pdf.js explicitly
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set worker source (using CDN for simplicity and reliability with Vite)
+// Alternatively, we could copy the worker file to public assets, but this is a standard pattern
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 interface Props {
   isOpen: boolean
@@ -22,7 +29,33 @@ const emit = defineEmits<{
 
 const additionalInfo = ref('')
 
-// Initialize or reset input based on demo mode when modal opens
+// PDF Viewer State
+const pdfPage = ref(1)
+const pageCount = ref(0)
+const pdfScale = ref(1.0)
+const isLoadingPdf = ref(false)
+const pdfKey = ref(0) // Force re-render if needed
+
+// Viewer Mode: True = Custom (VuePdf), False = Native (Iframe)
+const useCustomViewer = ref(false)
+
+onMounted(() => {
+  // Broad detection: If touch capability exists, err on the side of using the Custom Viewer
+  // This covers iPads, mobile phones, and hybrid laptops (which usually handle the JS viewer fine)
+  const isTouchDevice = navigator.maxTouchPoints > 0 || /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
+  useCustomViewer.value = isTouchDevice
+})
+
+function toggleViewer() {
+  useCustomViewer.value = !useCustomViewer.value
+  // Reset PDF state when switching
+  pdfPage.value = 1
+  pdfScale.value = 1.0
+  isLoadingPdf.value = true
+  pdfKey.value++
+}
+
+// Initialize or reset
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
     if (props.isDemoMode) {
@@ -30,8 +63,34 @@ watch(() => props.isOpen, (isOpen) => {
     } else {
       additionalInfo.value = ''
     }
+    // Reset PDF state
+    pdfPage.value = 1
+    pdfScale.value = 1.0
+    isLoadingPdf.value = true
+    // Force component refresh
+    pdfKey.value++
   }
 })
+
+// PDF Handlers
+function handlePdfLoaded(doc: any) {
+  isLoadingPdf.value = false
+  pageCount.value = doc.numPages
+}
+
+function handlePdfError(error: any) {
+  console.error("PDF Render Error:", error)
+  isLoadingPdf.value = false
+}
+
+
+function prevPage() {
+  if (pdfPage.value > 1) pdfPage.value--
+}
+
+function nextPage() {
+  if (pdfPage.value < pageCount.value) pdfPage.value++
+}
 
 function handleSubmit() {
   emit('submit', additionalInfo.value)
@@ -56,25 +115,88 @@ function handleClose() {
           <FileText class="w-5 h-5 text-blue-600" />
           Add More Information (Optional)
         </h3>
-        <button 
-          @click="handleClose"
-          class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100"
-        >
-          <X class="w-5 h-5" />
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Viewer Toggle -->
+          <button 
+            @click="toggleViewer"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            title="Switch PDF Viewer Engine"
+          >
+            <component :is="useCustomViewer ? Smartphone : Monitor" class="w-3.5 h-3.5" />
+            <span>{{ useCustomViewer ? 'Web Viewer' : 'Native Viewer' }}</span>
+          </button>
+
+          <button 
+            @click="handleClose"
+            class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       <!-- Content - Split View -->
       <div class="flex-1 flex overflow-hidden">
         
-        <!-- Left Panel: PDF Preview -->
-        <div class="w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col">
-          <div v-if="pdfUrl" class="flex-1 w-full h-full">
-            <iframe :src="pdfUrl" class="w-full h-full border-none"></iframe>
-          </div>
-          <div v-else class="flex-1 flex items-center justify-center text-slate-400">
-            <p>No PDF available for preview</p>
-          </div>
+        <!-- Left Panel: Hybrid PDF Viewer -->
+        <div class="w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col relative group">
+          
+          <!-- Case A: Custom Web Viewer (VuePdfEmbed) - For iOS/Touch/Fallback -->
+          <template v-if="useCustomViewer">
+            <!-- PDF Toolbar -->
+            <div v-if="pdfUrl" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-slate-900/80 backdrop-blur shadow-lg rounded-full px-4 py-2 border border-slate-700 transition-opacity">
+              <!-- Navigation -->
+              <div class="flex items-center gap-3 text-white">
+                <button @click="prevPage" :disabled="pdfPage <= 1" class="touch-manipulation p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-colors">
+                  <ChevronLeft class="w-5 h-5 pointer-events-none" />
+                </button>
+                <span class="select-none text-sm font-medium min-w-[3rem] text-center tabular-nums">
+                  {{ pdfPage }} / {{ pageCount || '-' }}
+                </span>
+                <button @click="nextPage" :disabled="pdfPage >= pageCount" class="touch-manipulation p-1 hover:bg-white/10 rounded disabled:opacity-30 transition-colors">
+                  <ChevronRight class="w-5 h-5 pointer-events-none" />
+                </button>
+              </div>
+
+
+            </div>
+
+            <!-- Viewer Container -->
+            <div class="flex-1 overflow-auto bg-slate-200/50 flex justify-center relative" id="pdf-container">
+              <div v-if="isLoadingPdf" class="absolute inset-0 flex items-center justify-center bg-white/50 z-10">
+                <Loader2 class="w-8 h-8 text-blue-600 animate-spin" />
+              </div>
+
+              <div v-if="pdfUrl" class="shadow-xl" :style="{ width: pdfScale * 100 + '%' }">
+                 <VuePdfEmbed
+                  :key="pdfKey"
+                  :source="pdfUrl"
+                  :page="pdfPage"
+                  :text-layer="false"
+                  :annotation-layer="false"
+                  @loaded="handlePdfLoaded"
+                  @rendered="isLoadingPdf = false"
+                  @error="handlePdfError"
+                  class="bg-white w-full transition-transform duration-200"
+                />
+              </div>
+              
+              <div v-else class="flex-1 flex items-center justify-center text-slate-400">
+                <p>No PDF available for preview</p>
+              </div>
+            </div>
+          </template>
+
+          <!-- Case B: PC/Native Viewer (Iframe) -->
+          <template v-else>
+             <div v-if="pdfUrl" class="flex-1 w-full h-full">
+              <iframe :src="pdfUrl" class="w-full h-full border-none"></iframe>
+            </div>
+            <div v-else class="flex-1 flex items-center justify-center text-slate-400">
+              <p>No PDF available for preview</p>
+            </div>
+          </template>
+
         </div>
 
         <!-- Right Panel: Form -->
@@ -125,3 +247,23 @@ function handleClose() {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Optional: Hide scrollbar for the PDF container if desirable, 
+   but usually vertical scroll is wanted for the page logic if we change to "all pages" mode.
+   Here we are using single page mode with internal scrolling if zoomed. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+</style>
