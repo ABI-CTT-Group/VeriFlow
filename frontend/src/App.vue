@@ -13,6 +13,7 @@ import { useWorkflowStore } from './stores/workflow'
 // Layout components
 import ResizablePanel from './components/layout/ResizablePanel.vue'
 import CollapsibleHorizontalPanel from './components/layout/CollapsibleHorizontalPanel.vue'
+import LandingPageOverlay from './components/layout/LandingPageOverlay.vue'
 
 // Module components
 import UploadModule from './components/modules/UploadModule.vue'
@@ -57,6 +58,7 @@ const shouldCollapseViewer = ref(false)
 const collapseAllExceptSelected = ref(false)
 const isResizingConsole = ref(false)
 const defaultViewerPlugin = ref('auto')
+const showLandingPage = ref(true)
 
 // Handler functions
 function handleSourceClick(propertyId: string) {
@@ -170,6 +172,15 @@ watch(isDatasetNavCollapsed, (val) => {
     @touchmove="handleMouseMove"
     @touchend="handleMouseUp"
   >
+    <LandingPageOverlay 
+      v-if="showLandingPage" 
+      @get-started="showLandingPage = false" 
+    />
+    
+    <div 
+      class="h-full flex flex-col overflow-hidden transition-all duration-500"
+      :class="{ 'blur-sm scale-[0.98]': showLandingPage }"
+    >
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-sm z-10">
       <div class="flex items-center gap-3">
@@ -332,6 +343,7 @@ watch(isDatasetNavCollapsed, (val) => {
         <ChevronUp class="w-4 h-4 text-slate-600" />
         <span class="text-xs font-medium text-slate-600">Console</span>
       </button>
+    </div>
     </div>
   </div>
 </template>
