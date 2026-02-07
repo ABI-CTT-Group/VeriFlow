@@ -155,3 +155,121 @@ class TestReviewerAgent:
 
         assert result["final_result"]["passed"] is True
         assert result["iterations"] == 2
+
+    # --- suggest_fixes ---
+
+    @pytest.mark.asyncio
+    async def test_suggest_fixes_passed(self, reviewer_agent, mock_genai):
+        """Test suggest_fixes returns no fixes when validation passed."""
+        result = await reviewer_agent.suggest_fixes(
+            validation_result={"passed": True},
+            workflow_cwl="cwl",
+            graph={},
+        )
+
+        assert result["fixes"] == []
+        assert result["message"] == "No fixes needed"
+
+    @pytest.mark.asyncio
+    async def test_suggest_fixes_type_mismatch(self, reviewer_agent, mock_genai):
+        """Test suggest_fixes returns adapter fix for type mismatch."""
+        validation_result = {
+            "passed": False,
+            "checks": {
+                "data_format": {
+                    "mismatches": [
+                        {
+                            "source_node": "n1",
+                            "target_node": "n2",
+                            "suggested_adapter": "dcm2niix",
+                            "message": "Type mismatch",
+                        }
+                    ]
+                },
+                "dependencies": {"missing": []},
+            },
+        }
+
+        result = await reviewer_agent.suggest_fixes(
+            validation_result=validation_result,
+            workflow_cwl="cwl",
+            graph={},
+        )
+
+        assert len(result["fixes"]) == 1
+        assert result["fixes"][0]["type"] == "add_adapter"
+        assert result["fixes"][0]["adapter"] == "dcm2niix"
+
+    # --- _basic_cwl_validation ---
+
+    def test_basic_cwl_validation_valid(self, reviewer_agent):
+        """Test basic CWL validation passes for valid content."""
+        cwl = "cwlVersion: v1.3\nclass: Workflow\ninputs:\n  x: File\noutputs:\n  y: File"
+        result = reviewer_agent._basic_cwl_validation(cwl)
+
+        assert result["passed"] is True
+        assert len(result["errors"]) == 0
+
+    def test_basic_cwl_validation_missing_sections(self, reviewer_agent):
+        """Test basic CWL validation catches missing sections."""
+        result = reviewer_agent._basic_cwl_validation("just some text")
+
+        assert result["passed"] is False
+        assert any("cwlVersion" in e for e in result["errors"])
+
+    # --- _validate_cwl_syntax ---
+
+    @pytest.mark.asyncio
+    async def test_validate_cwl_syntax_empty(self, reviewer_agent, mock_genai):
+        """Test validation of empty CWL content."""
+        result = await reviewer_agent._validate_cwl_syntax("")
+
+        assert result["passed"] is False
+        assert "Empty CWL content" in result["errors"]
+
+    @pytest.mark.asyncio
+    async def test_validate_cwl_syntax_cwltool_not_found(self, reviewer_agent, mock_genai, mock_subprocess):
+        """Test fallback to basic validation when cwltool not found."""
+        mock_subprocess.side_effect = FileNotFoundError("cwltool not found")
+
+        result = await reviewer_agent._validate_cwl_syntax(
+            "cwlVersion: v1.3\nclass: Workflow\ninputs:\n  x: File\noutputs:\n  y: File"
+        )
+
+        # Falls back to _basic_cwl_validation which should pass
+        assert result["passed"] is True
+
+    # --- _types_compatible ---
+
+    def test_types_compatible_same(self, reviewer_agent):
+        """Test same types are compatible."""
+        assert reviewer_agent._types_compatible("File", "File") is True
+
+    def test_types_compatible_octet_wildcard(self, reviewer_agent):
+        """Test octet-stream is compatible with wildcard."""
+        assert reviewer_agent._types_compatible("application/octet-stream", "*") is True
+
+    def test_types_compatible_nifti_variants(self, reviewer_agent):
+        """Test NIfTI MIME type variants are compatible."""
+        assert reviewer_agent._types_compatible("application/x-nifti", "application/nifti") is True
+        assert reviewer_agent._types_compatible("image/nifti", "application/x-nifti") is True
+
+    # --- _suggest_adapter ---
+
+    def test_suggest_adapter_known_pair(self, reviewer_agent):
+        """Test known adapter suggestion for DICOM to NIfTI."""
+        adapter = reviewer_agent._suggest_adapter("application/dicom", "application/x-nifti")
+        assert adapter == "dcm2niix"
+
+    def test_suggest_adapter_unknown_pair(self, reviewer_agent):
+        """Test custom adapter name for unknown type pair."""
+        adapter = reviewer_agent._suggest_adapter("text/plain", "image/png")
+        assert "custom-adapter" in adapter
+
+    # --- _check_dependencies ---
+
+    def test_check_dependencies_empty(self, reviewer_agent):
+        """Test dependency check passes with no tools."""
+        result = reviewer_agent._check_dependencies({})
+        assert result["passed"] is True
+        assert result["missing"] == []
