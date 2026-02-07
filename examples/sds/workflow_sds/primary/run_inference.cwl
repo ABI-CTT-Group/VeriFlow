@@ -6,18 +6,23 @@ label: nnUNet Inference
 doc: |
   Runs nnUNet inference on a dataset to generate segmentation results.
   Wraps the nnUNetv2_predict command with configurable parameters.
+  Uses PyTorch CUDA base image with nnUNetv2 installed at runtime.
 
-baseCommand: ["python", "run_inference.py"]
+baseCommand: ["bash", "-c"]
+
+arguments:
+  - valueFrom: |
+      pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && pip install nnunetv2 && python run_inference.py $(inputs.input_folder.path) $(inputs.output_folder) $(inputs.dataset_name) $(inputs.configuration) $(inputs.pre_trained_network.path)
+    shellQuote: false
 
 requirements:
   DockerRequirement:
-    dockerPull: python:3.9
+    dockerPull: python:3.10-slim
   InitialWorkDirRequirement:
     listing:
       - entryname: run_inference.py
         entry: |
           #!/usr/bin/env python
-          import argparse
           import os
           import subprocess
           import sys
@@ -35,36 +40,29 @@ requirements:
                   "-c", configuration
               ]
 
+              print(f"Running command: {' '.join(command)}")
               subprocess.run(command, check=True)
 
           def main():
-              parser = argparse.ArgumentParser(description="Run nnUNet inference on a dataset.")
-              
-              parser.add_argument("-i", "--input-folder", type=str, required=True,
-                  help="Path to the input folder containing images for inference.")
-              parser.add_argument("-o", "--output-folder", type=str, required=True,
-                  help="Path to the output folder for segmentation results.")
-              parser.add_argument("-d", "--dataset-name", type=str,
-                  default=os.environ.get("NNUNET_DATASET_NAME", "new_dataset"),
-                  help="Name of the dataset.")
-              parser.add_argument("-c", "--configuration", type=str,
-                  default=os.environ.get("NNUNET_CONFIGURATION", "3d_fullres"),
-                  help="nnUNet configuration.")
+              if len(sys.argv) != 6:
+                  print("Usage: run_inference.py <input_folder> <output_folder> <dataset_name> <configuration> <pre_trained_network>")
+                  sys.exit(1)
 
-              parser.add_argument("--pre-trained-network", type=str, required=True,
-                  help="Path to the pre-trained network (nnUNet_results) directory.")
+              input_folder = sys.argv[1]
+              output_folder = sys.argv[2]
+              dataset_name = sys.argv[3]
+              configuration = sys.argv[4]
+              pre_trained_network = sys.argv[5]
 
-              args = parser.parse_args()
-
-
-              if args.pre_trained_network:
-                  os.environ['nnUNet_results'] = args.pre_trained_network
+              # Set nnUNet_results environment variable
+              os.environ['nnUNet_results'] = pre_trained_network
+              print(f"Set nnUNet_results to: {pre_trained_network}")
 
               run_nnunet_inference(
-                  input_folder=args.input_folder,
-                  output_folder=args.output_folder,
-                  dataset_name=args.dataset_name,
-                  configuration=args.configuration
+                  input_folder=input_folder,
+                  output_folder=output_folder,
+                  dataset_name=dataset_name,
+                  configuration=configuration
               )
 
           if __name__ == "__main__":
@@ -73,37 +71,25 @@ requirements:
 inputs:
   input_folder:
     type: Directory
-    inputBinding:
-      prefix: --input-folder
     doc: Directory containing images for inference
 
   output_folder:
     type: string
     default: "inference_output"
-    inputBinding:
-      prefix: --output-folder
     doc: Name of the output directory for segmentation results
 
   dataset_name:
     type: string?
     default: "new_dataset"
-    inputBinding:
-      prefix: --dataset-name
     doc: Name of the dataset
 
   configuration:
     type: string?
     default: "3d_fullres"
-    inputBinding:
-      prefix: --configuration
     doc: nnUNet configuration (e.g., 3d_fullres, 2d)
-
-
 
   pre_trained_network:
     type: Directory
-    inputBinding:
-      prefix: --pre-trained-network
     doc: Path to the pre-trained network (nnUNet_results) directory
 
 outputs:

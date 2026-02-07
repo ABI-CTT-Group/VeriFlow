@@ -9,9 +9,21 @@ doc: |
 
 baseCommand: ["python", "create_nifti.py"]
 
+hints:
+  SoftwareRequirement:
+    packages:
+      - package: dicom2nifti
+        specs:
+          - https://pypi.org/project/dicom2nifti/
+
 requirements:
   DockerRequirement:
     dockerPull: python:3.9
+    dockerImageId: dicom2nifti-tool
+  NetworkAccess:
+    networkAccess: true
+  ShellCommandRequirement: {}
+  InlineJavascriptRequirement: {}
   InitialWorkDirRequirement:
     listing:
       - entryname: create_nifti.py
