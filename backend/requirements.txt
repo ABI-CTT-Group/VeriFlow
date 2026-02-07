@@ -13,8 +13,8 @@ psycopg2-binary>=2.9.9
 # Object Storage
 minio>=7.2.0
 
-# AI/ML
-google-generativeai>=0.3.0
+# AI/ML - Gemini 3 SDK (google-genai, not the legacy google-generativeai)
+google-genai>=1.0.0
 
 # PDF Processing
 pymupdf>=1.23.0

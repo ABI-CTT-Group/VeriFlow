@@ -47,7 +47,7 @@ VeriFlow is an autonomous Research Reliability Engineer that:
 |-----------|------------|
 | Frontend | Vue 3 + Vue Flow + TypeScript |
 | Backend | Python FastAPI |
-| AI Engine | Gemini API (Direct calls) |
+| AI Engine | Gemini 3 API via google-genai SDK |
 | Storage | MinIO (S3-compatible) |
 | Execution | Apache Airflow 3 (local) |
 | Database | PostgreSQL |

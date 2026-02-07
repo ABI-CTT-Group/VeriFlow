@@ -7,7 +7,7 @@
 
 ## Summary
 
-Stage 4 implemented the three core AI agents for VeriFlow using the Gemini API:
+Stage 4 implemented the three core AI agents for VeriFlow using the Gemini 3 API (google-genai SDK):
 
 - **Scholar Agent**: PDF parsing and ISA hierarchy extraction
 - **Engineer Agent**: CWL workflow and Dockerfile generation
@@ -21,7 +21,7 @@ Stage 4 implemented the three core AI agents for VeriFlow using the Gemini API:
 
 | File | Description |
 |------|-------------|
-| `backend/app/services/gemini_client.py` | Gemini API wrapper with history support and JSON generation |
+| `backend/app/services/gemini_client.py` | Gemini 3 API wrapper (google-genai SDK) with history support and JSON generation |
 | `backend/app/agents/__init__.py` | Agents module exports |
 | `backend/app/agents/scholar.py` | Scholar Agent with PyMuPDF text extraction |
 | `backend/app/agents/engineer.py` | Engineer Agent with CWL/Dockerfile generation |
@@ -45,10 +45,13 @@ Stage 4 implemented the three core AI agents for VeriFlow using the Gemini API:
 
 ### Gemini Client (`gemini_client.py`)
 
+- Uses the `google-genai` SDK (not the legacy `google-generativeai` package)
+- Explicit `genai.Client` for all API calls per SDK best practices
 - Model fallback chain: `gemini-3-pro-preview` → `gemini-3-flash-preview`
 - Methods: `generate_content()`, `generate_content_with_history()`, `generate_json()`
-- Automatic JSON cleaning (strips markdown code blocks)
-- Permissive safety settings for scientific content
+- JSON mode via `response_mime_type="application/json"` in GenerateContentConfig
+- Safety settings via `types.SafetySetting` (permissive for scientific content)
+- Multi-turn chat via `client.chats.create()` with history
 
 ### Scholar Agent (`scholar.py`)
 

@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # This allows tests to be collected even if requirements aren't fully installed
 sys.modules['fitz'] = MagicMock()
 sys.modules['minio'] = MagicMock()
-sys.modules['minio'] = MagicMock()
 sys.modules['minio.error'] = MagicMock()
 
 # Set dummy API key to avoid initialization errors during collection
@@ -24,6 +23,8 @@ def mock_gemini_client():
         # Default mock behavior for common methods
         client_instance.generate_json.return_value = {}
         client_instance.generate_content.return_value = "Mock content"
+        client_instance.generate_content_with_history.return_value = "Mock chat content"
+        client_instance.model_name = "gemini-3-flash-preview"
         yield client_instance
 
 @pytest.fixture

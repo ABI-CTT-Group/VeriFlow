@@ -669,7 +669,7 @@ Before requesting developer sign-off:
 | Database | PostgreSQL | 15 |
 | Object Storage | MinIO | latest |
 | Workflow Engine | Apache Airflow | 2.8+ |
-| AI Engine | Gemini API | gemini-3-pro |
+| AI Engine | Gemini 3 API (google-genai SDK) | gemini-3-pro-preview |
 | Container Runtime | Docker | latest |
 
 ## Appendix B: File Structure
