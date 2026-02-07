@@ -6,8 +6,11 @@
  * Drag-and-drop file upload with expand/collapse functionality.
  * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
-import { ref, computed } from 'vue'
-import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import { Upload, File, X, ChevronDown, ChevronRight, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
+import { endpoints } from '../../services/api'
+import { useWorkflowStore } from '../../stores/workflow'
+import AdditionalInfoModal from './AdditionalInfoModal.vue'
 
 interface Props {
   hasUploadedFiles?: boolean
@@ -25,11 +28,25 @@ const emit = defineEmits<{
   loadDemo: []
 }>()
 
+const store = useWorkflowStore()
 const files = ref<string[]>([])
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 // Start collapsed if files have already been uploaded
 const isExpanded = ref(!props.hasUploadedFiles)
+
+// Additional Info Modal Logic
+const showInfoModal = ref(false)
+const previewPdfUrl = ref('')
+const isDemoMode = ref(false)
+const additionalInfoInput = ref('') // store input if needed, though modal handles its own state mostly
+
+// Watch for external updates to files (e.g. loading demo)
+watch(() => props.hasUploadedFiles, (hasFiles) => {
+  if (hasFiles) {
+    isExpanded.value = false
+  }
+})
 
 const fileCountText = computed(() => {
   if (files.value.length > 0) {
@@ -41,12 +58,31 @@ const fileCountText = computed(() => {
 function handleDrop(e: DragEvent) {
   e.preventDefault()
   setIsDragging(false)
-  // Mock file handling
-  const mockPdf = 'breast_cancer_segmentation.pdf'
-  files.value.push(mockPdf)
-  emit('pdfUpload', mockPdf)
-  // Auto-collapse after PDF upload
-  isExpanded.value = false
+  
+  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files)
+      const fileNames = droppedFiles.map(f => f.name)
+      files.value.push(...fileNames)
+      
+      const pdfFile = droppedFiles.find(f => f.name.toLowerCase().endsWith('.pdf'))
+      if (pdfFile) {
+          const objectUrl = URL.createObjectURL(pdfFile)
+          previewPdfUrl.value = objectUrl
+          emit('pdfUpload', pdfFile.name)
+          
+           // Auto-collapse and show modal after PDF upload
+          isExpanded.value = false
+          isDemoMode.value = false
+          showInfoModal.value = true
+      }
+  } else {
+      // Fallback for mock/testing if needed
+      const mockPdf = 'breast_cancer_segmentation.pdf'
+      files.value.push(mockPdf)
+      emit('pdfUpload', mockPdf)
+      isExpanded.value = false
+      setTimeout(() => { showInfoModal.value = true }, 500)
+  }
 }
 
 function handleDragOver(e: DragEvent) {
@@ -66,17 +102,83 @@ function handleFileInput(e: Event) {
   const target = e.target as HTMLInputElement
   const uploadedFiles = target.files
   if (uploadedFiles && uploadedFiles.length > 0) {
-    const fileNames = Array.from(uploadedFiles).map(f => f.name)
+    const fileList = Array.from(uploadedFiles)
+    const fileNames = fileList.map(f => f.name)
     files.value.push(...fileNames)
     
     // Find and notify about PDF
-    const pdfFile = fileNames.find(f => f.toLowerCase().endsWith('.pdf'))
+    const pdfFile = fileList.find(f => f.name.toLowerCase().endsWith('.pdf'))
     if (pdfFile) {
-      emit('pdfUpload', pdfFile)
+      const objectUrl = URL.createObjectURL(pdfFile)
+      previewPdfUrl.value = objectUrl
+      emit('pdfUpload', pdfFile.name)
+      
+      // Auto-open modal after PDF upload
+      isDemoMode.value = false
+      showInfoModal.value = true
     }
     
     // Auto-collapse after file upload
     isExpanded.value = false
+  }
+}
+
+function handleLoadDemo() {
+  // Use the exact path requested by the user
+  previewPdfUrl.value = '/A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations.pdf'
+  isDemoMode.value = true
+  showInfoModal.value = true
+}
+
+async function handleModalSubmit(info: string) {
+  // Handle Demo Mode
+  if (isDemoMode.value) {
+    emit('loadDemo')
+    showInfoModal.value = false
+    
+    // Expand console automatically
+    if (store.isConsoleCollapsed) {
+      store.isConsoleCollapsed = false
+    }
+    return
+  }
+
+  if (!store.uploadId) {
+    console.warn("No upload ID available to attach info")
+    // Use timeout to simulate "waiting for backend to give ID" or just proceed if strictly separate
+    // For now, assume ID might be there or this is a "best effort"
+  }
+
+  // If we have an ID, send it. If not, maybe we should queue it? 
+  // For this Refactor, I'll keep existing logic: try to send if ID exists.
+  if (store.uploadId) {
+      try {
+        await endpoints.sendAdditionalInfo(store.uploadId, info)
+        console.log("Additional info submitted")
+      } catch (error) {
+        console.error("Failed to submit additional info", error)
+      }
+  } else {
+      console.warn("Skipping additional info submission: No uploadId")
+  }
+  
+  showInfoModal.value = false
+  
+  // Expand console automatically
+  if (store.isConsoleCollapsed) {
+    store.isConsoleCollapsed = false
+  }
+}
+
+function handleModalSkip() {
+  if (isDemoMode.value) {
+    emit('loadDemo')
+  }
+  showInfoModal.value = false
+  
+  // Expand console automatically
+  if (store.isConsoleCollapsed) {
+    store.isConsoleCollapsed = false
   }
 }
 
@@ -148,7 +250,7 @@ function removeFile(index: number) {
 
       <!-- Load Demo Button -->
       <button
-        @click="emit('loadDemo')"
+        @click="handleLoadDemo"
         :disabled="props.isLoading"
         :class="[
           'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
@@ -164,24 +266,35 @@ function removeFile(index: number) {
       <p class="text-xs text-slate-400 text-center">Pre-loaded MRI segmentation example</p>
 
       <!-- Uploaded files list -->
-      <div v-if="files.length > 0" class="space-y-2">
-        <p class="text-xs text-slate-500">Uploaded Files</p>
-        <div
-          v-for="(file, index) in files"
-          :key="index"
-          class="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-200"
-        >
-          <div class="flex items-center gap-2">
-            <File class="w-4 h-4 text-slate-400" />
-            <span class="text-sm text-slate-700">{{ file }}</span>
-          </div>
-          <button
-            @click="removeFile(index)"
-            class="text-slate-400 hover:text-slate-600"
+      <div v-if="files.length > 0" class="space-y-4">
+        <div>
+          <p class="text-xs text-slate-500 mb-2">Uploaded Files</p>
+          <div
+            v-for="(file, index) in files"
+            :key="index"
+            class="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-200"
           >
-            <X class="w-4 h-4" />
-          </button>
+            <div class="flex items-center gap-2">
+              <File class="w-4 h-4 text-slate-400" />
+              <span class="text-sm text-slate-700">{{ file }}</span>
+            </div>
+            <button
+              @click="removeFile(index)"
+              class="text-slate-400 hover:text-slate-600"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        <!-- Add info button (only visible when files exist) -->
+        <button
+          @click="showInfoModal = true"
+          class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 border border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+        >
+          <Plus class="w-4 h-4" />
+          <span>Add additional information</span>
+        </button>
       </div>
       
       <!-- Hidden file input -->
@@ -194,4 +307,13 @@ function removeFile(index: number) {
       />
     </div>
   </div>
+
+  <AdditionalInfoModal
+    :is-open="showInfoModal"
+    :pdf-url="previewPdfUrl"
+    :is-demo-mode="isDemoMode"
+    @close="showInfoModal = false"
+    @submit="handleModalSubmit"
+    @skip="handleModalSkip"
+  />
 </template>

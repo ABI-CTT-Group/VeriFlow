@@ -5,13 +5,12 @@ VeriFlow - Services Package
 from app.services.minio_client import minio_service, MinIOService
 from app.services.database import db_service, DatabaseService
 
-# Stage 4: Gemini client
+# Stage 4: Gemini client (google-genai SDK)
 try:
-    from app.services.gemini_client import get_gemini_client, GeminiClient
+    from app.services.gemini_client import GeminiClient
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    get_gemini_client = None
     GeminiClient = None
 
 # Stage 5: Execution engine services
@@ -42,7 +41,6 @@ __all__ = [
     "db_service",
     "DatabaseService",
     # Stage 4: Gemini
-    "get_gemini_client",
     "GeminiClient",
     "GEMINI_AVAILABLE",
     # Stage 5: Execution engine

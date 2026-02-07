@@ -5,56 +5,14 @@
  * 
  * Real-time log viewer with agent chat interface.
  */
-import { ref, nextTick, onMounted } from 'vue'
-import { Send, Terminal, User, Bot } from 'lucide-vue-next'
+import { ref, nextTick, onMounted, watch } from 'vue'
+import { Terminal, User, Bot } from 'lucide-vue-next'
+import { useConsoleStore } from '../../stores/console'
+import { storeToRefs } from 'pinia'
 
-interface Message {
-  id: string
-  type: 'user' | 'agent' | 'system'
-  agent?: 'scholar' | 'engineer' | 'reviewer'
-  content: string
-  timestamp: Date
-}
-
+const store = useConsoleStore()
+const { messages } = storeToRefs(store)
 const messagesEndRef = ref<HTMLDivElement | null>(null)
-const input = ref('')
-
-const messages = ref<Message[]>([
-  {
-    id: '1',
-    type: 'system',
-    content: 'VeriFlow initialized. Agents ready.',
-    timestamp: new Date(Date.now() - 300000)
-  },
-  {
-    id: '2',
-    type: 'agent',
-    agent: 'scholar',
-    content: 'Analyzing PDF: breast_cancer_segmentation.pdf...',
-    timestamp: new Date(Date.now() - 240000)
-  },
-  {
-    id: '3',
-    type: 'agent',
-    agent: 'scholar',
-    content: 'Extracted ISA hierarchy: 1 Investigation, 1 Study, 2 Assays. Creating SDS metadata...',
-    timestamp: new Date(Date.now() - 180000)
-  },
-  {
-    id: '4',
-    type: 'agent',
-    agent: 'scholar',
-    content: 'Identified measurements: DCE-MRI Scans (384 subjects), Tools: nnU-Net, Models: Pretrained weights',
-    timestamp: new Date(Date.now() - 120000)
-  },
-  {
-    id: '5',
-    type: 'agent',
-    agent: 'reviewer',
-    content: 'Validation complete. Study design populated. Ready for workflow assembly.',
-    timestamp: new Date(Date.now() - 60000)
-  }
-])
 
 function scrollToBottom() {
   nextTick(() => {
@@ -62,33 +20,10 @@ function scrollToBottom() {
   })
 }
 
-function handleSend() {
-  if (!input.value.trim()) return
-
-  const newMessage: Message = {
-    id: Date.now().toString(),
-    type: 'user',
-    content: input.value,
-    timestamp: new Date()
-  }
-
-  messages.value.push(newMessage)
-  input.value = ''
+// Watch for new messages to scroll to bottom
+watch(() => messages.value.length, () => {
   scrollToBottom()
-
-  // Simulate agent response
-  setTimeout(() => {
-    const response: Message = {
-      id: (Date.now() + 1).toString(),
-      type: 'agent',
-      agent: 'reviewer',
-      content: 'I understand your request. Processing...',
-      timestamp: new Date()
-    }
-    messages.value.push(response)
-    scrollToBottom()
-  }, 1000)
-}
+})
 
 function getAgentColor(agent?: string): string {
   switch (agent) {
@@ -174,25 +109,6 @@ onMounted(() => {
         </div>
       </div>
       <div ref="messagesEndRef" />
-    </div>
-
-    <!-- Input - Fixed at bottom -->
-    <div class="border-t border-slate-200 p-3 flex-shrink-0">
-      <div class="flex gap-2">
-        <input
-          type="text"
-          v-model="input"
-          @keypress.enter="handleSend"
-          placeholder="Chat with VeriFlow agents..."
-          class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          @click="handleSend"
-          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          <Send class="w-4 h-4" />
-        </button>
-      </div>
     </div>
   </div>
 </template>

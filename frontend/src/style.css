@@ -155,10 +155,23 @@
     font-feature-settings: var(--default-font-feature-settings, normal);
     font-variation-settings: var(--default-font-variation-settings, normal);
     -webkit-tap-highlight-color: transparent;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
   }
 
   body {
     line-height: inherit;
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #app {
+    height: 100%;
+    width: 100%;
   }
 
   hr {
@@ -1798,4 +1811,33 @@ html {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+* {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+/* Vue Flow Overrides */
+.vue-flow__node {
+  background: transparent !important;
+  border: none !important;
+  width: auto !important;
+  box-shadow: none !important;
+}
+
+.vue-flow__node-default,
+.vue-flow__node-input,
+.vue-flow__node-output,
+.vue-flow__node-group {
+  background: transparent !important;
+  border: none !important;
 }

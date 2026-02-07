@@ -1,42 +1,54 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
 import UploadModule from '../UploadModule.vue'
 
 describe('UploadModule.vue', () => {
-    it('renders correctly', () => {
-        const wrapper = mount(UploadModule)
-        expect(wrapper.find('h3').text()).toContain('Upload Data')
-        expect(wrapper.find('input[type="file"]').exists()).toBe(true)
+    beforeEach(() => {
+        setActivePinia(createPinia())
     })
 
-    it('emits files-selected event when file is chosen', async () => {
-        const wrapper = mount(UploadModule)
+    const mountComponent = (props = {}) => {
+        return mount(UploadModule, {
+            props,
+            global: {
+                stubs: {
+                    Upload: { template: '<span />' },
+                    File: { template: '<span />' },
+                    X: { template: '<span />' },
+                    ChevronDown: { template: '<span />' },
+                    ChevronRight: { template: '<span />' },
+                    ChevronLeft: { template: '<span />' },
+                    Loader2: { template: '<span />' },
+                    Beaker: { template: '<span />' },
+                    FileText: { template: '<span />' },
+                    Plus: { template: '<span />' },
+                },
+            },
+        })
+    }
+
+    it('renders correctly', () => {
+        const wrapper = mountComponent()
+        expect(wrapper.text()).toContain('Upload Publication')
+        expect(wrapper.find('.border-dashed').exists()).toBe(true)
+    })
+
+    it('emits pdfUpload event when file is chosen', async () => {
+        const wrapper = mountComponent()
         const input = wrapper.find('input[type="file"]')
+        expect(input.exists()).toBe(true)
 
-        // Mock file input
         const file = new File(['content'], 'test.pdf', { type: 'application/pdf' })
-        const fileList = [file]
-
-        // Trigger change event
-        Object.defineProperty(input.element, 'files', { value: fileList })
+        Object.defineProperty(input.element, 'files', { value: [file] })
         await input.trigger('change')
 
-        // Verify emitted event
-        expect(wrapper.emitted()).toHaveProperty('file-selected')
-        const emittedEvent = wrapper.emitted('file-selected')
-        expect(emittedEvent).toBeTruthy()
-        if (emittedEvent) {
-            expect(emittedEvent[0][0]).toBeInstanceOf(File)
-            expect((emittedEvent[0][0] as File).name).toBe('test.pdf')
-        }
+        expect(wrapper.emitted()).toHaveProperty('pdfUpload')
     })
 
-    it('shows error for invalid file type', async () => {
-        const wrapper = mount(UploadModule)
-        // Note: This assumes the component has logic to check file types.
-        // As we haven't seen the implementation, we'll write a basic test 
-        // and might need to adjust based on actual logic. 
-        // For now, let's verify visual feedback elements exist.
-        expect(wrapper.find('.border-dashed').exists()).toBe(true)
+    it('has a drop zone with dashed border', () => {
+        const wrapper = mountComponent()
+        const dropZone = wrapper.find('.border-dashed')
+        expect(dropZone.exists()).toBe(true)
     })
 })

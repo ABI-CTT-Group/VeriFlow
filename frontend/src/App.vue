@@ -13,11 +13,13 @@ import { useWorkflowStore } from './stores/workflow'
 // Layout components
 import ResizablePanel from './components/layout/ResizablePanel.vue'
 import CollapsibleHorizontalPanel from './components/layout/CollapsibleHorizontalPanel.vue'
+import LandingPageOverlay from './components/layout/LandingPageOverlay.vue'
 
 // Module components
 import UploadModule from './components/modules/UploadModule.vue'
 import StudyDesignModule from './components/modules/StudyDesignModule.vue'
 import ConsoleModule from './components/modules/ConsoleModule.vue'
+import ConsoleInput from './components/modules/ConsoleInput.vue'
 import ConfigurationPanel from './components/modules/ConfigurationPanel.vue'
 import DatasetNavigationModule from './components/modules/DatasetNavigationModule.vue'
 
@@ -57,6 +59,7 @@ const shouldCollapseViewer = ref(false)
 const collapseAllExceptSelected = ref(false)
 const isResizingConsole = ref(false)
 const defaultViewerPlugin = ref('auto')
+const showLandingPage = ref(true)
 
 // Handler functions
 function handleSourceClick(propertyId: string) {
@@ -99,6 +102,7 @@ function handleAssembleClick() {
   activePropertyId.value = ''
   shouldCollapseViewer.value = true
   store.isLeftPanelCollapsed = true
+  store.isConsoleCollapsed = false
 }
 
 function handleRunWorkflow() {
@@ -116,14 +120,32 @@ function handleDatasetSelect(datasetId: string | null) {
 }
 
 // Console resize handlers
-function handleConsoleMouseDown(e: MouseEvent) {
-  e.preventDefault()
+function handleConsoleMouseDown(e: MouseEvent | TouchEvent) {
+  if (e.cancelable) {
+    e.preventDefault()
+  }
   isResizingConsole.value = true
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+  document.body.style.touchAction = 'none'
 }
 
-function handleMouseMove(e: MouseEvent) {
+function handleMouseMove(e: MouseEvent | TouchEvent) {
   if (isResizingConsole.value) {
-    const newHeight = window.innerHeight - e.clientY
+    let clientY: number
+    
+    // Check for touches support and existence
+    const isTouch = 'touches' in e && (e as TouchEvent).touches.length > 0
+    
+    if (isTouch) {
+      clientY = (e as TouchEvent).touches[0].clientY
+    } else if (e instanceof MouseEvent) {
+      clientY = e.clientY
+    } else {
+      return
+    }
+
+    const newHeight = window.innerHeight - clientY
     const minHeight = 100
     const maxHeight = window.innerHeight - 200
     store.consoleHeight = Math.min(Math.max(newHeight, minHeight), maxHeight)
@@ -132,6 +154,9 @@ function handleMouseMove(e: MouseEvent) {
 
 function handleMouseUp() {
   isResizingConsole.value = false
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+  document.body.style.touchAction = ''
 }
 
 // Watchers for UI state consistency
@@ -142,10 +167,21 @@ watch(isDatasetNavCollapsed, (val) => {
 
 <template>
   <div 
-    class="h-screen flex flex-col bg-slate-50 overflow-hidden"
+    class="h-[100dvh] flex flex-col bg-slate-50 overflow-hidden"
     @mousemove="handleMouseMove"
     @mouseup="handleMouseUp"
+    @touchmove="handleMouseMove"
+    @touchend="handleMouseUp"
   >
+    <LandingPageOverlay 
+      v-if="showLandingPage" 
+      @get-started="showLandingPage = false" 
+    />
+    
+    <div 
+      class="h-full flex flex-col overflow-hidden transition-all duration-500"
+      :class="{ 'blur-sm scale-[0.98]': showLandingPage }"
+    >
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-sm z-10">
       <div class="flex items-center gap-3">
@@ -169,7 +205,7 @@ watch(isDatasetNavCollapsed, (val) => {
       <ResizablePanel
         v-if="!isLeftPanelCollapsed"
         side="left"
-        :default-width="320"
+        :default-width="400"
         :min-width="280"
         :max-width="600"
       >
@@ -188,6 +224,7 @@ watch(isDatasetNavCollapsed, (val) => {
             @source-click="handleSourceClick"
             @assemble-click="handleAssembleClick"
             @collapse-left-panel="isLeftPanelCollapsed = true"
+            @properties-opened="isConsoleCollapsed = true"
           />
         </div>
       </ResizablePanel>
@@ -266,18 +303,20 @@ watch(isDatasetNavCollapsed, (val) => {
 
     <!-- Bottom Panel - Console -->
     <div 
-      v-if="!isConsoleCollapsed"
-      class="border-t border-slate-200 flex-shrink-0 bg-white relative" 
-      :style="{ height: consoleHeight + 'px' }"
+      class="border-t border-slate-200 flex-shrink-0 bg-white relative flex flex-col" 
+      :style="{ height: isConsoleCollapsed ? 'auto' : consoleHeight + 'px' }"
     >
-      <!-- Resize handle -->
+      <!-- Resize handle (only visible when expanded) -->
       <div
+        v-if="!isConsoleCollapsed"
         @mousedown="handleConsoleMouseDown"
-        class="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-blue-500 transition-colors z-20"
+        @touchstart.prevent="handleConsoleMouseDown"
+        class="absolute top-0 left-0 right-0 h-4 cursor-ns-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500 -top-2"
       />
-      <div class="h-full flex flex-col overflow-hidden" style="padding-top: 4px">
-        <!-- Header with collapse button -->
-        <div class="px-4 py-2 flex items-center justify-between flex-shrink-0">
+      
+      <div class="flex-1 flex flex-col overflow-hidden min-h-0" :style="{ paddingTop: isConsoleCollapsed ? '0' : '4px' }">
+        <!-- Header -->
+        <div v-if="!isConsoleCollapsed" class="px-4 py-2 flex items-center justify-between flex-shrink-0">
           <div class="flex items-center gap-2">
             <button
               @click="isConsoleCollapsed = true"
@@ -288,24 +327,25 @@ watch(isDatasetNavCollapsed, (val) => {
             <span class="text-sm font-medium text-slate-700">Console</span>
           </div>
         </div>
-        <!-- Content -->
-        <div class="flex-1 overflow-hidden">
+        <div v-else class="h-8 flex-shrink-0 bg-slate-50">
+           <button
+            @click="isConsoleCollapsed = false"
+            class="w-full h-full hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <ChevronUp class="w-4 h-4 text-slate-600" />
+            <span class="text-xs font-medium text-slate-600">Console</span>
+          </button>
+        </div>
+
+        <!-- Content (Messages) -->
+        <div v-show="!isConsoleCollapsed" class="flex-1 overflow-hidden">
           <ConsoleModule />
         </div>
       </div>
+
+      <!-- Input (Always rendered, preserving focus) -->
+      <ConsoleInput />
     </div>
-    <div 
-      v-else
-      class="border-t border-slate-200 flex-shrink-0 bg-slate-50" 
-      style="height: 32px"
-    >
-      <button
-        @click="isConsoleCollapsed = false"
-        class="w-full h-full hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
-      >
-        <ChevronUp class="w-4 h-4 text-slate-600" />
-        <span class="text-xs font-medium text-slate-600">Console</span>
-      </button>
     </div>
   </div>
 </template>

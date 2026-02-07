@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import publications, workflows, executions, catalogue
+from app.api import publications, workflows, executions, catalogue, settings
 from app.services.database import db_service
 from app.services.minio_client import minio_service
 
@@ -58,6 +58,7 @@ app.include_router(publications.router, prefix="/api/v1", tags=["Publications"])
 app.include_router(workflows.router, prefix="/api/v1", tags=["Workflows"])
 app.include_router(executions.router, prefix="/api/v1", tags=["Executions"])
 app.include_router(catalogue.router, prefix="/api/v1", tags=["Catalogue"])
+app.include_router(settings.router, prefix="/api/v1", tags=["Settings"])
 
 
 @app.get("/health")

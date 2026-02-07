@@ -7,25 +7,23 @@ import asyncio
 # Add app to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.agents.scholar_v2 import ScholarAgentV2
+from app.agents.scholar import ScholarAgent
 
 async def run_multimodal_benchmark():
     # 1. Setup V2 Agent
-    agent = ScholarAgentV2()
+    agent = ScholarAgent()
     
-    # pdf_path = r"tests\mamamiaworkflow.pdf"
-    pdf_path = r"tests\978-3-031-94562-5_34.pdf"
+    pdf_path = r"tests\mamamiaworkflow.pdf"
+    # pdf_path = r"tests\978-3-031-94562-5_34.pdf"
     
     if not os.path.exists(pdf_path):
         print(f"Error: {pdf_path} not found. Please place it in this directory.")
         return
 
     # 2. Test Configuration
-    # Using a model compatible with the new Google Gen AI SDK (v2)
-    # gemini-2.0-flash is recommended for high-speed structured output
-    target_model = "gemini-2.0-flash" 
+    target_model = "gemini-3-pro-preview" 
 
-    print(f"\n=== Starting V2 (New SDK + Structured Output) Benchmark ===")
+    print(f"\n=== Starting Test ===")
     print(f"File: {pdf_path}")
     print(f"Model: {target_model}")
     

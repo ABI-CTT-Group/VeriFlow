@@ -7,6 +7,7 @@ Per PLAN.md Stage 2/4 and SPEC.md Section 5.2
 import uuid
 import asyncio
 import json
+import tempfile
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
@@ -24,12 +25,14 @@ from app.models.session import AgentSession, Message, AgentType, MessageRole
 from app.services.minio_client import minio_service
 from app.services.database import db_service
 
-# Stage 4: Import Scholar Agent
+# Stage 4: Import Scholar Agent (Gemini 3 SDK)
 try:
-    from app.agents.scholar import scholar_agent
+    from app.agents.scholar import ScholarAgent
+    scholar_agent = ScholarAgent()
     SCHOLAR_AVAILABLE = True
-except ImportError:
+except (ImportError, ValueError):
     SCHOLAR_AVAILABLE = False
+    scholar_agent = None
 
 router = APIRouter()
 
@@ -59,6 +62,11 @@ class PropertyUpdateRequest(BaseModel):
     """Request to update a property."""
     property_id: str
     value: str
+
+
+class AdditionalInfoRequest(BaseModel):
+    """Request to add additional info."""
+    info: str
 
 
 @router.post("/publications/upload", response_model=UploadResponse)
@@ -122,12 +130,15 @@ async def upload_publication(
     
     # Stage 4: Trigger Scholar Agent in background if available
     if SCHOLAR_AVAILABLE:
-        # Extract text from PDF
         try:
-            pdf_text = scholar_agent.extract_text_from_pdf(file_content)
-            # Store extracted text for analysis
+            # Save PDF to temp file for Gemini native upload
+            temp_dir = tempfile.mkdtemp()
+            temp_pdf_path = Path(temp_dir) / (file.filename or "upload.pdf")
+            with open(temp_pdf_path, "wb") as f:
+                f.write(file_content)
+
             _upload_cache[upload_id] = {
-                "pdf_text": pdf_text,
+                "pdf_path": str(temp_pdf_path),
                 "context_content": context_content,
                 "status": "processing",
                 "result": None,
@@ -136,13 +147,13 @@ async def upload_publication(
             background_tasks.add_task(
                 _process_publication_async,
                 upload_id,
-                pdf_text,
+                str(temp_pdf_path),
                 context_content,
                 session_id,
             )
         except Exception as e:
             _upload_cache[upload_id] = {
-                "pdf_text": None,
+                "pdf_path": None,
                 "context_content": context_content,
                 "status": "error",
                 "error": str(e),
@@ -164,14 +175,14 @@ _upload_cache: dict[str, dict] = {}
 
 async def _process_publication_async(
     upload_id: str,
-    pdf_text: str,
+    pdf_path: str,
     context_content: Optional[str],
     session_id: str,
 ):
-    """Background task to process publication with Scholar Agent."""
+    """Background task to process publication with Scholar Agent (Gemini 3)."""
     try:
         result = await scholar_agent.analyze_publication(
-            pdf_text=pdf_text,
+            pdf_path=pdf_path,
             context_content=context_content,
             upload_id=upload_id,
         )
@@ -193,6 +204,23 @@ async def _process_publication_async(
     except Exception as e:
         _upload_cache[upload_id]["status"] = "error"
         _upload_cache[upload_id]["error"] = str(e)
+
+
+@router.post("/publications/{upload_id}/additional-info")
+async def add_additional_info(upload_id: str, request: AdditionalInfoRequest):
+    """
+    Add user-provided additional guidance for the publication.
+    This info helps downstream agents (Engineer/Reviewer).
+    """
+    if upload_id not in _upload_cache:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    
+    # Store the info in the cache entry
+    _upload_cache[upload_id]["additional_info"] = request.info
+    
+    # If using DB (Stage 4), we would persist this here
+    
+    return {"status": "success", "message": "Additional info stored"}
 
 
 @router.get("/study-design/{upload_id}", response_model=StudyDesignResponse)
@@ -234,26 +262,16 @@ async def get_study_design(upload_id: str):
         # Stage 4: Handle Scholar Agent results
         if status == "completed" and cache_entry.get("result"):
             result = cache_entry["result"]
-            if SCHOLAR_AVAILABLE:
-                hierarchy_response = scholar_agent.build_hierarchy_response(result, upload_id)
-                return StudyDesignResponse(
-                    upload_id=upload_id,
-                    status="completed",
-                    hierarchy=hierarchy_response.get("hierarchy"),
-                    confidence_scores=hierarchy_response.get("confidence_scores"),
-                )
-            else:
-                # If Scholar not available but we have result, use it directly
-                return StudyDesignResponse(
-                    upload_id=upload_id,
-                    status="completed",
-                    hierarchy={"investigation": result.get("isa_json", {})},
-                    confidence_scores={
-                        "upload_id": upload_id,
-                        "generated_at": datetime.utcnow().isoformat() + "Z",
-                        "scores": result.get("confidence_scores", {}),
-                    },
-                )
+            return StudyDesignResponse(
+                upload_id=upload_id,
+                status="completed",
+                hierarchy={"investigation": result.get("isa_json", {})},
+                confidence_scores={
+                    "upload_id": upload_id,
+                    "generated_at": datetime.utcnow().isoformat() + "Z",
+                    "scores": result.get("confidence_scores", {}),
+                },
+            )
         elif status == "error":
             return StudyDesignResponse(
                 upload_id=upload_id,
@@ -269,69 +287,10 @@ async def get_study_design(upload_id: str):
                 confidence_scores=None,
             )
     
-    # Fallback: Return mock data for demo purposes
-    mock_hierarchy = {
-        "investigation": {
-            "id": "inv_1",
-            "title": "Automated Breast Cancer Detection using DCE-MRI",
-            "description": "A study on automated tumor segmentation from dynamic contrast-enhanced MRI scans.",
-            "properties": [
-                {"id": "inv-title", "value": "Automated Breast Cancer Detection", "source_id": "src_1", "confidence": 95},
-                {"id": "inv-description", "value": "Study on automated tumor segmentation", "source_id": "src_2", "confidence": 88},
-            ],
-            "studies": [
-                {
-                    "id": "study_1",
-                    "title": "MAMA-MIA Segmentation Study",
-                    "description": "Segmentation of breast tumors using U-Net architecture.",
-                    "properties": [
-                        {"id": "study-subjects", "value": "384 patients", "source_id": "src_3", "confidence": 92},
-                        {"id": "study-modality", "value": "DCE-MRI", "source_id": "src_4", "confidence": 97},
-                    ],
-                    "assays": [
-                        {
-                            "id": "assay_1",
-                            "name": "U-Net Training Pipeline",
-                            "description": "Training pipeline for breast tumor segmentation.",
-                            "steps": [
-                                {"id": "step_1", "description": "Data acquisition and preprocessing"},
-                                {"id": "step_2", "description": "DICOM to NIfTI conversion"},
-                                {"id": "step_3", "description": "U-Net model training"},
-                                {"id": "step_4", "description": "Inference and evaluation"},
-                            ],
-                        },
-                        {
-                            "id": "assay_2",
-                            "name": "Inference Pipeline",
-                            "description": "Inference pipeline for new patient scans.",
-                            "steps": [
-                                {"id": "step_1", "description": "Load pre-trained model"},
-                                {"id": "step_2", "description": "Process input scan"},
-                                {"id": "step_3", "description": "Generate segmentation mask"},
-                            ],
-                        },
-                    ],
-                },
-            ],
-        },
-    }
-    
-    mock_confidence = {
-        "upload_id": upload_id,
-        "generated_at": "2026-01-29T12:00:00Z",
-        "scores": {
-            "inv-title": {"value": 95, "source_page": 1, "source_text": "Automated Breast Cancer Detection..."},
-            "inv-description": {"value": 88, "source_page": 1, "source_text": "This study presents..."},
-            "study-subjects": {"value": 92, "source_page": 3, "source_text": "384 patients were enrolled..."},
-            "study-modality": {"value": 97, "source_page": 2, "source_text": "Dynamic contrast-enhanced MRI..."},
-        },
-    }
-    
-    return StudyDesignResponse(
-        upload_id=upload_id,
-        status="completed",
-        hierarchy=mock_hierarchy,
-        confidence_scores=mock_confidence,
+    # No data found - return not found error
+    raise HTTPException(
+        status_code=404,
+        detail=f"No study design found for upload {upload_id}. Upload a PDF or load an example first."
     )
 
 

@@ -1,0 +1,132 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata for backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for airflow
+        id: meta-airflow
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/airflow
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build and push airflow
+        uses: docker/build-push-action@v5
+        with:
+          context: ./airflow
+          push: true
+          tags: ${{ steps.meta-airflow.outputs.tags }}
+          labels: ${{ steps.meta-airflow.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate .env file
+        run: |
+          cat << 'EOF' > .env
+          ${{ secrets.PROD_ENV }}
+          EOF
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "docker-compose.prod.yml,.env"
+          target: ${{ secrets.SERVER_PATH }}
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          # Strip 'v' prefix from tag to match Docker image tags (e.g., v0.1.0 -> 0.1.0)
+          APP_VERSION: ${{ github.event.release.tag_name }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: APP_VERSION
+          script_stop: true
+          script: |
+            cd ${{ secrets.SERVER_PATH }}
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Strip 'v' prefix from APP_VERSION to match image tags
+            export APP_VERSION=${APP_VERSION#v}
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f

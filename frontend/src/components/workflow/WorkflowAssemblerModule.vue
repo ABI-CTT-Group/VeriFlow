@@ -4,11 +4,20 @@
  * Ported from: planning/UI/src/components/WorkflowAssemblerModule.tsx
  * 
  * Main workflow canvas with nodes, connections, and execution controls.
+ * Refactored to use @vue-flow/core for robust zoom/pan and graph management.
  */
-import { ref, watch } from 'vue'
+import { ref, watch, markRaw } from 'vue'
 import { Play, Square, Download, ChevronLeft } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import type { Edge } from '@vue-flow/core'
+import { VueFlow, type Edge, type Connection } from '@vue-flow/core'
+import { Background } from '@vue-flow/background'
+import { Controls } from '@vue-flow/controls'
+import { MiniMap } from '@vue-flow/minimap'
+import '@vue-flow/core/dist/style.css'
+import '@vue-flow/core/dist/theme-default.css'
+import '@vue-flow/controls/dist/style.css'
+import '@vue-flow/minimap/dist/style.css'
+
 import { useWorkflowStore } from '../../stores/workflow'
 import GraphNode from './GraphNode.vue'
 import ConnectionLine from './ConnectionLine.vue'
@@ -23,11 +32,11 @@ interface Props {
   viewerPdfUrl?: string | null
   isViewerVisible?: boolean
   activePropertyId?: string
-  // isAssembled?: boolean // Unused, coming from store usually, but kept for compatibility if needed. Actually removal is cleaner.
   hasUploadedFiles?: boolean
   isWorkflowRunning?: boolean
   defaultViewerPlugin?: string
   selectedDatasetId?: string | null
+  shouldCollapseViewer?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -36,11 +45,11 @@ const props = withDefaults(defineProps<Props>(), {
   viewerPdfUrl: null,
   isViewerVisible: false,
   activePropertyId: undefined,
-  // isAssembled: false,
   hasUploadedFiles: false,
   isWorkflowRunning: false,
   defaultViewerPlugin: 'auto',
   selectedDatasetId: null,
+  shouldCollapseViewer: false,
 })
 
 const emit = defineEmits<{
@@ -55,7 +64,7 @@ const emit = defineEmits<{
 const store = useWorkflowStore()
 const { 
   nodes, 
-  edges: storeEdges, // Rename to avoid conflict if we used edges locally, though inconsistent with other usage. Keeping storeEdges for clarity.
+  edges: storeEdges, 
   isAssembled 
 } = storeToRefs(store)
 const { runWorkflow } = store
@@ -65,13 +74,38 @@ const isRunning = ref(false)
 const numSubjects = ref(1)
 const isViewerCollapsed = ref(!props.isViewerVisible)
 const isCatalogueCollapsed = ref(false)
-const canvasRef = ref<HTMLDivElement | null>(null)
-const dragConnection = ref<{ sourceNodeId: string; sourcePortId: string; x: number; y: number } | null>(null)
+
+// Provide handlers for child nodes
+import { provide } from 'vue'
+provide('onDatasetSelect', (datasetId: string) => {
+  emit('datasetSelect', datasetId)
+})
+
+// Vue Flow State
+// We wrap components in markRaw to avoid Vue reactivity overhead on component definitions
+const nodeTypes = {
+  tool: markRaw(GraphNode),
+  measurement: markRaw(GraphNode),
+  dataset: markRaw(GraphNode),
+  default: markRaw(GraphNode)
+} as any
+
+const edgeTypes = {
+  default: markRaw(ConnectionLine)
+}
+
+const vueFlowInstance = ref<any>(null)
 
 // Watchers
 watch(() => props.isViewerVisible, (visible) => {
   if (visible) {
     isViewerCollapsed.value = false
+  }
+})
+
+watch(() => props.shouldCollapseViewer, (shouldCollapse) => {
+  if (shouldCollapse) {
+    isViewerCollapsed.value = true
   }
 })
 
@@ -82,53 +116,29 @@ function handleRunWorkflow() {
   emit('runWorkflow') // Keep emit for parent UI updates if needed
 }
 
+function onPaneReady(instance: any) {
+  vueFlowInstance.value = instance
+  instance.fitView()
+}
+
+// Handle new connections
+function onConnectHandler(params: Connection) {
+  const newEdge: Edge = {
+    id: `e-${params.source}-${params.target}-${Date.now()}`,
+    source: params.source,
+    target: params.target,
+    sourceHandle: params.sourceHandle,
+    targetHandle: params.targetHandle,
+    type: 'default'
+  }
+  store.edges.push(newEdge)
+}
+
 function handleDeleteConnection(connectionId: string) {
   store.edges = store.edges.filter(c => c.id !== connectionId)
 }
 
-function handlePortMouseDown(nodeId: string, portId: string, portType: 'input' | 'output', event: MouseEvent) {
-  if (portType === 'output' && canvasRef.value) {
-    event.stopPropagation()
-    const rect = canvasRef.value.getBoundingClientRect()
-    dragConnection.value = {
-      sourceNodeId: nodeId,
-      sourcePortId: portId,
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
-    }
-  }
-}
-
-function handleMouseMove(event: MouseEvent) {
-  if (dragConnection.value && canvasRef.value) {
-    const rect = canvasRef.value.getBoundingClientRect()
-    dragConnection.value = {
-      ...dragConnection.value,
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
-    }
-  }
-}
-
-function handlePortMouseUp(nodeId: string, portId: string, portType: 'input' | 'output') {
-  if (dragConnection.value && portType === 'input') {
-    // Add to store edges
-    const newEdge: Edge = {
-      id: `conn-${Date.now()}`,
-      source: dragConnection.value.sourceNodeId,
-      sourceHandle: dragConnection.value.sourcePortId,
-      target: nodeId,
-      targetHandle: portId
-    }
-    store.edges.push(newEdge)
-  }
-  dragConnection.value = null
-}
-
-function handleMouseUp() {
-  dragConnection.value = null
-}
-
+// Drag and Drop
 function onDragOver(event: DragEvent) {
   event.preventDefault()
   if (event.dataTransfer) {
@@ -137,25 +147,35 @@ function onDragOver(event: DragEvent) {
 }
 
 function onDrop(event: DragEvent) {
-  if (!canvasRef.value) return
-  
   const data = event.dataTransfer?.getData('application/json')
   if (!data) return
   
   try {
     const { item, type } = JSON.parse(data)
-    const rect = canvasRef.value.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+    
+    // Project mouse coordinates to flow coordinates
+    // We need the bounding rect of the flow container to calculate relative position first
+    // Note: useVueFlow's project assumes coordinates relative to the flow pane (usually) or requires adjustment
+    // But better: use screenToFlowCoordinate if available from specific instance APIs or manually calculate.
+    // simpler approach with project:
+    if (!vueFlowInstance.value) return 
+
+    // Get bounds of the flow wrapper
+    // We can rely on event properties directly for projection if we have the instance
+    const position = vueFlowInstance.value.screenToFlowCoordinate({
+      x: event.clientX,
+      y: event.clientY,
+    })
     
     // Create new node compatible with Vue Flow structure
-    const newNode: any = { // Using any to bypass strict type checking against standard Node for custom props
+    const newNode: any = { 
       id: `${type}-${Date.now()}`,
-      type: type,
-      position: { x, y },
+      type: type, // This triggers the correct node type mapping
+      position,
       data: {
         name: item.name,
         status: 'pending',
+        type: type, // Redundant but useful for data access inside GraphNode
         inputs: type === 'tool' ? [{ id: `in-${Date.now()}`, label: 'Input' }] : undefined,
         outputs: [{ id: `out-${Date.now()}`, label: 'Output' }]
       }
@@ -168,25 +188,10 @@ function onDrop(event: DragEvent) {
   }
 }
 
-// Helper to get connection line coordinates from Edge
-function getConnectionCoords(edge: Edge) {
-  const sourceNode = nodes.value.find(n => n.id === edge.source)
-  const targetNode = nodes.value.find(n => n.id === edge.target)
-  if (!sourceNode || !targetNode) return null
-  
-  // Adapt to Vue Flow structure (node.data)
-  const sourceNodeData = sourceNode.data
-  const targetNodeData = targetNode.data
-  
-  const sourcePort = (sourceNodeData as any).outputs?.find((p: any) => p.id === edge.sourceHandle)
-  const targetPort = (targetNodeData as any).inputs?.find((p: any) => p.id === edge.targetHandle)
-  if (!sourcePort || !targetPort) return null
-
-  const sourcePortIndex = (sourceNodeData as any).outputs?.indexOf(sourcePort) || 0
-  const targetPortIndex = (targetNodeData as any).inputs?.indexOf(targetPort) || 0
-
-  return { sourceNode, targetNode, sourcePortIndex, targetPortIndex }
+function handleNodeClick(event: any) {
+  emit('selectNode', event.node)
 }
+
 </script>
 
 <template>
@@ -302,70 +307,31 @@ function getConnectionCoords(edge: Edge) {
         </button>
       </div>
 
-      <!-- Canvas (Center) -->
-      <div 
-        ref="canvasRef"
-        class="flex-1 overflow-auto bg-slate-50 relative min-w-0"
-        @mousemove="handleMouseMove"
-        @mouseup="handleMouseUp"
-        @mouseleave="handleMouseUp"
-        @dragover="onDragOver"
-        @drop="onDrop"
-      >
-        <div class="relative" style="width: 1600px; height: 600px;">
-          <!-- Connection Lines -->
-          <svg class="absolute inset-0 pointer-events-none" style="width: 100%; height: 100%;">
-            <template v-for="edge in storeEdges" :key="edge.id">
-              <ConnectionLine
-                v-if="getConnectionCoords(edge)"
-                :id="edge.id"
-                :source-node="getConnectionCoords(edge)!.sourceNode"
-                :target-node="getConnectionCoords(edge)!.targetNode"
-                :source-port-index="getConnectionCoords(edge)!.sourcePortIndex"
-                :target-port-index="getConnectionCoords(edge)!.targetPortIndex"
-                @delete="handleDeleteConnection"
-              />
-            </template>
-            
-            <!-- Drag Connection -->
-            <path
-              v-if="dragConnection"
-              :d="(() => {
-                const sourceNode = nodes.find(n => n.id === dragConnection!.sourceNodeId);
-                const sourcePort = (sourceNode?.data as any)?.outputs?.find((p: any) => p.id === dragConnection!.sourcePortId);
-                if (!sourceNode || !sourcePort) return '';
-                
-                const sourcePortIndex = (sourceNode.data as any).outputs?.indexOf(sourcePort) || 0;
-                // Calculations matching GraphNode size and port layout
-                // Node width: 280, Header ~50, Port height ~40 (approx based on layout)
-                // Source port is absolute positioned right side (-right-6)
-                // But GraphNode inputs/outputs are in Body.
-                // React code uses: startX = sourceNode.x + 280; startY = sourceNode.y + 70 + index * 28;
-                const startX = sourceNode.position.x + 280;
-                const startY = sourceNode.position.y + 70 + sourcePortIndex * 28;
-                
-                return `M ${startX} ${startY} C ${startX + 100} ${startY}, ${dragConnection.x - 100} ${dragConnection.y}, ${dragConnection.x} ${dragConnection.y}`;
-              })()"
-              stroke="#3b82f6"
-              stroke-width="2"
-              fill="none"
-              stroke-dasharray="5,5"
-            />
-          </svg>
-
-          <!-- Nodes -->
-          <GraphNode
-            v-for="node in nodes"
-            :key="node.id"
-            :node="node"
-            :is-selected="selectedNode?.id === node.id"
-            :selected-dataset-id="selectedDatasetId"
-            @select="emit('selectNode', node)"
-            @port-mouse-down="handlePortMouseDown"
-            @port-mouse-up="handlePortMouseUp"
-            @dataset-select="emit('datasetSelect', $event)"
-          />
-        </div>
+      <!-- Canvas (Center) - Vue Flow Implemenation -->
+      <div class="flex-1 h-full w-full relative bg-slate-50" @dragover="onDragOver" @drop="onDrop">
+        <VueFlow
+          v-model="nodes"
+          v-model:edges="storeEdges"
+          :node-types="nodeTypes"
+          :edge-types="edgeTypes"
+          :default-viewport="{ zoom: 1 }"
+          :min-zoom="0.2"
+          :max-zoom="4"
+          @pane-ready="onPaneReady"
+          @connect="onConnectHandler"
+          @node-click="handleNodeClick"
+          fit-view-on-init
+          class="h-full w-full"
+        >
+          <Background pattern-color="#e2e8f0" :gap="16" />
+          <Controls />
+          <MiniMap />
+          
+          <!-- Edge Delete Handler - passed via custom edge emit -->
+          <template #edge-default="props">
+            <ConnectionLine v-bind="props" @delete="handleDeleteConnection" />
+          </template>
+        </VueFlow>
       </div>
 
       <!-- Data Object Catalogue (Collapsible) -->

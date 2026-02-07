@@ -73,15 +73,40 @@ class AirflowClient:
         self.base_url = base_url or self.DEFAULT_BASE_URL
         self.username = username or self.DEFAULT_USERNAME
         self.password = password or self.DEFAULT_PASSWORD
-        self.api_base = f"{self.base_url}/api/v1"
+        # Airflow 3: Remove /api/v1 prefix, endpoints are relative to root or api root
+        self.api_base = self.base_url
         self._client: Optional[httpx.AsyncClient] = None
+        self._token: Optional[str] = None
     
+    async def _get_access_token(self) -> Optional[str]:
+        """Get JWT access token from Airflow."""
+        try:
+            async with httpx.AsyncClient(base_url=self.api_base, timeout=10.0) as client:
+                response = await client.post(
+                    "/auth/token",
+                    json={"username": self.username, "password": self.password}
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("access_token")
+        except Exception as e:
+            logger.error(f"Failed to get access token: {e}")
+            return None
+
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client with authentication."""
+        """Get or create HTTP client with JWT authentication."""
         if self._client is None or self._client.is_closed:
+            # Refresh token if needed (simplistic approach: fetch new one on client creation)
+            if not self._token:
+                self._token = await self._get_access_token()
+            
+            headers = {}
+            if self._token:
+                headers["Authorization"] = f"Bearer {self._token}"
+            
             self._client = httpx.AsyncClient(
                 base_url=self.api_base,
-                auth=(self.username, self.password),
+                headers=headers,
                 timeout=30.0,
             )
         return self._client
@@ -94,9 +119,10 @@ class AirflowClient:
     async def health_check(self) -> bool:
         """Check if Airflow is healthy and accessible."""
         try:
-            client = await self._get_client()
-            response = await client.get("/health")
-            return response.status_code == 200
+            # Airflow 3: Use /monitor/health instead of /health
+            async with httpx.AsyncClient(base_url=self.api_base, timeout=5.0) as client:
+                response = await client.get("/monitor/health")
+                return response.status_code == 200
         except Exception as e:
             logger.error(f"Airflow health check failed: {e}")
             return False
@@ -105,6 +131,7 @@ class AirflowClient:
         """List all available DAGs."""
         try:
             client = await self._get_client()
+            # Airflow 3: Endpoints might be unversioned or v2. Trying standard /dags
             response = await client.get("/dags")
             response.raise_for_status()
             data = response.json()
@@ -250,6 +277,7 @@ class AirflowClient:
         """
         try:
             client = await self._get_client()
+            # Log endpoint structure might vary, keeping consistent with v2 for now
             response = await client.get(
                 f"/dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances/{task_id}/logs/{task_try_number}",
                 headers={"Accept": "text/plain"},

@@ -36,7 +36,7 @@ class DAGGenerator:
     # Default directory for generated DAGs
     DEFAULT_DAGS_PATH = os.getenv("AIRFLOW_DAGS_PATH", "/opt/airflow/dags")
     # Local dags path for development
-    LOCAL_DAGS_PATH = Path(__file__).parent.parent.parent.parent / "dags"
+    LOCAL_DAGS_PATH = Path(__file__).parent.parent.parent.parent / "airflow" / "dags"
     
     # MinIO configuration for volume mounts
     MINIO_DATA_PATH = os.getenv("MINIO_DATA_PATH", "/data/minio")

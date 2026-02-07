@@ -1,27 +1,26 @@
-
 <script setup lang="ts">
 /**
  * GraphNode.vue
  * Ported from: planning/UI/src/components/GraphNode.tsx
  * 
  * Workflow graph node component with inputs/outputs and status indicators.
+ * Adapted for Vue Flow Custom Node.
  */
 import { Database, Beaker, Box, CheckCircle, Loader, Clock, AlertCircle } from 'lucide-vue-next'
+import { Handle, Position } from '@vue-flow/core'
+import { inject } from 'vue'
 
+// Vue Flow passes node data via `data` prop, and other props like `selected`
 interface Props {
-  node: any
-  isSelected: boolean
-  selectedDatasetId?: string | null
+  id: string
+  data: any
+  selected: boolean 
 }
 
 const props = defineProps<Props>()
 
-const emit = defineEmits<{
-  select: []
-  portMouseDown: [nodeId: string, portId: string, portType: 'input' | 'output', event: MouseEvent]
-  portMouseUp: [nodeId: string, portId: string, portType: 'input' | 'output']
-  datasetSelect: [datasetId: string]
-}>()
+// Emits from Vue Flow custom nodes don't easily bubble, so we use injected handlers
+const onDatasetSelect = inject<(datasetId: string) => void>('onDatasetSelect')
 
 const availableDatasets = [
   { id: 'dce-mri-scans', name: 'DCE-MRI Scans', samples: ['Subject_001/T1w.nii.gz', 'Subject_002/T1w.nii.gz'] },
@@ -33,9 +32,9 @@ function getSampleDisplayName(samplePath: string): string {
 }
 
 function getStatusColor(): string {
-  if (props.node.type !== 'tool') return 'border-slate-300'
+  if (props.data.type !== 'tool') return 'border-slate-300'
   
-  switch (props.node.data?.status) {
+  switch (props.data.status) {
     case 'completed': return 'border-green-300 bg-green-50'
     case 'running': return 'border-blue-300 bg-blue-50'
     case 'error': return 'border-red-300 bg-red-50'
@@ -43,39 +42,22 @@ function getStatusColor(): string {
   }
 }
 
-function handleNodeClick(e: MouseEvent) {
-  if (props.node.type === 'measurement') {
-    e.stopPropagation()
-    return
-  }
-  emit('select')
-}
-
-function handlePortMouseDown(portId: string, portType: 'input' | 'output', event: MouseEvent) {
-  emit('portMouseDown', props.node.id, portId, portType, event)
-}
-
-function handlePortMouseUp(portId: string, portType: 'input' | 'output') {
-  emit('portMouseUp', props.node.id, portId, portType)
-}
-
 function handleDatasetSelect(datasetId: string, event: MouseEvent) {
   event.stopPropagation()
-  emit('datasetSelect', datasetId)
+  if (onDatasetSelect) {
+    onDatasetSelect(datasetId)
+  }
 }
 </script>
 
 <template>
   <div
-    @click="handleNodeClick"
     :class="[
-      'absolute bg-white rounded-xl border-2 transition-all duration-200 ease-in-out',
-      isSelected ? 'border-blue-500 shadow-xl ring-1 ring-blue-500/20' : getStatusColor() + ' shadow-sm hover:border-blue-300 hover:shadow-md',
-      node.type === 'measurement' ? 'cursor-default' : 'cursor-pointer'
+      'bg-white rounded-xl border-2 transition-all duration-200 ease-in-out',
+      selected ? 'border-blue-500 shadow-xl ring-1 ring-blue-500/20' : getStatusColor() + ' shadow-sm hover:border-blue-300 hover:shadow-md',
+      data.type === 'measurement' ? 'cursor-default' : 'cursor-pointer'
     ]"
     :style="{ 
-      left: node.position.x + 'px', 
-      top: node.position.y + 'px',
       width: '280px'
     }"
   >
@@ -84,51 +66,53 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-2 flex-1 min-w-0">
           <!-- Node Icon -->
-          <Database v-if="node.type === 'measurement'" class="w-5 h-5 text-blue-600" />
-          <Beaker v-else-if="node.type === 'tool'" class="w-5 h-5 text-purple-600" />
+          <Database v-if="data.type === 'measurement'" class="w-5 h-5 text-blue-600" />
+          <Beaker v-else-if="data.type === 'tool'" class="w-5 h-5 text-purple-600" />
           <Box v-else class="w-5 h-5 text-green-600" />
           
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-slate-900 truncate">{{ node.data?.name }}</p>
-            <p v-if="node.data?.confidence" class="text-xs text-slate-500 mt-0.5">
-              Confidence: {{ (node.data.confidence * 100).toFixed(0) }}%
+            <p class="text-sm font-medium text-slate-900 truncate">{{ data.name }}</p>
+            <p v-if="data.confidence" class="text-xs text-slate-500 mt-0.5">
+              Confidence: {{ (data.confidence * 100).toFixed(0) }}%
             </p>
-            <p v-if="node.data?.totalSubjects" class="text-xs text-slate-500 mt-0.5">
-              {{ node.data.totalSubjects }} subjects available
+            <p v-if="data.totalSubjects" class="text-xs text-slate-500 mt-0.5">
+              {{ data.totalSubjects }} subjects available
             </p>
           </div>
         </div>
         
         <!-- Status Icon -->
-        <CheckCircle v-if="node.data?.status === 'completed'" class="w-4 h-4 text-green-600" />
-        <Loader v-else-if="node.data?.status === 'running'" class="w-4 h-4 text-blue-600 animate-spin" />
-        <Clock v-else-if="node.data?.status === 'pending'" class="w-4 h-4 text-slate-400" />
-        <AlertCircle v-else-if="node.data?.status === 'error'" class="w-4 h-4 text-red-600" />
+        <CheckCircle v-if="data.status === 'completed'" class="w-4 h-4 text-green-600" />
+        <Loader v-else-if="data.status === 'running'" class="w-4 h-4 text-blue-600 animate-spin" />
+        <Clock v-else-if="data.status === 'pending'" class="w-4 h-4 text-slate-400" />
+        <AlertCircle v-else-if="data.status === 'error'" class="w-4 h-4 text-red-600" />
       </div>
     </div>
 
     <!-- Body -->
     <div class="p-3">
       <!-- Input Ports -->
-      <div v-if="node.data?.inputs && node.data.inputs.length > 0" class="space-y-2 mb-3">
-        <p v-if="node.data?.role !== 'output'" class="text-xs font-medium text-slate-600">Inputs</p>
+      <div v-if="data.inputs && data.inputs.length > 0" class="space-y-2 mb-3">
+        <p v-if="data.role !== 'output'" class="text-xs font-medium text-slate-600">Inputs</p>
         
-        <div v-for="input in node.data.inputs" :key="input.id" class="relative">
+        <div v-for="input in data.inputs" :key="input.id" class="relative">
           <!-- Dataset Input -->
           <div 
             v-if="input.datasetId"
             :class="[
               'border rounded-lg p-2 bg-white cursor-pointer transition-all',
-              selectedDatasetId === input.datasetId 
+              data.selectedDatasetId === input.datasetId 
                 ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
                 : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
             ]"
             @click="handleDatasetSelect(input.datasetId, $event)"
           >
-            <!-- Input Port Circle -->
-            <div
-              class="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
-              @mouseup="handlePortMouseUp(input.id, 'input')"
+            <!-- Input Port Handle -->
+            <Handle
+              type="target"
+              :position="Position.Left"
+              :id="input.id"
+              class="!w-4 !h-4 !bg-white !border-2 !border-slate-400 hover:!border-blue-500 hover:!bg-blue-50 hover:!scale-125 transition-all !-left-6"
             />
             
             <div class="flex-1 space-y-1.5">
@@ -167,9 +151,11 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
           
           <!-- Simple Input -->
           <div v-else class="flex items-center gap-2">
-            <div
-              class="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
-              @mouseup="handlePortMouseUp(input.id, 'input')"
+            <Handle
+              type="target"
+              :position="Position.Left"
+              :id="input.id"
+              class="!w-4 !h-4 !bg-white !border-2 !border-slate-400 hover:!border-blue-500 hover:!bg-blue-50 hover:!scale-125 transition-all !-left-6"
             />
             <div class="flex-1 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded">
               {{ input.label }}
@@ -179,16 +165,16 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
       </div>
 
       <!-- Output Ports -->
-      <div v-if="node.data?.outputs && node.data.outputs.length > 0" class="space-y-2">
-        <p v-if="node.data?.role !== 'input'" class="text-xs font-medium text-slate-600">Outputs</p>
+      <div v-if="data.outputs && data.outputs.length > 0" class="space-y-2">
+        <p v-if="data.role !== 'input'" class="text-xs font-medium text-slate-600">Outputs</p>
         
-        <div v-for="output in node.data.outputs" :key="output.id" class="relative">
+        <div v-for="output in data.outputs" :key="output.id" class="relative">
           <!-- Dataset Output -->
           <div 
             v-if="output.datasetId"
             :class="[
               'border rounded-lg p-2 bg-white cursor-pointer transition-all',
-              selectedDatasetId === output.datasetId 
+              data.selectedDatasetId === output.datasetId 
                 ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
                 : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
             ]"
@@ -226,10 +212,12 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
                 </select>
               </div>
             </div>
-            <!-- Output Port Circle -->
-            <div
-              class="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
-              @mousedown="handlePortMouseDown(output.id, 'output', $event)"
+            <!-- Output Port Handle -->
+            <Handle
+              type="source"
+              :position="Position.Right"
+              :id="output.id"
+              class="!w-4 !h-4 !bg-white !border-2 !border-slate-400 hover:!border-blue-500 hover:!bg-blue-50 hover:!scale-125 transition-all !-right-6"
             />
           </div>
           
@@ -238,9 +226,11 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
             <div class="flex-1 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded">
               {{ output.label }}
             </div>
-            <div
-              class="absolute -right-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-slate-400 bg-white cursor-crosshair hover:border-blue-500 hover:bg-blue-50 hover:scale-125 transition-all z-10"
-              @mousedown="handlePortMouseDown(output.id, 'output', $event)"
+            <Handle
+              type="source"
+              :position="Position.Right"
+              :id="output.id"
+              class="!w-4 !h-4 !bg-white !border-2 !border-slate-400 hover:!border-blue-500 hover:!bg-blue-50 hover:!scale-125 transition-all !-right-6"
             />
           </div>
         </div>

@@ -37,3 +37,6 @@ venv/
 
 # AI Agent
 .agent/
+
+# archive
+archive/

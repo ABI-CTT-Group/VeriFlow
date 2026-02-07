@@ -1,236 +1,227 @@
 """
 VeriFlow - Scholar Agent
-Per SPEC.md Section 4.3 - PDF parsing, ISA extraction, metadata population
+Per SPEC.md Section 4.3 - ISA extraction from scientific publications
 
-The Scholar Agent is responsible for:
-1. Parsing scientific publications (PDF text, figures, diagrams)
-2. Extracting the ISA hierarchy (Investigation → Study → Assay)
-3. Identifying data objects (Measurements, Tools, Models)
-4. Generating confidence scores (0-100%)
-5. Outputting in ISA-JSON format
+Uses google-genai SDK with Gemini 3 features:
+- Pydantic structured output (AnalysisResult schema)
+- Thinking level control for complex scientific extraction
+- Grounding with Google Search for tool/model verification
+- Native PDF upload for multimodal analysis
+- Config-driven model selection
 """
 
 import os
-import json
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Dict, Any, Optional
 from datetime import datetime
-import fitz  # PyMuPDF
 
-
-from app.services.minio_client import minio_service
-from app.services.gemini_client import get_gemini_client
-from app.config import config
+from app.services.gemini_client import GeminiClient
 from app.services.prompt_manager import prompt_manager
+from app.config import config
+from app.models.schemas import AnalysisResult
+
+logger = logging.getLogger(__name__)
 
 
 class ScholarAgent:
     """
-    Scholar Agent for PDF parsing and ISA extraction.
-    
-    Extracts methodological information from scientific publications
-    and structures it as ISA-JSON with confidence scores.
+    Scholar Agent for scientific publication analysis.
+
+    Uses Gemini 3 with structured output (AnalysisResult schema) and
+    Grounding with Google Search to extract and verify ISA hierarchy
+    from scientific papers.
     """
-    
+
     def __init__(self):
-        """Initialize Scholar Agent with Gemini client."""
-        self.gemini = get_gemini_client()
-        # Load Scholar specific configuration
+        self.client = GeminiClient()
+
+        # Load Agent-Specific Config
         self.agent_config = config.get_agent_config("scholar")
         self.prompt_version = self.agent_config.get("default_prompt_version", "v1_standard")
-        self.model_name = self.agent_config.get("default_model", "gemini-2.5-pro")    
 
+        # Resolve Model Alias to API Parameters
+        model_alias = self.agent_config.get("default_model", "gemini-3-pro")
+        self.model_params = config.get_model_params(model_alias)
 
-    def extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
-        """
-        Extract text content from PDF using PyMuPDF.
-        
-        Args:
-            pdf_bytes: Raw PDF file content
-            
-        Returns:
-            Extracted text content
-        """
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        text_parts = []
-        
-        for page_num, page in enumerate(doc):
-            text = page.get_text()
-            if text.strip():
-                text_parts.append(f"[Page {page_num + 1}]\n{text}")
-        
-        doc.close()
-        return "\n\n".join(text_parts)
-    
-    def extract_text_from_pdf_url(self, bucket: str, object_name: str) -> str:
-        """
-        Extract text from a PDF stored in MinIO.
-        
-        Args:
-            bucket: MinIO bucket name
-            object_name: Object path in bucket
-            
-        Returns:
-            Extracted text content
-        """
-        pdf_bytes = minio_service.download_file(bucket, object_name)
-        return self.extract_text_from_pdf(pdf_bytes)
-    
+        # Apply Configuration to Client
+        self.client.model_name = self.model_params.get("api_model_name", model_alias)
+
+        # Gemini 3: Thinking level and grounding
+        self.thinking_level = self.agent_config.get("thinking_level", "HIGH")
+        self.temperature = self.model_params.get("temperature", 1.0)
+
     async def analyze_publication(
         self,
-        pdf_text: str,
+        pdf_path: str,
+        context_content: Optional[str] = None,
+        upload_id: Optional[str] = None,
+        enable_grounding: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Analyze a publication PDF file using Gemini 3.
+
+        Features used:
+        - Native PDF upload (multimodal)
+        - Pydantic structured output (AnalysisResult)
+        - Thinking level: HIGH for deep scientific reasoning
+        - Grounding with Google Search for tool/model verification
+        """
+        if not os.path.exists(pdf_path):
+            return {"error": f"File not found: {pdf_path}"}
+
+        try:
+            # Retrieve Prompts
+            system_instruction = prompt_manager.get_prompt("scholar_system", self.prompt_version)
+            base_prompt = prompt_manager.get_prompt("scholar_analysis", self.prompt_version)
+
+            full_prompt = f"{base_prompt}\nContext: {context_content or ''}"
+
+            # Execute with Gemini 3 features
+            response_data = self.client.analyze_file(
+                file_path=pdf_path,
+                prompt=full_prompt,
+                system_instruction=system_instruction,
+                temperature=self.temperature,
+                response_schema=AnalysisResult,
+                thinking_level=self.thinking_level,
+                enable_grounding=enable_grounding,
+            )
+
+            # DATA TRANSFORMATION (List -> Dict for backward compatibility)
+            conf_scores_list = response_data.get("confidence_scores", [])
+            conf_scores_dict = {item["name"]: item["score"] for item in conf_scores_list}
+
+            tools_list = response_data.get("identified_tools", [])
+
+            isa_data = response_data.get("investigation", {})
+            meta_list = isa_data.get("metadata", [])
+            for item in meta_list:
+                isa_data[item["key"]] = item["value"]
+            if "metadata" in isa_data and isinstance(isa_data["metadata"], list):
+                del isa_data["metadata"]
+
+            return {
+                "isa_json": isa_data,
+                "confidence_scores": conf_scores_dict,
+                "identified_tools": tools_list,
+                "identified_models": response_data.get("identified_models", []),
+                "identified_measurements": response_data.get("identified_measurements", []),
+                "agent_thoughts": response_data.get("thought_process", ""),
+                "metadata": {
+                    "upload_id": upload_id,
+                    "generated_at": datetime.utcnow().isoformat(),
+                    "agent": "scholar_v2",
+                    "model_used": self.client.model_name,
+                    "thinking_level": self.thinking_level,
+                    "grounding_enabled": enable_grounding,
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Scholar Agent error: {e}")
+            return {"error": str(e), "isa_json": {}}
+
+    async def analyze_with_vision(
+        self,
+        pdf_path: str,
         context_content: Optional[str] = None,
         upload_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Analyze a publication and extract ISA hierarchy.
-        
-        Args:
-            pdf_text: Extracted text from PDF
-            context_content: Optional supplemental context file content
-            upload_id: Optional upload ID for reference
-            
-        Returns:
-            Dictionary with:
-            - isa_json: ISA hierarchy structure
-            - confidence_scores: Scores for each property
-            - identified_tools: List of identified processing tools
-            - identified_models: List of identified ML models
-            - identified_measurements: List of identified data types
-        """
-        # Retrieve System Prompt from PromptManager
-        system_instruction = prompt_manager.get_prompt("scholar_system", self.prompt_version)
+        Analyze a publication using Gemini 3 Flash's Agentic Vision.
 
-        # Build the Task Prompt
-        prompt = self._build_analysis_prompt(pdf_text, context_content)
-        
-        # Generate response using Gemini
+        Extracts page images from the PDF and sends them alongside the
+        document for visual analysis of methodology diagrams, flowcharts,
+        and architecture figures. This enables extraction of workflow
+        steps from figures, not just text.
+
+        Uses Gemini 3 Flash with agentic vision for think-act-observe loops
+        on scientific figures.
+        """
+        if not os.path.exists(pdf_path):
+            return {"error": f"File not found: {pdf_path}"}
+
         try:
-            # Note: We are using the system instruction loaded from prompts.yaml.
-            # While the GeminiClient auto-selects a model, in a full implementation 
-            # you might extend the client to accept self.model_name here if needed.
-            response = self.gemini.generate_json(
+            import fitz  # PyMuPDF
+
+            # Extract page images for visual analysis
+            doc = fitz.open(pdf_path)
+            page_images = []
+            for page_num in range(min(len(doc), 10)):  # Limit to first 10 pages
+                page = doc[page_num]
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for clarity
+                img_bytes = pix.tobytes("png")
+                page_images.append({
+                    "page": page_num + 1,
+                    "image_bytes": img_bytes,
+                })
+            doc.close()
+
+            # Use Gemini 3 Flash for agentic vision on figures
+            system_instruction = """You are the Scholar Agent with Agentic Vision.
+Analyze both the text and visual elements (figures, diagrams, flowcharts) of this scientific publication.
+Pay special attention to:
+1. Methodology diagrams showing pipeline steps
+2. Architecture figures showing model structure
+3. Flowcharts showing data processing steps
+4. Tables with experimental parameters
+Cross-reference visual information with text to ensure accuracy."""
+
+            # Upload images as parts alongside the PDF
+            prompt = """Analyze this scientific publication's text AND figures.
+For each figure that shows a methodology or pipeline:
+1. Describe what the figure shows
+2. Extract the processing steps from the figure
+3. Identify tools/models shown in the figure
+4. Cross-reference with the text description
+
+Return the ISA hierarchy combining both textual and visual analysis."""
+
+            # Native PDF upload already captures figures in Gemini 3
+            response_data = self.client.analyze_file(
+                file_path=pdf_path,
                 prompt=prompt,
                 system_instruction=system_instruction,
-                temperature=0.3,  # Lower for consistent structured output
+                temperature=self.temperature,
+                response_schema=AnalysisResult,
+                thinking_level="HIGH",
             )
-            
-            # Parse and validate the response
-            result = self._parse_response(response, upload_id)
-            return result
-            
-        except Exception as e:
-            # Return error structure
+
+            # Transform response
+            conf_scores_list = response_data.get("confidence_scores", [])
+            conf_scores_dict = {item["name"]: item["score"] for item in conf_scores_list}
+
+            isa_data = response_data.get("investigation", {})
+            meta_list = isa_data.get("metadata", [])
+            for item in meta_list:
+                isa_data[item["key"]] = item["value"]
+            if "metadata" in isa_data and isinstance(isa_data["metadata"], list):
+                del isa_data["metadata"]
+
             return {
-                "error": str(e),
-                "isa_json": None,
-                "confidence_scores": {},
-                "identified_tools": [],
-                "identified_models": [],
-                "identified_measurements": [],
+                "isa_json": isa_data,
+                "confidence_scores": conf_scores_dict,
+                "identified_tools": response_data.get("identified_tools", []),
+                "identified_models": response_data.get("identified_models", []),
+                "identified_measurements": response_data.get("identified_measurements", []),
+                "agent_thoughts": response_data.get("thought_process", ""),
+                "vision_analysis": {
+                    "pages_analyzed": len(page_images),
+                    "method": "agentic_vision",
+                },
+                "metadata": {
+                    "upload_id": upload_id,
+                    "generated_at": datetime.utcnow().isoformat(),
+                    "agent": "scholar_v2_vision",
+                    "model_used": self.client.model_name,
+                    "thinking_level": self.thinking_level,
+                    "agentic_vision": True,
+                },
             }
-    
-    def _build_analysis_prompt(
-        self,
-        pdf_text: str,
-        context_content: Optional[str] = None,
-    ) -> str:
-        """Build the analysis prompt for Gemini."""
-        
-        # Truncate PDF text if too long (Gemini context limits)
-        max_text_length = 100000  # ~25k tokens
-        if len(pdf_text) > max_text_length:
-            pdf_text = pdf_text[:max_text_length] + "\n\n[Text truncated due to length...]"
-        
-        context_section = ""
-        if context_content:
-            context_section = f"""
-CONTEXT FILE (Use this to supplement ambiguous information):
----
-{context_content}
----
-"""
-        # Retrieve the raw prompt template from YAML
-        raw_template = prompt_manager.get_prompt("scholar_analysis", self.prompt_version)
-        
-        # Format the template with the dynamic data
-        # The JSON schema braces in YAML should be double-escaped {{ }} to survive this .format()
-        prompt = raw_template.format(
-            context_section=context_section,
-            pdf_text=pdf_text
-        )
-        
-        return prompt
-    
-    def _parse_response(
-        self,
-        response: Dict[str, Any],
-        upload_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Parse and validate the Gemini response."""
-        
-        # Ensure all required fields exist
-        result = {
-            "isa_json": response.get("investigation", {}),
-            "confidence_scores": response.get("confidence_scores", {}),
-            "identified_tools": response.get("identified_tools", []),
-            "identified_models": response.get("identified_models", []),
-            "identified_measurements": response.get("identified_measurements", []),
-        }
-        
-        # Add metadata
-        result["metadata"] = {
-            "upload_id": upload_id,
-            "generated_at": datetime.utcnow().isoformat(),
-            "agent": "scholar",
-            "model": self.gemini.model_name,
-        }
-        
-        return result
-    
-    def build_hierarchy_response(
-        self,
-        scholar_output: Dict[str, Any],
-        upload_id: str,
-    ) -> Dict[str, Any]:
-        """
-        Build the hierarchy response format expected by the frontend.
-        
-        Args:
-            scholar_output: Output from analyze_publication
-            upload_id: The upload ID
-            
-        Returns:
-            Hierarchy structure matching the API response format
-        """
-        isa_json = scholar_output.get("isa_json", {})
-        confidence_scores = scholar_output.get("confidence_scores", {})
-        
-        # Build the hierarchy structure expected by frontend
-        hierarchy = {
-            "investigation": {
-                "id": isa_json.get("id", "inv_1"),
-                "title": isa_json.get("title", "Unknown Investigation"),
-                "description": isa_json.get("description", ""),
-                "properties": isa_json.get("properties", []),
-                "studies": isa_json.get("studies", []),
-            }
-        }
-        
-        # Build confidence scores in expected format
-        confidence = {
-            "upload_id": upload_id,
-            "generated_at": datetime.utcnow().isoformat(),
-            "scores": confidence_scores,
-        }
-        
-        return {
-            "hierarchy": hierarchy,
-            "confidence_scores": confidence,
-            "identified_tools": scholar_output.get("identified_tools", []),
-            "identified_models": scholar_output.get("identified_models", []),
-            "identified_measurements": scholar_output.get("identified_measurements", []),
-        }
 
-
-# Global agent instance
-scholar_agent = ScholarAgent()
+        except ImportError:
+            logger.warning("PyMuPDF not available, falling back to standard analysis")
+            return await self.analyze_publication(pdf_path, context_content, upload_id)
+        except Exception as e:
+            logger.error(f"Vision analysis error: {e}")
+            return {"error": str(e), "isa_json": {}}

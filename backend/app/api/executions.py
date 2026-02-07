@@ -436,21 +436,10 @@ async def get_execution_results(execution_id: str, node_id: Optional[str] = None
     results = exec_data.get("results", [])
     
     if not results:
-        # Mock result files for MVP
-        results = [
-            {
-                "path": "derivative/sub-001/tumor_mask.nii.gz",
-                "node_id": "segmentation",
-                "size": 1048576,
-                "mime_type": "application/x-nifti",
-            },
-            {
-                "path": "derivative/sub-001/segmentation_overlay.png",
-                "node_id": "segmentation",
-                "size": 524288,
-                "mime_type": "image/png",
-            },
-        ]
+        return ExecutionResultsResponse(
+            execution_id=execution_id,
+            files=[],
+        )
     
     # Convert to ResultFile objects
     files = []
