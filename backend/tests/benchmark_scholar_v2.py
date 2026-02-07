@@ -21,35 +21,32 @@ async def run_multimodal_benchmark():
         return
 
     # 2. Test Configuration
-    test_case = {
-        # Using the exact model you saw success with
-        "model": "gemini-2.5-flash-preview-09-2025", 
-        "version": "v2_multimodal"
-    }
+    # Using a model compatible with the new Google Gen AI SDK (v2)
+    # gemini-2.0-flash is recommended for high-speed structured output
+    target_model = "gemini-2.0-flash" 
 
-    print(f"\n=== Starting V2 (Multimodal) Benchmark ===")
+    print(f"\n=== Starting V2 (New SDK + Structured Output) Benchmark ===")
     print(f"File: {pdf_path}")
-    print(f"Model: {test_case['model']}")
+    print(f"Model: {target_model}")
     
-    # Force client to use this specific model
-    agent.client.model_name = test_case['model']
-    import google.generativeai as genai
-    agent.client.model = genai.GenerativeModel(
-        model_name=test_case['model'],
-        safety_settings=agent.client.SAFETY_SETTINGS
-    )
+    # Configure the internal client directly with the string name
+    # The new Client architecture handles authentication and connection internally
+    agent.client.model_name = target_model
     
-    agent.prompt_version = test_case['version']
+    # Ensure the correct prompt version is used
+    agent.prompt_version = "v2_multimodal"
 
     start_time = time.time()
     
     try:
         # 3. Execute Analysis
-        print("\n>> Uploading and Analyzing...")
+        print("\n>> Uploading and Analyzing (Schema Enforced)...")
+        
+        # The agent now returns a clean dictionary derived from the Pydantic model
         output = await agent.analyze_publication(
             pdf_path=pdf_path,
             context_content="Focus on the data preprocessing pipeline steps.",
-            upload_id="bench_v2_001"
+            upload_id="bench_v2_new_sdk"
         )
         
         duration = time.time() - start_time
@@ -60,22 +57,28 @@ async def run_multimodal_benchmark():
         else:
             isa = output.get("isa_json", {})
             tools = output.get("identified_tools", [])
+            thoughts = output.get("agent_thoughts", None) # New "Thinking" field
+            
             print(f"\nSUCCESS in {duration:.2f}s")
-            print(f"Investigation: {isa.get('title', 'Unknown')[:50]}...")
+            
+            # --- PRINT REASONING TRACE (New Feature) ---
+            if thoughts:
+                print(f"\n--- Agent Thoughts (Chain of Thought) ---")
+                # Print first 500 chars or full thought if short
+                preview = thoughts[:1000] + "..." if len(thoughts) > 1000 else thoughts
+                print(preview)
+                print("-" * 40)
+            
+            print(f"\nInvestigation: {isa.get('title', 'Unknown')[:50]}...")
             print(f"Tools Identified: {len(tools)}")
             
-            # --- ROBUST PRINTING LOOP ---
+            # --- STRUCTURED OUTPUT PRINTING ---
+            # With Pydantic Schema, tools are guaranteed to be in the format defined in schemas.py
+            # (e.g., List[str])
             for t in tools:
-                if isinstance(t, dict):
-                    # It's a proper object: {"name": "ToolName", ...}
-                    print(f" - {t.get('name', 'Unknown')}: {t.get('description', '')[:40]}...")
-                elif isinstance(t, str):
-                    # It's just a string (Model hallucinated schema): "ToolName"
-                    print(f" - [String Only]: {t}")
-                else:
-                    print(f" - [Unknown Format]: {str(t)}")
+                print(f" - {t}")
 
-            out_file = f"result_978-3-031-94562-5_34_benchmark.json"
+            out_file = f"result_benchmark_{os.path.basename(pdf_path)}.json"
             with open(out_file, "w") as f:
                 json.dump(output, f, indent=2)
             print(f"\nSaved full output to {out_file}")
