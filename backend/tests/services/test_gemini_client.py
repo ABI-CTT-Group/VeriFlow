@@ -11,7 +11,7 @@ class TestGeminiClient:
         with patch("app.services.gemini_client.genai") as mock:
             # Setup list_models return
             mock_model_1 = MagicMock()
-            mock_model_1.name = "models/gemini-2.0-flash"
+            mock_model_1.name = "models/gemini-3-flash-preview"
             mock.list_models.return_value = [mock_model_1]
             yield mock
 
@@ -20,7 +20,7 @@ class TestGeminiClient:
         client = GeminiClient(api_key="test-key")
         
         mock_genai.configure.assert_called_with(api_key="test-key")
-        assert client.model_name == "gemini-2.0-flash"
+        assert client.model_name == "gemini-3-flash-preview"
 
     def test_init_no_key(self):
         """Test init failure without API key."""
