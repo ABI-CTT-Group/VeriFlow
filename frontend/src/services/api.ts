@@ -61,6 +61,9 @@ export const endpoints = {
     updateNodeProperty: (nodeId: string, propertyId: string, value: string) =>
         api.put(`/study-design/nodes/${nodeId}/properties`, { property_id: propertyId, value }),
 
+    sendAdditionalInfo: (uploadId: string, info: string) =>
+        api.post(`/publications/${uploadId}/additional-info`, { info }),
+
     // Workflow Management
     assembleWorkflow: (assayId: string) =>
         api.post<WorkflowResponse>('/workflows/assemble', { assay_id: assayId }),

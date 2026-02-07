@@ -39,6 +39,7 @@ const emit = defineEmits<{
   sourceClick: [propertyId: string]
   assembleClick: []
   collapseLeftPanel: []
+  propertiesOpened: []
 }>()
 
 const selectedItem = ref<SelectedItem | null>(null)
@@ -92,6 +93,7 @@ function handleNodeClick(id: string, type: SelectedItem['type'], name: string, e
     }
   } else {
     selectedItem.value = { id, type, name }
+    emit('propertiesOpened')
     if (type === 'assay') {
       emit('selectAssay', id)
     } else {
@@ -176,11 +178,12 @@ const hoverClass = 'hover:bg-slate-50'
     <template v-if="hasUploadedFiles">
       <ResizablePanel
         orientation="vertical"
-        :default-height="300"
+        :default-height="200"
         :min-height="150"
         :max-height="600"
+        class="flex flex-col"
       >
-        <div class="px-3 py-3 space-y-1 overflow-auto h-full">
+        <div class="px-3 py-3 space-y-1 overflow-auto h-full w-full">
         <div class="space-y-1">
           <!-- Paper -->
           <div
@@ -190,7 +193,7 @@ const hoverClass = 'hover:bg-slate-50'
             ]"
             @click="handleNodeClick('root', 'paper', 'Breast Cancer Segmentation Using Deep Learning', $event)"
           >
-            <FileText class="w-4 h-4 text-blue-600" />
+            <FileText class="w-4 h-4 text-blue-600 flex-shrink-0" />
             <span class="text-sm font-medium text-slate-900 truncate">
               Breast Cancer Segmentation Using Dee...
             </span>
@@ -205,8 +208,8 @@ const hoverClass = 'hover:bg-slate-50'
               ]"
               @click="handleNodeClick('inv-1', 'investigation', 'Automated Tumor Detection Investigation', $event)"
             >
-              <BookOpen class="w-4 h-4 text-green-600" />
-              <span class="text-sm text-slate-700 truncate">Automated Tumor Detection Investig...</span>
+              <BookOpen class="w-4 h-4 text-green-600 flex-shrink-0" />
+              <span class="text-sm text-slate-700 truncate">Automated Tumor Detection Investigation</span>
             </div>
 
             <div class="ml-6 space-y-1">
@@ -218,8 +221,8 @@ const hoverClass = 'hover:bg-slate-50'
                 ]"
                 @click="handleNodeClick('study-1', 'study', 'MRI-based Segmentation Study', $event)"
               >
-                <Layers class="w-4 h-4 text-purple-600" />
-                <span class="text-sm text-slate-700">MRI-based Segmentation Study</span>
+                <Layers class="w-4 h-4 text-purple-600 flex-shrink-0" />
+                <span class="text-sm text-slate-700 truncate">MRI-based Segmentation Study</span>
               </div>
 
               <div class="ml-6 space-y-1">
@@ -231,11 +234,11 @@ const hoverClass = 'hover:bg-slate-50'
                   ]"
                   @click="handleNodeClick('assay-1', 'assay', 'U-Net Training Assay', $event)"
                 >
-                  <FlaskConical class="w-4 h-4 text-orange-600" />
+                  <FlaskConical class="w-4 h-4 text-orange-600 flex-shrink-0" />
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                      <p class="text-sm text-slate-700">U-Net Training Assay</p>
-                      <span class="text-xs text-slate-500">(6 steps)</span>
+                      <p class="text-sm text-slate-700 truncate">U-Net Training Assay</p>
+                      <span class="text-xs text-slate-500 flex-shrink-0">(6 steps)</span>
                     </div>
                   </div>
                 </div>
@@ -248,11 +251,11 @@ const hoverClass = 'hover:bg-slate-50'
                   ]"
                   @click="handleNodeClick('assay-2', 'assay', 'Model Inference Assay', $event)"
                 >
-                  <FlaskConical class="w-4 h-4 text-orange-600" />
+                  <FlaskConical class="w-4 h-4 text-orange-600 flex-shrink-0" />
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                      <p class="text-sm text-slate-700">Model Inference Assay</p>
-                      <span class="text-xs text-slate-500">(4 steps)</span>
+                      <p class="text-sm text-slate-700 truncate">Model Inference Assay</p>
+                      <span class="text-xs text-slate-500 flex-shrink-0">(4 steps)</span>
                     </div>
                   </div>
                 </div>
