@@ -39,6 +39,7 @@ const emit = defineEmits<{
   sourceClick: [propertyId: string]
   assembleClick: []
   collapseLeftPanel: []
+  propertiesOpened: []
 }>()
 
 const selectedItem = ref<SelectedItem | null>(null)
@@ -92,6 +93,7 @@ function handleNodeClick(id: string, type: SelectedItem['type'], name: string, e
     }
   } else {
     selectedItem.value = { id, type, name }
+    emit('propertiesOpened')
     if (type === 'assay') {
       emit('selectAssay', id)
     } else {

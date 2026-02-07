@@ -168,7 +168,7 @@ onUnmounted(() => {
     <!-- Vertical Resize Handle -->
     <div
       v-if="orientation === 'vertical'"
-      class="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500 -bottom-2"
+      class="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500 translate-y-1/2"
       @mousedown="handleMouseDown"
       @touchstart.prevent="handleMouseDown"
     />

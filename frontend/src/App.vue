@@ -99,6 +99,7 @@ function handleAssembleClick() {
   activePropertyId.value = ''
   shouldCollapseViewer.value = true
   store.isLeftPanelCollapsed = true
+  store.isConsoleCollapsed = false
 }
 
 function handleRunWorkflow() {
@@ -117,23 +118,28 @@ function handleDatasetSelect(datasetId: string | null) {
 
 // Console resize handlers
 function handleConsoleMouseDown(e: MouseEvent | TouchEvent) {
-  if (window.TouchEvent && e instanceof TouchEvent) {
-    // For touch, we don't prevent default immediately to allow potential other interactions
-    // but for resize handle it's usually fine.
-  } else {
+  if (e.cancelable) {
     e.preventDefault()
   }
   isResizingConsole.value = true
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+  document.body.style.touchAction = 'none'
 }
 
 function handleMouseMove(e: MouseEvent | TouchEvent) {
   if (isResizingConsole.value) {
     let clientY: number
     
-    if (window.TouchEvent && e instanceof TouchEvent) {
-      clientY = e.touches[0].clientY
+    // Check for touches support and existence
+    const isTouch = 'touches' in e && (e as TouchEvent).touches.length > 0
+    
+    if (isTouch) {
+      clientY = (e as TouchEvent).touches[0].clientY
+    } else if (e instanceof MouseEvent) {
+      clientY = e.clientY
     } else {
-      clientY = (e as MouseEvent).clientY
+      return
     }
 
     const newHeight = window.innerHeight - clientY
@@ -145,6 +151,9 @@ function handleMouseMove(e: MouseEvent | TouchEvent) {
 
 function handleMouseUp() {
   isResizingConsole.value = false
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+  document.body.style.touchAction = ''
 }
 
 // Watchers for UI state consistency
@@ -203,6 +212,7 @@ watch(isDatasetNavCollapsed, (val) => {
             @source-click="handleSourceClick"
             @assemble-click="handleAssembleClick"
             @collapse-left-panel="isLeftPanelCollapsed = true"
+            @properties-opened="isConsoleCollapsed = true"
           />
         </div>
       </ResizablePanel>
@@ -288,8 +298,8 @@ watch(isDatasetNavCollapsed, (val) => {
       <!-- Resize handle -->
       <div
         @mousedown="handleConsoleMouseDown"
-        @touchstart="handleConsoleMouseDown"
-        class="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-blue-500 transition-colors z-20"
+        @touchstart.prevent="handleConsoleMouseDown"
+        class="absolute top-0 left-0 right-0 h-4 cursor-ns-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500 -top-2"
       />
       <div class="h-full flex flex-col overflow-hidden" style="padding-top: 4px">
         <!-- Header with collapse button -->
