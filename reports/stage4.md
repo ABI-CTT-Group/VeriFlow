@@ -45,7 +45,7 @@ Stage 4 implemented the three core AI agents for VeriFlow using the Gemini API:
 
 ### Gemini Client (`gemini_client.py`)
 
-- Model fallback chain: `gemini-2.0-flash` → `gemini-1.5-pro` → `gemini-1.5-flash`
+- Model fallback chain: `gemini-3-pro-preview` → `gemini-3-flash-preview`
 - Methods: `generate_content()`, `generate_content_with_history()`, `generate_json()`
 - Automatic JSON cleaning (strips markdown code blocks)
 - Permissive safety settings for scientific content
@@ -151,7 +151,7 @@ pytest tests/agents/integration/ -v
 
 ## Known Limitations
 
-1. **Gemini Model**: Configured for `gemini-2.0-flash` with fallback chain
+1. **Gemini Model**: Configured for `gemini-3-flash-preview` with fallback chain
 2. **PDF Only**: Only supports PDF input (no other document types)
 3. **Context Length**: PDF text truncated at 100k characters
 4. **No cwltool**: Falls back to basic validation if cwltool not installed
