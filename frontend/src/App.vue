@@ -60,8 +60,23 @@ const collapseAllExceptSelected = ref(false)
 const isResizingConsole = ref(false)
 const defaultViewerPlugin = ref('auto')
 const showLandingPage = ref(true)
+// Initialize visibility based on whether files are already uploaded (e.g. refresh)
+const isStudyDesignVisible = ref(hasUploadedFiles.value)
+// Initialize collapsed state: 
+// The user wants it "default collapsed" but also mentions "Trigger button... then open".
+// If we are starting fresh (invisible), it will open when made visible. 
+// If we reload and it's visible, let's respect the "default collapsed" request if that's what "default" means here,
+// OR since the user said "when Continue button clicked... trigger panel open", 
+// we should probably start it as collapsed if it IS visible initially, unless we just completed the action.
+// Let's stick to the prompt: "Default collapsed" might mean initial state if visible. 
+const isStudyDesignCollapsed = ref(true)
 
 // Handler functions
+function handleUploadComplete() {
+  isStudyDesignVisible.value = true
+  isStudyDesignCollapsed.value = false // Open panel
+  store.isLeftPanelCollapsed = true // Collapse Upload panel
+}
 function handleSourceClick(propertyId: string) {
   // Update store state via direct mutation (or action if preferred)
   store.viewerPdfUrl = store.uploadedPdfUrl
@@ -201,7 +216,7 @@ watch(isDatasetNavCollapsed, (val) => {
 
     <!-- Main Content -->
     <div class="flex-1 flex overflow-hidden min-h-0">
-      <!-- Left Panel - Upload & Review Study Design -->
+      <!-- Left Panel - Upload -->
       <ResizablePanel
         v-if="!isLeftPanelCollapsed"
         side="left"
@@ -214,22 +229,14 @@ watch(isDatasetNavCollapsed, (val) => {
             @pdf-upload="handlePdfUpload"
             @collapse-left-panel="isLeftPanelCollapsed = true"
             @load-demo="handleLoadDemo"
+            @upload-complete="handleUploadComplete"
             :has-uploaded-files="hasUploadedFiles"
             :is-loading="isLoading"
-          />
-          <StudyDesignModule 
-            :selected-assay="selectedAssay"
-            :has-uploaded-files="hasUploadedFiles"
-            @select-assay="selectedAssay = $event"
-            @source-click="handleSourceClick"
-            @assemble-click="handleAssembleClick"
-            @collapse-left-panel="isLeftPanelCollapsed = true"
-            @properties-opened="isConsoleCollapsed = true"
           />
         </div>
       </ResizablePanel>
 
-      <!-- Collapsed left panel -->
+      <!-- Collapsed Upload panel -->
       <div v-else class="w-8 bg-slate-50 border-r border-slate-200 flex-shrink-0">
         <button
           @click="isLeftPanelCollapsed = false"
@@ -239,10 +246,48 @@ watch(isDatasetNavCollapsed, (val) => {
             class="text-xs font-medium text-slate-600 whitespace-nowrap" 
             style="writing-mode: vertical-rl; transform: rotate(180deg)"
           >
-            Upload &amp; Review Study Design
+            Upload Publication
           </span>
         </button>
       </div>
+
+      <!-- Study Design Panel (Conditionally Visible) -->
+      <template v-if="isStudyDesignVisible">
+        <ResizablePanel
+          v-if="!isStudyDesignCollapsed"
+          side="left"
+          :default-width="400"
+          :min-width="280"
+          :max-width="600"
+        >
+          <div class="h-full flex flex-col bg-white border-r border-slate-200 overflow-hidden">
+            <StudyDesignModule 
+              :selected-assay="selectedAssay"
+              :has-uploaded-files="hasUploadedFiles"
+              @select-assay="selectedAssay = $event"
+              @source-click="handleSourceClick"
+              @assemble-click="handleAssembleClick"
+              @collapse-left-panel="isStudyDesignCollapsed = true"
+              @properties-opened="isConsoleCollapsed = true"
+            />
+          </div>
+        </ResizablePanel>
+
+        <!-- Collapsed Study Design panel -->
+        <div v-else class="w-8 bg-slate-50 border-r border-slate-200 flex-shrink-0">
+          <button
+            @click="isStudyDesignCollapsed = false"
+            class="h-full w-full hover:bg-slate-100 transition-colors flex items-center justify-center"
+          >
+            <span 
+              class="text-xs font-medium text-slate-600 whitespace-nowrap" 
+              style="writing-mode: vertical-rl; transform: rotate(180deg)"
+            >
+              Review Study Design
+            </span>
+          </button>
+        </div>
+      </template>
 
       <!-- Middle Panel - Workflow Assembler -->
       <div class="flex-1 flex flex-col bg-white overflow-hidden min-w-0">
@@ -325,6 +370,12 @@ watch(isDatasetNavCollapsed, (val) => {
               <ChevronDown class="w-4 h-4" />
             </button>
             <span class="text-sm font-medium text-slate-700">Console</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1">
+              <div class="w-2 h-2 rounded-full bg-green-500"></div>
+              <span class="text-xs text-slate-500">All agents active</span>
+            </div>
           </div>
         </div>
         <div v-else class="h-8 flex-shrink-0 bg-slate-50">
