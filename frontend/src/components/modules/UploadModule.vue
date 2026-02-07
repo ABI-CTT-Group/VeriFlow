@@ -131,9 +131,15 @@ function handleLoadDemo() {
 }
 
 async function handleModalSubmit(info: string) {
+  // Handle Demo Mode
   if (isDemoMode.value) {
     emit('loadDemo')
     showInfoModal.value = false
+    
+    // Expand console automatically
+    if (store.isConsoleCollapsed) {
+      store.isConsoleCollapsed = false
+    }
     return
   }
 
@@ -157,6 +163,11 @@ async function handleModalSubmit(info: string) {
   }
   
   showInfoModal.value = false
+  
+  // Expand console automatically
+  if (store.isConsoleCollapsed) {
+    store.isConsoleCollapsed = false
+  }
 }
 
 function handleModalSkip() {
@@ -164,6 +175,11 @@ function handleModalSkip() {
     emit('loadDemo')
   }
   showInfoModal.value = false
+  
+  // Expand console automatically
+  if (store.isConsoleCollapsed) {
+    store.isConsoleCollapsed = false
+  }
 }
 
 function removeFile(index: number) {
