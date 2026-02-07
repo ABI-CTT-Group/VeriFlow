@@ -116,7 +116,7 @@ function handleClose() {
               @click="handleSubmit"
               class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200 transition-all active:scale-95"
             >
-              Finished
+              Continue
             </button>
           </div>
         </div>
