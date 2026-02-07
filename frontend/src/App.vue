@@ -200,9 +200,7 @@ watch(isDatasetNavCollapsed, (val) => {
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-sm z-10">
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-          <span class="text-white font-bold text-sm">VF</span>
-        </div>
+        <img src="/icon.svg" alt="VeriFlow Icon" class="w-8 h-8" />
         <div>
           <h1 class="font-semibold text-slate-900">VeriFlow</h1>
           <p class="text-xs text-slate-500">Research Reproducibility Engineer</p>

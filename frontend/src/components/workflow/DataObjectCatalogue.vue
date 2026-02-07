@@ -310,10 +310,42 @@ onMounted(() => {
       
       <!-- Helper for SECTION -->
       <template v-for="section in [
-        { title: 'Input Measurements', id: 'input-measurements', items: inputMeasurements, icon: Database, color: 'text-blue-600' },
-        { title: 'Output Measurements', id: 'output-measurements', items: outputMeasurements, icon: Database, color: 'text-blue-600' },
-        { title: 'Tools', id: 'tools', items: tools, icon: Beaker, color: 'text-purple-600' },
-        { title: 'Models', id: 'models', items: models, icon: Box, color: 'text-green-600' }
+        { 
+          title: 'Input Measurements', 
+          id: 'input-measurements', 
+          items: inputMeasurements, 
+          icon: Database, 
+          color: 'text-blue-600',
+          activeHeaderBg: '#2f9e44',
+          activeContentBg: '#b2f2bb'
+        },
+        { 
+          title: 'Output Measurements', 
+          id: 'output-measurements', 
+          items: outputMeasurements, 
+          icon: Database, 
+          color: 'text-blue-600',
+          activeHeaderBg: '#2f9e44',
+          activeContentBg: '#b2f2bb'
+        },
+        { 
+          title: 'Tools', 
+          id: 'tools', 
+          items: tools, 
+          icon: Beaker, 
+          color: 'text-purple-600',
+          activeHeaderBg: '#4bccff',
+          activeContentBg: '#b6ebff'
+        },
+        { 
+          title: 'Models', 
+          id: 'models', 
+          items: models, 
+          icon: Box, 
+          color: 'text-green-600',
+          activeHeaderBg: '#fa5252',
+          activeContentBg: '#ffc9c9'
+        }
       ]" :key="section.id">
         
         <div class="border-b border-slate-200">
@@ -337,35 +369,74 @@ onMounted(() => {
           <div v-show="expandedCategories.has(section.id)" class="pb-2">
             <div v-for="item in section.items" :key="item.id">
               <div
-                class="mx-3 mb-2 bg-white border border-slate-200 rounded-lg overflow-hidden hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer"
+                class="mx-3 mb-2 border border-slate-200 rounded-lg overflow-hidden transition-all cursor-pointer"
+                :class="[
+                  activeTab === 'active' && expandedItem === item.id ? '' : 'bg-white hover:shadow-sm hover:border-blue-300'
+                ]"
+                :style="{
+                  backgroundColor: activeTab === 'active' && expandedItem === item.id ? section.activeHeaderBg : ''
+                }"
                 @click="toggleItem(item.id)"
                 :draggable="true"
                 @dragstart="(e) => onDragStart(e, item, section.title.includes('Measure') ? 'measurement' : section.id.slice(0, -1))"
               >
                 <div class="flex items-start gap-2 p-3">
-                  <Database v-if="section.id.includes('measure')" class="w-4 h-4 text-slate-300 mt-0.5" />
-                  <component :is="section.icon" :class="['w-5 h-5 mt-0.5 flex-shrink-0', section.color]" />
+                  <Database 
+                    v-if="section.id.includes('measure')" 
+                    class="w-4 h-4 mt-0.5" 
+                    :class="activeTab === 'active' && expandedItem === item.id ? 'text-black/50' : 'text-slate-300'"
+                  />
+                  <component 
+                    :is="section.icon" 
+                    class="w-5 h-5 mt-0.5 flex-shrink-0"
+                    :class="[
+                       activeTab === 'active' && expandedItem === item.id ? 'text-black' : section.color
+                    ]" 
+                  />
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                      <p class="text-sm font-medium text-slate-900">{{ item.name }}</p>
+                      <p 
+                        class="text-sm font-medium"
+                        :class="activeTab === 'active' && expandedItem === item.id ? 'text-black' : 'text-slate-900'"
+                      >
+                        {{ item.name }}
+                      </p>
                       <span v-if="item.inUse" class="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded">In Use</span>
                     </div>
-                    <p class="text-xs text-slate-500 mt-0.5">{{ item.description }}</p>
+                    <p 
+                      class="text-xs mt-0.5"
+                      :class="activeTab === 'active' && expandedItem === item.id ? 'text-black/80' : 'text-slate-500'"
+                    >
+                      {{ item.description }}
+                    </p>
                   </div>
-                  <component :is="expandedItem === item.id ? ChevronDown : ChevronRight" class="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <component 
+                    :is="expandedItem === item.id ? ChevronDown : ChevronRight" 
+                    class="w-4 h-4 flex-shrink-0" 
+                    :class="activeTab === 'active' && expandedItem === item.id ? 'text-black' : 'text-slate-400'"
+                  />
                 </div>
               </div>
               
               <!-- Property Editor (Expanded) -->
-              <div v-if="expandedItem === item.id" class="mx-3 mb-2 bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div class="px-3 py-2 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
+              <div 
+                v-if="expandedItem === item.id" 
+                class="mx-3 mb-2 border border-slate-200 rounded-lg overflow-hidden"
+                :style="{
+                  backgroundColor: activeTab === 'active' ? section.activeContentBg : '#ffffff'
+                }"
+              >
+                <div 
+                  class="px-3 py-2 border-b border-slate-200 flex items-center gap-2"
+                  :class="activeTab === 'active' ? 'bg-black/5' : 'bg-slate-100'"
+                >
                   <div class="flex items-center gap-2 flex-1">
                      <component :is="section.icon" class="w-4 h-4 text-slate-400" />
                      <span class="text-xs font-medium text-slate-700">Editing: {{ item.name }}</span>
                   </div>
                 </div>
                 
-                <div class="p-3 space-y-3 bg-white">
+                <div class="p-3 space-y-3" :class="activeTab === 'active' ? '' : 'bg-white'">
                   <div>
                     <div class="flex items-center justify-between mb-1">
                       <label class="text-xs font-medium text-slate-700">Name</label>
