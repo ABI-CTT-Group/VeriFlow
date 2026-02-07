@@ -56,20 +56,50 @@ const panelStyle = computed(() => {
   }
 })
 
-function handleMouseDown(e: MouseEvent) {
-  e.preventDefault()
+function handleMouseDown(e: MouseEvent | TouchEvent) {
+  // Prevent default to avoid scrolling on touch devices while resizing
+  if (e.cancelable) {
+    e.preventDefault()
+  }
+  
   isResizing.value = true
-  startPos.value = props.orientation === 'horizontal' ? e.clientX : e.clientY
+  
+  // Use 'touches' in e check for safer type guarding
+  const isTouch = 'touches' in e
+  const clientX = isTouch ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX
+  const clientY = isTouch ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY
+  
+  startPos.value = props.orientation === 'horizontal' ? clientX : clientY
   startSize.value = size.value
   
   document.body.style.cursor = props.orientation === 'horizontal' ? 'ew-resize' : 'ns-resize'
   document.body.style.userSelect = 'none'
+  // Also prevent touch scrolling on body while resizing
+  document.body.style.touchAction = 'none'
 }
 
-function handleMouseMove(e: MouseEvent) {
+function handleMouseMove(e: MouseEvent | TouchEvent) {
   if (!isResizing.value) return
   
-  const currentPos = props.orientation === 'horizontal' ? e.clientX : e.clientY
+  // Use 'touches' in e check for safer type guarding
+  const isTouch = 'touches' in e && (e as TouchEvent).touches.length > 0
+  
+  // For mousemove, e is MouseEvent. For touchmove, e is TouchEvent.
+  // Note: touchmove event might not have touches property directly on the event type in some strict configurations without cast,
+  // but logically if it is a touch event it has touches.
+  let clientX, clientY;
+  
+  if (isTouch) {
+     clientX = (e as TouchEvent).touches[0].clientX
+     clientY = (e as TouchEvent).touches[0].clientY
+  } else if (e instanceof MouseEvent) {
+     clientX = e.clientX
+     clientY = e.clientY
+  } else {
+     return
+  }
+  
+  const currentPos = props.orientation === 'horizontal' ? clientX : clientY
   let delta = currentPos - startPos.value
   
   // Invert delta if resizing from right side (for horizontal)
@@ -92,17 +122,22 @@ function handleMouseUp() {
     isResizing.value = false
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
+    document.body.style.touchAction = ''
   }
 }
 
 onMounted(() => {
   window.addEventListener('mousemove', handleMouseMove)
   window.addEventListener('mouseup', handleMouseUp)
+  window.addEventListener('touchmove', handleMouseMove, { passive: false })
+  window.addEventListener('touchend', handleMouseUp)
 })
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('mouseup', handleMouseUp)
+  window.removeEventListener('touchmove', handleMouseMove)
+  window.removeEventListener('touchend', handleMouseUp)
 })
 </script>
 
@@ -123,17 +158,19 @@ onUnmounted(() => {
     <div
       v-if="orientation === 'horizontal'"
       :class="[
-        'absolute top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-500 transition-colors z-20',
-        side === 'left' ? 'right-0' : 'left-0'
+        'absolute top-0 bottom-0 w-4 cursor-ew-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500',
+        side === 'left' ? '-right-2' : '-left-2'
       ]"
       @mousedown="handleMouseDown"
+      @touchstart.prevent="handleMouseDown"
     />
 
     <!-- Vertical Resize Handle -->
     <div
       v-if="orientation === 'vertical'"
-      class="absolute bottom-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-blue-500 transition-colors z-20"
+      class="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize transition-colors z-20 opacity-0 hover:opacity-100 bg-blue-500 -bottom-2"
       @mousedown="handleMouseDown"
+      @touchstart.prevent="handleMouseDown"
     />
   </div>
 </template>

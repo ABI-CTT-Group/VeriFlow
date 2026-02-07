@@ -184,7 +184,7 @@ watch(isDatasetNavCollapsed, (val) => {
       <ResizablePanel
         v-if="!isLeftPanelCollapsed"
         side="left"
-        :default-width="320"
+        :default-width="400"
         :min-width="280"
         :max-width="600"
       >
