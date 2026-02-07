@@ -88,7 +88,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const isLeftPanelCollapsed = ref(false)
     const isRightPanelCollapsed = ref(true)
     const isConsoleCollapsed = ref(true)
-    const consoleHeight = ref(300)
+    const consoleHeight = ref(typeof window !== 'undefined' && window.innerHeight < 900 ? 220 : 300)
     const viewerPdfUrl = ref<string | null>(null)
     const isViewerVisible = ref(false)
 

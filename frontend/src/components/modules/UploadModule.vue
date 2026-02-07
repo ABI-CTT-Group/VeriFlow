@@ -26,6 +26,7 @@ const emit = defineEmits<{
   pdfUpload: [pdfUrl: string]
   collapseLeftPanel: []
   loadDemo: []
+  uploadComplete: []
 }>()
 
 const store = useWorkflowStore()
@@ -39,7 +40,6 @@ const isExpanded = ref(!props.hasUploadedFiles)
 const showInfoModal = ref(false)
 const previewPdfUrl = ref('')
 const isDemoMode = ref(false)
-const additionalInfoInput = ref('') // store input if needed, though modal handles its own state mostly
 
 // Watch for external updates to files (e.g. loading demo)
 watch(() => props.hasUploadedFiles, (hasFiles) => {
@@ -140,6 +140,7 @@ async function handleModalSubmit(info: string) {
     if (store.isConsoleCollapsed) {
       store.isConsoleCollapsed = false
     }
+    emit('uploadComplete')
     return
   }
 

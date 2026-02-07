@@ -5,10 +5,10 @@
  * 
  * ISA hierarchy tree viewer with property editing and source citations.
  */
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { 
   FileText, BookOpen, FlaskConical, Layers, 
-  ChevronRight, ChevronDown, ChevronLeft, 
+  ChevronLeft, 
   ExternalLink, X, Plus 
 } from 'lucide-vue-next'
 
@@ -42,7 +42,6 @@ const emit = defineEmits<{
 }>()
 
 const selectedItem = ref<SelectedItem | null>(null)
-const isExpanded = ref(props.hasUploadedFiles)
 
 // Paper properties
 const paperTitle = ref('Breast Cancer Segmentation Using Deep Learning')
@@ -73,11 +72,7 @@ const workflowSteps = ref<WorkflowStep[]>([
 ])
 
 // Expand when files are uploaded
-watch(() => props.hasUploadedFiles, (hasFiles) => {
-  if (hasFiles) {
-    isExpanded.value = true
-  }
-})
+
 
 function handleNodeClick(id: string, type: SelectedItem['type'], name: string, event?: Event) {
   if (event) {
@@ -125,37 +120,10 @@ const hoverClass = 'hover:bg-slate-50'
 </script>
 
 <template>
-  <!-- Collapsed state -->
-  <div v-if="!isExpanded" class="border-b border-slate-200 bg-white">
-    <button
-      @click="isExpanded = true"
-      class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
-    >
-      <div class="flex items-center gap-2 flex-1">
-        <button
-          @click.stop="emit('collapseLeftPanel')"
-          class="text-slate-400 hover:text-slate-600 transition-colors"
-        >
-          <ChevronLeft class="w-4 h-4" />
-        </button>
-        <div class="text-left">
-          <span class="text-sm font-medium text-slate-700">2. Review Study Design</span>
-          <p class="text-xs text-slate-500">ISA (Investigation, Study, Assay) Hierarchy</p>
-        </div>
-      </div>
-      <ChevronRight class="w-4 h-4 text-slate-400" />
-    </button>
-  </div>
-
-  <!-- Expanded state -->
-  <div v-else class="flex-1 border-b border-slate-200 bg-white flex flex-col overflow-hidden">
+  <div class="flex-1 border-b border-slate-200 bg-white flex flex-col overflow-hidden h-full">
     <!-- Header -->
-    <button
-      @click="isExpanded = !isExpanded"
-      :class="[
-        'w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors',
-        isExpanded ? 'border-b border-slate-200' : ''
-      ]"
+    <div
+      class="w-full flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white"
     >
       <div class="flex items-center gap-2 flex-1">
         <button
@@ -169,9 +137,7 @@ const hoverClass = 'hover:bg-slate-50'
           <p class="text-xs text-slate-500">ISA (Investigation, Study, Assay) Hierarchy</p>
         </div>
       </div>
-      <ChevronDown v-if="isExpanded" class="w-4 h-4 text-slate-400" />
-      <ChevronRight v-else class="w-4 h-4 text-slate-400" />
-    </button>
+    </div>
 
     <!-- Content Area -->
     <template v-if="hasUploadedFiles">
