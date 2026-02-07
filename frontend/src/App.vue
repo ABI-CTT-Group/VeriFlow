@@ -142,7 +142,7 @@ watch(isDatasetNavCollapsed, (val) => {
 
 <template>
   <div 
-    class="h-screen flex flex-col bg-slate-50 overflow-hidden"
+    class="h-[100dvh] flex flex-col bg-slate-50 overflow-hidden"
     @mousemove="handleMouseMove"
     @mouseup="handleMouseUp"
   >
