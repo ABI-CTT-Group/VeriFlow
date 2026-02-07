@@ -50,24 +50,15 @@ requirements:
               parser.add_argument("-c", "--configuration", type=str,
                   default=os.environ.get("NNUNET_CONFIGURATION", "3d_fullres"),
                   help="nnUNet configuration.")
-              parser.add_argument("--nnunet-raw", type=str,
-                  default=os.environ.get("nnUNet_raw"),
-                  help="Path to nnUNet_raw directory.")
-              parser.add_argument("--nnunet-preprocessed", type=str,
-                  default=os.environ.get("nnUNet_preprocessed"),
-                  help="Path to nnUNet_preprocessed directory.")
-              parser.add_argument("--nnunet-results", type=str,
-                  default=os.environ.get("nnUNet_results"),
-                  help="Path to nnUNet_results directory.")
+
+              parser.add_argument("--pre-trained-network", type=str, required=True,
+                  help="Path to the pre-trained network (nnUNet_results) directory.")
 
               args = parser.parse_args()
 
-              if args.nnunet_raw:
-                  os.environ['nnUNet_raw'] = args.nnunet_raw
-              if args.nnunet_preprocessed:
-                  os.environ['nnUNet_preprocessed'] = args.nnunet_preprocessed
-              if args.nnunet_results:
-                  os.environ['nnUNet_results'] = args.nnunet_results
+
+              if args.pre_trained_network:
+                  os.environ['nnUNet_results'] = args.pre_trained_network
 
               run_nnunet_inference(
                   input_folder=args.input_folder,
@@ -107,23 +98,13 @@ inputs:
       prefix: --configuration
     doc: nnUNet configuration (e.g., 3d_fullres, 2d)
 
-  nnunet_raw:
-    type: Directory?
-    inputBinding:
-      prefix: --nnunet-raw
-    doc: Path to nnUNet_raw directory
 
-  nnunet_preprocessed:
-    type: Directory?
-    inputBinding:
-      prefix: --nnunet-preprocessed
-    doc: Path to nnUNet_preprocessed directory
 
-  nnunet_results:
-    type: Directory?
+  pre_trained_network:
+    type: Directory
     inputBinding:
-      prefix: --nnunet-results
-    doc: Path to nnUNet_results directory
+      prefix: --pre-trained-network
+    doc: Path to the pre-trained network (nnUNet_results) directory
 
 outputs:
   segmentation_output:

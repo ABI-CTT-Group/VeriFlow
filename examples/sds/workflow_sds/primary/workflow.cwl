@@ -22,17 +22,11 @@ inputs:
     default: "3d_fullres"
     doc: nnUNet configuration (e.g., 3d_fullres, 2d)
 
-  nnunet_raw:
-    type: Directory?
-    doc: Path to nnUNet_raw directory
 
-  nnunet_preprocessed:
-    type: Directory?
-    doc: Path to nnUNet_preprocessed directory
 
-  nnunet_results:
-    type: Directory?
-    doc: Path to nnUNet_results directory
+  pre_trained_network:
+    type: Directory
+    doc: Path to the pre-trained network (nnUNet_results) directory
 
 steps:
   create_nifti:
@@ -47,9 +41,8 @@ steps:
       input_folder: create_nifti/nifti_output
       dataset_name: dataset_name
       configuration: configuration
-      nnunet_raw: nnunet_raw
-      nnunet_preprocessed: nnunet_preprocessed
-      nnunet_results: nnunet_results
+
+      pre_trained_network: pre_trained_network
     out: [segmentation_output]
 
 outputs:

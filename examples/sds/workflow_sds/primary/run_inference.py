@@ -59,34 +59,20 @@ def main():
     )
     
     # nnUNet environment paths (optional, can be set via env vars)
+
     parser.add_argument(
-        "--nnunet-raw",
+        "--pre-trained-network",
         type=str,
-        default=os.environ.get("nnUNet_raw"),
-        help="Path to nnUNet_raw directory (default: env nnUNet_raw)."
-    )
-    parser.add_argument(
-        "--nnunet-preprocessed",
-        type=str,
-        default=os.environ.get("nnUNet_preprocessed"),
-        help="Path to nnUNet_preprocessed directory (default: env nnUNet_preprocessed)."
-    )
-    parser.add_argument(
-        "--nnunet-results",
-        type=str,
-        default=os.environ.get("nnUNet_results"),
-        help="Path to nnUNet_results directory (default: env nnUNet_results)."
+        required=True,
+        help="Path to the pre-trained network (nnUNet_results) directory."
     )
 
     args = parser.parse_args()
 
     # Set nnUNet environment variables if provided via CLI
-    if args.nnunet_raw:
-        os.environ['nnUNet_raw'] = args.nnunet_raw
-    if args.nnunet_preprocessed:
-        os.environ['nnUNet_preprocessed'] = args.nnunet_preprocessed
-    if args.nnunet_results:
-        os.environ['nnUNet_results'] = args.nnunet_results
+
+    if args.pre_trained_network:
+        os.environ['nnUNet_results'] = args.pre_trained_network
 
     run_nnunet_inference(
         input_folder=args.input_folder,
