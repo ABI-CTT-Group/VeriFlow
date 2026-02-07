@@ -1,0 +1,79 @@
+{
+  "isa_json": {
+    "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+    "description": "The MAMA-MIA dataset consolidates and harmonizes 1,506 pre-treatment T1-weighted DCE-MRI cases from four TCIA collections (ISPY1, ISPY2, NACT, DUKE). It provides expert-corrected tumor segmentations, harmonized clinical and demographic variables, and baseline AI model weights to support breast cancer AI research.",
+    "study_factors": [
+      "Scanner Manufacturer",
+      "Magnetic Field Strength",
+      "Acquisition Plane",
+      "Patient Age",
+      "Ethnicity",
+      "Tumor Subtype",
+      "Pathologic Complete Response (pCR)",
+      "Survival Status"
+    ],
+    "Total Cases": "1506",
+    "Modality": "DCE-MRI",
+    "Anatomical Region": "Breast",
+    "Source Database": "The Cancer Imaging Archive (TCIA)",
+    "License": "CC-BY-NC",
+    "Repository": "Synapse"
+  },
+  "confidence_scores": {
+    "sample_size_extraction": 1.0,
+    "workflow_reconstruction": 0.98,
+    "tool_identification": 1.0
+  },
+  "identified_tools": [
+    {
+      "name": "nnU-Net",
+      "description": "Deep learning framework used for generating preliminary segmentations and training the baseline segmentation model."
+    },
+    {
+      "name": "Mango viewer",
+      "description": "Software tool used by 16 experts to manually correct and verify the preliminary automatic segmentations."
+    },
+    {
+      "name": "nibabel",
+      "description": "Python library used for image processing and orientation standardization (reorienting to LAS/PSR systems)."
+    },
+    {
+      "name": "SimpleITK",
+      "description": "Library used for image analysis and processing."
+    },
+    {
+      "name": "pycad",
+      "description": "Python library used to transform original DICOM images from TCIA to NIfTI format."
+    },
+    {
+      "name": "seg-metrics",
+      "description": "Python library used to compute validation metrics like Dice coefficient and Hausdorff Distance."
+    },
+    {
+      "name": "pandas",
+      "description": "Library used for data filtering and visualization scripts provided in the repository."
+    },
+    {
+      "name": "matplotlib",
+      "description": "Library used for plotting MRI images and visual inspection."
+    }
+  ],
+  "identified_models": [
+    "nnU-Net"
+  ],
+  "identified_measurements": [
+    "Dice Similarity Coefficient (DSC)",
+    "95% Hausdorff Distance (HD)",
+    "Functional Tumor Volume (FTV)",
+    "Signal Enhancement Ratio (SER)",
+    "Percent Enhancement (PE)",
+    "Cohen's Kappa"
+  ],
+  "agent_thoughts": "The document describes the creation of the MAMA-MIA dataset. \n\n1.  **Investigation Extraction**: The title is clearly stated. The description is summarized from the abstract. The study is a Data Descriptor for a benchmark dataset.\n\n2.  **Study Factors**: Identified from the 'Data Records' and 'Technical Validation' sections (e.g., Scanner Manufacturer, Magnetic Field Strength, Clinical outcomes).\n\n3.  **ISA Hierarchy (Workflow)**:\n    *   **Data Collection**: Sourced from TCIA (ISPY1, ISPY2, NACT, DUKE). Selection criteria (Fig 2) applied.\n    *   **Harmonization**: Consolidating clinical data, standardizing image orientation (Fig 1).\n    *   **Segmentation Workflow**: \n        *   Preliminary segmentation using nnU-Net (trained on auxiliary data).\n        *   Visual QC by 2 radiologists.\n        *   Expert correction by 16 experts using Mango viewer.\n    *   **Baseline Model**: Training a new nnU-Net on the final expert annotations.\n\n4.  **Tools & Models**: \n    *   Software: nnU-Net, Mango viewer, nibabel, SimpleITK, pandas, pycad.\n    *   Models: nnU-Net (used for both preliminary and baseline).\n\n5.  **Measurements**: DSC, Hausdorff Distance (validation), FTV, SER (volumetric analysis).\n\n6.  **Metadata**: Extracted case counts (1506), license (CC-BY-NC), and repository location.",
+  "metadata": {
+    "upload_id": "bench_v2_new_sdk",
+    "generated_at": "2026-02-07T10:44:29.887651",
+    "agent": "scholar_v2",
+    "model_used": "gemini-3-pro-preview"
+  }
+}
