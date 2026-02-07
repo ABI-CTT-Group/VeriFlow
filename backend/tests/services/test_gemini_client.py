@@ -159,3 +159,72 @@ class TestGeminiClient:
 
         # Config should be a GenerateContentConfig instance
         assert config is not None
+
+    def test_calculate_file_hash(self, mock_genai, tmp_path):
+        """Test MD5 hash calculation for file caching."""
+        client = GeminiClient()
+
+        test_file = tmp_path / "test.txt"
+        test_file.write_bytes(b"hello world")
+
+        hash1 = client._calculate_file_hash(str(test_file))
+        hash2 = client._calculate_file_hash(str(test_file))
+
+        assert hash1 == hash2
+        assert len(hash1) == 32  # MD5 hex digest length
+
+    def test_analyze_file_cache_hit(self, mock_genai, tmp_path):
+        """Test analyze_file returns cached result when cache_enabled and key exists."""
+        client = GeminiClient()
+        client.cache_enabled = True
+
+        test_file = tmp_path / "test.pdf"
+        test_file.write_bytes(b"%PDF-1.4 content")
+
+        # Create cache file
+        import hashlib
+        file_hash = client._calculate_file_hash(str(test_file))
+        prompt = "analyze"
+        cache_key = f"{client.model_name}|{file_hash}|{hashlib.md5(prompt.encode()).hexdigest()}"
+
+        cache_file = tmp_path / "genai_cache.json"
+        cached_data = {cache_key: {"thought_process": "cached result"}}
+        cache_file.write_text(json.dumps(cached_data))
+        client.cache_file = cache_file
+
+        result = client.analyze_file(file_path=str(test_file), prompt=prompt)
+
+        assert result["thought_process"] == "cached result"
+        # API should NOT have been called
+        mock_genai["client"].files.upload.assert_not_called()
+
+    def test_analyze_file_cache_miss(self, mock_genai, tmp_path):
+        """Test analyze_file calls API and stores result on cache miss."""
+        client = GeminiClient()
+        client.cache_enabled = True
+        client.cache_file = tmp_path / "genai_cache.json"
+
+        test_file = tmp_path / "test.pdf"
+        test_file.write_bytes(b"%PDF-1.4 content")
+
+        mock_parsed = MagicMock()
+        mock_parsed.model_dump.return_value = {"thought_process": "new result"}
+        mock_genai["response"].parsed = mock_parsed
+
+        result = client.analyze_file(file_path=str(test_file), prompt="analyze")
+
+        assert result["thought_process"] == "new result"
+        mock_genai["client"].files.upload.assert_called_once()
+        # Cache file should have been created
+        assert client.cache_file.exists()
+
+    def test_generate_text_json_parse_fallback(self, mock_genai):
+        """Test generate_text falls back to json.loads when parsed=None but schema given."""
+        client = GeminiClient()
+        mock_genai["response"].parsed = None
+        mock_genai["response"].text = '{"key": "value"}'
+
+        from app.models.schemas import AnalysisResult
+        result = client.generate_text(prompt="test", response_schema=AnalysisResult)
+
+        assert result == {"key": "value"}
