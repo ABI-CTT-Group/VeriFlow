@@ -11,7 +11,7 @@ describe('Workflow Store', () => {
         const store = useWorkflowStore()
         expect(store.nodes).toEqual([])
         expect(store.edges).toEqual([])
-        expect(store.isProcessing).toBe(false)
+        expect(store.isLoading).toBe(false)
     })
 
     it('can add nodes', () => {

@@ -12,6 +12,20 @@ sys.modules['minio'] = MagicMock()
 sys.modules['minio.error'] = MagicMock()
 sys.modules['asyncpg'] = MagicMock()
 
+# Mock google-genai SDK (may not be installed in Docker/CI)
+try:
+    from google import genai as _test_genai  # noqa: F401
+except (ImportError, AttributeError):
+    _mock_genai_mod = MagicMock()
+    _mock_types_mod = MagicMock()
+    _mock_genai_mod.types = _mock_types_mod
+    # Ensure the google namespace exists
+    if 'google' not in sys.modules:
+        sys.modules['google'] = MagicMock()
+    sys.modules['google'].genai = _mock_genai_mod
+    sys.modules['google.genai'] = _mock_genai_mod
+    sys.modules['google.genai.types'] = _mock_types_mod
+
 # Set dummy API key to avoid initialization errors during collection
 os.environ["GEMINI_API_KEY"] = "test-key"
 
