@@ -28,7 +28,7 @@ interface WorkflowStep {
   description: string
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   selectedAssay: null,
   hasUploadedFiles: false,
 })
