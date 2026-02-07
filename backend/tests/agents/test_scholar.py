@@ -1,87 +1,73 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from app.agents.scholar import ScholarAgent
+
 
 class TestScholarAgent:
-    
-    @pytest.fixture
-    def scholar_agent(self, mock_gemini_client):
-        """Create a ScholarAgent instance with mocked Gemini client."""
-        with patch("app.agents.scholar.get_gemini_client", return_value=mock_gemini_client):
-            return ScholarAgent()
 
-    def test_extract_text_from_pdf(self, scholar_agent, mock_pymupdf):
-        """Test PDF text extraction."""
-        pdf_bytes = b"fake pdf content"
-        text = scholar_agent.extract_text_from_pdf(pdf_bytes)
-        
-        # Verify PyMuPDF was called
-        mock_pymupdf.assert_called_once()
-        # Verify text was extracted (logic from conftest mock)
-        assert "[Page 1]" in text
-        assert "Mock PDF Text Content" in text
+    @pytest.fixture
+    def scholar_agent(self, mock_genai):
+        """Create a ScholarAgent instance with mocked Gemini client."""
+        from app.agents.scholar import ScholarAgent
+        return ScholarAgent()
 
     @pytest.mark.asyncio
-    async def test_analyze_publication_success(self, scholar_agent, mock_gemini_client):
-        """Test successful publication analysis."""
-        # Setup mock response
-        mock_response = {
-            "investigation": {
-                "id": "inv_1",
-                "title": "Test Investigation",
-                "studies": []
-            },
-            "confidence_scores": {},
-            "identified_tools": [],
-            "identified_models": [],
-            "identified_measurements": []
-        }
-        mock_gemini_client.generate_json.return_value = mock_response
+    async def test_analyze_publication_success(self, scholar_agent, mock_genai, tmp_path):
+        """Test successful publication analysis with Gemini 3."""
+        # Create a fake PDF
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake content")
 
-        # Call the method
-        result = await scholar_agent.analyze_publication("Sample Text", upload_id="test-123")
-        
-        # Verify Gemini was called correctly
-        mock_gemini_client.generate_json.assert_called_once()
-        
+        # Mock parsed response
+        mock_parsed = MagicMock()
+        mock_parsed.model_dump.return_value = {
+            "thought_process": "Analyzed the document carefully",
+            "investigation": {
+                "title": "Test Investigation",
+                "description": "Test description",
+                "study_factors": [],
+                "metadata": [],
+            },
+            "confidence_scores": [{"name": "title", "score": 0.95}],
+            "identified_tools": [{"name": "Tool A", "description": "A test tool"}],
+            "identified_models": ["U-Net"],
+            "identified_measurements": ["DCE-MRI"],
+        }
+        mock_genai["response"].parsed = mock_parsed
+
+        result = await scholar_agent.analyze_publication(
+            pdf_path=str(pdf_file),
+            upload_id="test-123",
+        )
+
         # Verify result structure
         assert result["isa_json"]["title"] == "Test Investigation"
         assert result["metadata"]["upload_id"] == "test-123"
-        assert result["metadata"]["agent"] == "scholar"
+        assert result["metadata"]["agent"] == "scholar_v2"
+        assert result["metadata"]["thinking_level"] == "HIGH"
+        assert result["confidence_scores"]["title"] == 0.95
+        assert len(result["identified_tools"]) == 1
+        assert result["agent_thoughts"] == "Analyzed the document carefully"
 
     @pytest.mark.asyncio
-    async def test_analyze_publication_error(self, scholar_agent, mock_gemini_client):
-        """Test error handling during analysis."""
-        # Setup mock to raise exception
-        mock_gemini_client.generate_json.side_effect = Exception("Gemini Error")
-
-        # Call the method
-        result = await scholar_agent.analyze_publication("Sample Text")
-        
-        # Verify error handling
+    async def test_analyze_publication_file_not_found(self, scholar_agent):
+        """Test error when file doesn't exist."""
+        result = await scholar_agent.analyze_publication(
+            pdf_path="/nonexistent/file.pdf",
+        )
         assert "error" in result
-        assert result["error"] == "Gemini Error"
-        assert result["isa_json"] is None
+        assert "File not found" in result["error"]
 
-    def test_build_hierarchy_response(self, scholar_agent):
-        """Test building the frontend-compatible hierarchy response."""
-        scholar_output = {
-            "isa_json": {
-                "id": "inv_1",
-                "title": "Test Inv",
-                "studies": []
-            },
-            "confidence_scores": {"prop_1": 90},
-            "identified_tools": [{"name": "Tool A"}],
-            "identified_models": [],
-            "identified_measurements": []
-        }
-        
-        response = scholar_agent.build_hierarchy_response(scholar_output, "upload-xyz")
-        
-        # Verify structure
-        assert "hierarchy" in response
-        assert response["hierarchy"]["investigation"]["title"] == "Test Inv"
-        assert response["confidence_scores"]["upload_id"] == "upload-xyz"
-        assert len(response["identified_tools"]) == 1
-        assert response["identified_tools"][0]["name"] == "Tool A"
+    @pytest.mark.asyncio
+    async def test_analyze_publication_error(self, scholar_agent, mock_genai, tmp_path):
+        """Test error handling during analysis."""
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake content")
+
+        mock_genai["client"].files.upload.side_effect = Exception("Upload failed")
+
+        result = await scholar_agent.analyze_publication(
+            pdf_path=str(pdf_file),
+        )
+
+        assert "error" in result
+        assert "Upload failed" in result["error"]

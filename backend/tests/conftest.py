@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 import os
 import sys
 
@@ -7,24 +7,48 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Mock dependencies that might not be installed in the test environment
-# This allows tests to be collected even if requirements aren't fully installed
 sys.modules['fitz'] = MagicMock()
-sys.modules['minio'] = MagicMock()
 sys.modules['minio'] = MagicMock()
 sys.modules['minio.error'] = MagicMock()
 
 # Set dummy API key to avoid initialization errors during collection
 os.environ["GEMINI_API_KEY"] = "test-key"
 
+
 @pytest.fixture
-def mock_gemini_client():
-    """Mock the GeminiClient to avoid actual API calls."""
-    with patch("app.services.gemini_client.GeminiClient") as MockClient:
-        client_instance = MockClient.return_value
-        # Default mock behavior for common methods
-        client_instance.generate_json.return_value = {}
-        client_instance.generate_content.return_value = "Mock content"
-        yield client_instance
+def mock_genai():
+    """Mock the google.genai module for GeminiClient."""
+    with patch("app.services.gemini_client.genai") as mock:
+        # Mock the Client
+        mock_client = MagicMock()
+        mock.Client.return_value = mock_client
+
+        # Mock files.upload
+        mock_file_ref = MagicMock()
+        mock_client.files.upload.return_value = mock_file_ref
+
+        # Mock models.generate_content response
+        mock_response = MagicMock()
+        mock_response.parsed = None
+        mock_response.text = '{"thought_process": "test", "investigation": {"title": "Test", "description": "Test desc", "study_factors": [], "metadata": []}, "confidence_scores": [], "identified_tools": [], "identified_models": [], "identified_measurements": []}'
+        mock_response.candidates = []
+        mock_client.models.generate_content.return_value = mock_response
+
+        yield {
+            "genai": mock,
+            "client": mock_client,
+            "file_ref": mock_file_ref,
+            "response": mock_response,
+        }
+
+
+@pytest.fixture
+def mock_gemini_client(mock_genai):
+    """Create a mocked GeminiClient instance."""
+    from app.services.gemini_client import GeminiClient
+    client = GeminiClient()
+    return client
+
 
 @pytest.fixture
 def mock_minio_service():
@@ -32,17 +56,6 @@ def mock_minio_service():
     with patch("app.services.minio_client.minio_service") as mock_service:
         yield mock_service
 
-@pytest.fixture
-def mock_pymupdf():
-    """Mock fitz (PyMuPDF) for PDF processing."""
-    with patch("fitz.open") as mock_open:
-        # Create a mock document with pages
-        mock_doc = MagicMock()
-        mock_page = MagicMock()
-        mock_page.get_text.return_value = "Mock PDF Text Content"
-        mock_doc.__iter__.return_value = iter([mock_page])
-        mock_open.return_value = mock_doc
-        yield mock_open
 
 @pytest.fixture
 def mock_subprocess():
