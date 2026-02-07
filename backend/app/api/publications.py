@@ -61,6 +61,11 @@ class PropertyUpdateRequest(BaseModel):
     value: str
 
 
+class AdditionalInfoRequest(BaseModel):
+    """Request to add additional info."""
+    info: str
+
+
 @router.post("/publications/upload", response_model=UploadResponse)
 async def upload_publication(
     background_tasks: BackgroundTasks,
@@ -193,6 +198,23 @@ async def _process_publication_async(
     except Exception as e:
         _upload_cache[upload_id]["status"] = "error"
         _upload_cache[upload_id]["error"] = str(e)
+
+
+@router.post("/publications/{upload_id}/additional-info")
+async def add_additional_info(upload_id: str, request: AdditionalInfoRequest):
+    """
+    Add user-provided additional guidance for the publication.
+    This info helps downstream agents (Engineer/Reviewer).
+    """
+    if upload_id not in _upload_cache:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    
+    # Store the info in the cache entry
+    _upload_cache[upload_id]["additional_info"] = request.info
+    
+    # If using DB (Stage 4), we would persist this here
+    
+    return {"status": "success", "message": "Additional info stored"}
 
 
 @router.get("/study-design/{upload_id}", response_model=StudyDesignResponse)
