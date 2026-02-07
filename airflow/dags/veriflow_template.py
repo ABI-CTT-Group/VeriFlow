@@ -12,7 +12,7 @@ from airflow.operators.empty import EmptyOperator
 with DAG(
     dag_id="veriflow_template",
     start_date=datetime(2026, 1, 1),
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=["veriflow", "template"],
     description="VeriFlow template DAG for testing",
