@@ -116,14 +116,27 @@ function handleDatasetSelect(datasetId: string | null) {
 }
 
 // Console resize handlers
-function handleConsoleMouseDown(e: MouseEvent) {
-  e.preventDefault()
+function handleConsoleMouseDown(e: MouseEvent | TouchEvent) {
+  if (window.TouchEvent && e instanceof TouchEvent) {
+    // For touch, we don't prevent default immediately to allow potential other interactions
+    // but for resize handle it's usually fine.
+  } else {
+    e.preventDefault()
+  }
   isResizingConsole.value = true
 }
 
-function handleMouseMove(e: MouseEvent) {
+function handleMouseMove(e: MouseEvent | TouchEvent) {
   if (isResizingConsole.value) {
-    const newHeight = window.innerHeight - e.clientY
+    let clientY: number
+    
+    if (window.TouchEvent && e instanceof TouchEvent) {
+      clientY = e.touches[0].clientY
+    } else {
+      clientY = (e as MouseEvent).clientY
+    }
+
+    const newHeight = window.innerHeight - clientY
     const minHeight = 100
     const maxHeight = window.innerHeight - 200
     store.consoleHeight = Math.min(Math.max(newHeight, minHeight), maxHeight)
@@ -145,6 +158,8 @@ watch(isDatasetNavCollapsed, (val) => {
     class="h-[100dvh] flex flex-col bg-slate-50 overflow-hidden"
     @mousemove="handleMouseMove"
     @mouseup="handleMouseUp"
+    @touchmove="handleMouseMove"
+    @touchend="handleMouseUp"
   >
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-sm z-10">
@@ -273,6 +288,7 @@ watch(isDatasetNavCollapsed, (val) => {
       <!-- Resize handle -->
       <div
         @mousedown="handleConsoleMouseDown"
+        @touchstart="handleConsoleMouseDown"
         class="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-blue-500 transition-colors z-20"
       />
       <div class="h-full flex flex-col overflow-hidden" style="padding-top: 4px">
