@@ -75,13 +75,13 @@ class VeriFlowService:
             if stream_callback:
                 await stream_callback({"type": "error", "data": str(e)}, run_id)
         
-        # finally:
-        #     # Cleanup the temporary directory
-        #     if temp_dir and temp_dir.exists():
-        #         try:
-        #             shutil.rmtree(temp_dir)
-        #             logger.info(f"[{run_id}] Successfully cleaned up directory: {temp_dir}")
-        #         except Exception as e:
-        #             logger.error(f"[{run_id}] Error cleaning up directory {temp_dir}: {e}")
+        finally:
+            # Cleanup the temporary directory
+            if temp_dir and temp_dir.exists():
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.info(f"[{run_id}] Successfully cleaned up directory: {temp_dir}")
+                except Exception as e:
+                    logger.error(f"[{run_id}] Error cleaning up directory {temp_dir}: {e}")
 
 veriflow_service = VeriFlowService()

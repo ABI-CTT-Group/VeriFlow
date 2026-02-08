@@ -13,6 +13,9 @@ from typing import Optional, List, Dict, Any
 
 from app.services.veriflow_service import veriflow_service
 from app.services.database_sqlite import database_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -73,6 +76,7 @@ async def run_veriflow(
     Upload a PDF and context file to run the VeriFlow langraph workflow.
     """
     run_id = f"run_{uuid.uuid4().hex[:12]}"
+    logger.info(f"[/veriflow/run] New run initiated. run_id: {run_id}, pdf_file: {pdf_file.filename}, context_file: {context_file.filename if context_file else 'N/A'}")
     
     # Create a temporary directory for the run
     temp_dir = Path(tempfile.mkdtemp(prefix=f"{run_id}_"))
@@ -114,6 +118,7 @@ async def run_veriflow(
 
 @router.get("/veriflow/results/{run_id}")
 def get_veriflow_results(run_id: str):
+    logger.info(f"[/veriflow/results/{run_id}] Fetching results for run_id: {run_id}")
     """
     Retrieve the complete results of a VeriFlow run.
     """
@@ -125,14 +130,30 @@ def get_veriflow_results(run_id: str):
     
     scholar_path = session.get("scholar_isa_json_path")
     if scholar_path and Path(scholar_path).exists():
-        with open(scholar_path, "r") as f:
-            results["scholar"] = json.load(f)
+        try:
+            with open(scholar_path, "r") as f:
+                results["scholar"] = json.load(f)
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding scholar ISA JSON for run_id {run_id} at {scholar_path}")
+            results["scholar"] = {"error": "Failed to decode scholar ISA JSON"}
 
     engineer_path = session.get("engineer_cwl_path")
     if engineer_path and Path(engineer_path).exists():
-        with open(engineer_path, "r") as f:
-            results["engineer"] = json.load(f)
+        try:
+            with open(engineer_path, "r") as f:
+                engineer_data = json.load(f)
+                results["engineer"] = {
+                    "graph": engineer_data.get("graph", {"nodes": [], "edges": []}),
+                    "validation_report": engineer_data.get("validation_report", {})
+                }
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding engineer CWL JSON for run_id {run_id} at {engineer_path}")
+            results["engineer"] = {"graph": {"nodes": [], "edges": []}, "validation_report": {"error": "Failed to decode engineer CWL JSON"}}
+    else:
+        logger.warning(f"Engineer CWL path not found or does not exist for run_id {run_id}")
+        results["engineer"] = {"graph": {"nodes": [], "edges": []}, "validation_report": {}}
 
+    logger.info(f"[/veriflow/results/{run_id}] Returning results: {json.dumps(results, indent=2)}")
     return results
 
 @router.get("/veriflow/health")

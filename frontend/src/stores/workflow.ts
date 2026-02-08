@@ -123,6 +123,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
     // Stage 6: Load pre-loaded MAMA-MIA example
     async function loadExample(exampleName: string = 'mama-mia') {
+        reset(); // Clear previous state
         isLoading.value = true
         loadingMessage.value = `Loading ${exampleName.toUpperCase()} demo...`
         error.value = null
@@ -132,18 +133,41 @@ export const useWorkflowStore = defineStore('workflow', () => {
             const data = response.data
 
             uploadId.value = data.upload_id
-            veriflowRunId.value = data.upload_id // Use upload_id as the run_id for demos
             uploadedPdfUrl.value = null
             hasUploadedFiles.value = true
 
+            // Directly process demo results from the response
+            if (data.hierarchy) {
+                processStudyDesignResult({"hierarchy": data.hierarchy});
+            }
+
+            if (data.engineer_output) {
+                const graph = data.engineer_output.graph || { nodes: [], edges: [] };
+                const validation_report = data.engineer_output.validation_report || {};
+                nodeValidationStatus.value = validation_report;
+
+                let finalEdges = graph.edges || [];
+                if (Object.keys(validation_report).length > 0) {
+                    const invalidNodeIds = new Set(
+                        Object.entries(validation_report)
+                            .filter(([_, result]) => (result as any).status === 'invalid')
+                            .map(([key, _]) => key.replace('.cwl', ''))
+                    );
+                    finalEdges = (graph.edges || []).filter((edge: Edge) => 
+                        !invalidNodeIds.has(edge.source) && !invalidNodeIds.has(edge.target)
+                    );
+                }
+                const layouted = getLayoutedElements(graph.nodes || [], finalEdges, 'LR');
+                nodes.value = layouted.nodes;
+                edges.value = layouted.edges;
+                isAssembled.value = true;
+            }
+            
             addLog({
                 timestamp: new Date().toISOString(),
                 level: 'INFO',
-                message: `Loaded pre-configured ${exampleName.toUpperCase()} example. Fetching results...`
+                message: `Loaded pre-configured ${exampleName.toUpperCase()} example with ground truth ISA hierarchy and mock workflow.`
             })
-
-            // Immediately fetch the results using the new stateful architecture
-            await fetchAndProcessResults(data.upload_id);
 
         } catch (err: any) {
             error.value = err.response?.data?.detail || err.message || 'Failed to load example'
@@ -362,6 +386,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     }
 
     async function runVeriflowWorkflow(pdfFile: File, contextFile?: File) {
+        console.log("runVeriflowWorkflow called with:", { pdfFile, contextFile });
         reset(); // Clear previous state
         try {
             isLoading.value = true
@@ -383,6 +408,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     }
 
     function connectToVeriflowSocket(runId: string) {
+        console.log("connectToVeriflowSocket called with runId:", runId);
         if (veriflowSocket.value) {
             veriflowSocket.value.close()
         }
@@ -425,12 +451,14 @@ export const useWorkflowStore = defineStore('workflow', () => {
     }
 
     async function fetchAndProcessResults(runId: string) {
+        console.log("fetchAndProcessResults called for runId:", runId);
         try {
             isLoading.value = true;
             loadingMessage.value = "Fetching final results...";
             
             const response = await endpoints.getVeriflowResults(runId);
             const results = response.data;
+            console.log("fetchAndProcessResults received raw results:", results);
 
             // Process Scholar results
             if (results.scholar) {
@@ -438,27 +466,27 @@ export const useWorkflowStore = defineStore('workflow', () => {
                     hierarchy: { investigation: results.scholar.isa_json || {} },
                     confidence_scores: results.scholar.confidence_scores || {}
                 };
+                console.log("fetchAndProcessResults processed scholarData:", scholarData);
                 processStudyDesignResult(scholarData);
             }
 
             // Process Engineer results
             if (results.engineer) {
-                const engineerData = {
-                    graph: results.engineer.graph,
-                    validation_report: results.engineer.validation_report
-                };
+                const engineerData = results.engineer || {};
+                console.log("fetchAndProcessResults processed engineerData:", engineerData);
+                const graph = engineerData.graph || { nodes: [], edges: [] };
+                const validation_report = engineerData.validation_report || {};
                 
-                // Reuse the logic from the old 'workflow_assembled' handler
-                const { graph, validation_report } = engineerData;
-                nodeValidationStatus.value = validation_report || {};
+                nodeValidationStatus.value = validation_report;
                 let finalEdges = graph.edges || [];
 
-                if (validation_report) {
+                if (Object.keys(validation_report).length > 0) {
                     const invalidNodeIds = new Set(
                         Object.entries(validation_report)
                             .filter(([_, result]) => (result as any).status === 'invalid')
                             .map(([key, _]) => key.replace('.cwl', ''))
                     );
+                    
                     finalEdges = (graph.edges || []).filter((edge: Edge) => 
                         !invalidNodeIds.has(edge.source) && !invalidNodeIds.has(edge.target)
                     );
