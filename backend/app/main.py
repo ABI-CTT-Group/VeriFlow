@@ -1,86 +1,94 @@
-"""
-VeriFlow Backend - FastAPI Application Entry Point
-"""
-
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import uvicorn
+import os
+import logging
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
-from app.api import publications, workflows, executions, catalogue, settings
-from app.services.database import db_service
-from app.services.minio_client import minio_service
+from app.graph.workflow import app_graph
+from app.state import AgentState
 
+# Setup Logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("veriflow_backend")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan handler for startup/shutdown."""
-    # Startup
-    try:
-        await db_service.connect()
-    except Exception as e:
-        print(f"Warning: Could not connect to database: {e}")
-    
-    try:
-        minio_service.ensure_buckets_exist()
-    except Exception as e:
-        print(f"Warning: Could not initialize MinIO buckets: {e}")
-    
-    yield
-    
-    # Shutdown
-    await db_service.disconnect()
+app = FastAPI(title="VeriFlow Orchestrator")
 
-
-app = FastAPI(
-    title="VeriFlow API",
-    description="Research Reliability Engineer - API Backend",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    lifespan=lifespan,
-)
-
-# CORS configuration for frontend
+# CORS Setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API routers
-app.include_router(publications.router, prefix="/api/v1", tags=["Publications"])
-app.include_router(workflows.router, prefix="/api/v1", tags=["Workflows"])
-app.include_router(executions.router, prefix="/api/v1", tags=["Executions"])
-app.include_router(catalogue.router, prefix="/api/v1", tags=["Catalogue"])
-app.include_router(settings.router, prefix="/api/v1", tags=["Settings"])
+class OrchestrationRequest(BaseModel):
+    pdf_path: str
+    repo_path: str
 
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Docker and load balancers."""
-    return {"status": "healthy", "version": "1.0.0"}
-
+class OrchestrationResponse(BaseModel):
+    status: str
+    message: str
+    result: Optional[Dict[str, Any]] = None
 
 @app.get("/")
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "name": "VeriFlow API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "endpoints": {
-            "publications": "/api/v1/publications",
-            "study_design": "/api/v1/study-design",
-            "workflows": "/api/v1/workflows",
-            "executions": "/api/v1/executions",
-            "catalogue": "/api/v1/catalogue",
-            "sources": "/api/v1/sources",
-            "websocket": "/api/v1/ws/logs",
-        },
+def read_root():
+    return {"message": "VeriFlow Orchestrator is operational."}
+
+@app.post("/api/v1/orchestrate", response_model=OrchestrationResponse)
+async def orchestrate_workflow(request: OrchestrationRequest):
+    """
+    Asynchronously invokes the VeriFlow LangGraph.
+    Generates Docker/CWL/Airflow artifacts from PDF and Repo.
+    """
+    # 1. Validate Paths
+    if not os.path.exists(request.pdf_path):
+        raise HTTPException(status_code=404, detail=f"PDF not found at {request.pdf_path}")
+    if not os.path.exists(request.repo_path):
+        raise HTTPException(status_code=404, detail=f"Repo not found at {request.repo_path}")
+
+    # 2. Initialize State
+    initial_state: AgentState = {
+        "pdf_path": request.pdf_path,
+        "repo_path": request.repo_path,
+        "isa_json": None,
+        "repo_context": None,
+        "generated_code": {},
+        "validation_errors": [],
+        "retry_count": 0,
+        "review_decision": None,
+        "review_feedback": None
     }
+
+    try:
+        logger.info(f"Starting workflow for {request.pdf_path}")
+        
+        # 3. Invoke Graph (Async)
+        # Using ainvoke directly awaits the result. 
+        # In a real heavy-load scenario, we would use BackgroundTasks and a DB 
+        # to store state, but for this specific instruction we await execution.
+        final_state = await app_graph.ainvoke(initial_state)
+        
+        # 4. Process Result
+        decision = final_state.get("review_decision", "unknown")
+        
+        return OrchestrationResponse(
+            status="completed",
+            message=f"Workflow finished with decision: {decision}",
+            result={
+                "isa_json": final_state.get("isa_json"),
+                "generated_code": final_state.get("generated_code"),
+                "review_decision": decision,
+                "review_feedback": final_state.get("review_feedback"),
+                "errors": final_state.get("validation_errors")
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Workflow execution failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
