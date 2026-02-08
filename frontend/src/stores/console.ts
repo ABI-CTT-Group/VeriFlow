@@ -50,10 +50,10 @@ export const useConsoleStore = defineStore('console', () => {
     const input = ref('')
 
 
-    function addMessage(message: Omit<Message, 'id' | 'timestamp'>) {
+    function addMessage(message: Partial<Message> & { content: string, type: Message['type'] }) {
         messages.value.push({
-            id: Date.now().toString(),
-            timestamp: new Date(),
+            id: message.id || Date.now().toString(),
+            timestamp: message.timestamp || new Date(),
             ...message
         })
     }
@@ -63,23 +63,59 @@ export const useConsoleStore = defineStore('console', () => {
 
         addMessage({
             type: 'user',
-            content
+            content,
+            timestamp: new Date()
         })
+    }
 
-        // Simulate agent response
-        setTimeout(() => {
-            addMessage({
-                type: 'agent',
-                agent: 'reviewer',
-                content: 'I understand your request. Processing...'
-            })
-        }, 1000)
+    // Handle streaming chunks from agents
+    // We keep track of the last streaming message to append chunks
+    const lastStreamMessageId = ref<string | null>(null)
+
+    function appendAgentMessage(agent: string, chunk: string) {
+        // Enforce lowercase for styling matching
+        const normalizedAgent = agent.toLowerCase()
+
+        // If we have a current streaming message for this agent, append to it
+        if (lastStreamMessageId.value) {
+            const msgIndex = messages.value.findIndex(m => m.id === lastStreamMessageId.value)
+            if (msgIndex !== -1 && messages.value[msgIndex].agent === normalizedAgent) {
+                messages.value[msgIndex].content += chunk
+                return
+            }
+        }
+
+        // define new message
+        const newId = Date.now().toString()
+        addMessage({
+            id: newId,
+            type: 'agent',
+            agent: normalizedAgent as any, // Cast to agent type
+            content: chunk,
+            timestamp: new Date()
+        })
+        lastStreamMessageId.value = newId
+    }
+
+    function addSystemMessage(content: string) {
+        // Reset stream tracking on system message (status update)
+        lastStreamMessageId.value = null
+
+        addMessage({
+            type: 'system',
+            content,
+            timestamp: new Date()
+        })
     }
 
     return {
         messages,
         input,
         addMessage,
-        sendMessage
+        sendMessage,
+        appendAgentMessage,
+        addSystemMessage
     }
+
+
 })

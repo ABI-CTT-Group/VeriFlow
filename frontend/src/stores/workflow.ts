@@ -10,6 +10,8 @@ import { ref, computed } from 'vue'
 import type { Node, Edge } from '@vue-flow/core'
 import { endpoints } from '../services/api'
 import { getLayoutedElements } from '../utils/layout'
+import { wsService } from '../services/websocket'
+import { useConsoleStore } from './console'
 
 // Types per SPEC.md Section 3
 export interface ConfidenceScore {
@@ -43,6 +45,7 @@ export interface Assay {
     filename: string
     measurementType: { term: string }
     technologyType: { term: string }
+    steps?: any[]
 }
 
 export interface NodeStatus {
@@ -115,44 +118,116 @@ export const useWorkflowStore = defineStore('workflow', () => {
     // Stage 6: Load pre-loaded MAMA-MIA example
     async function loadExample(exampleName: string = 'mama-mia') {
         isLoading.value = true
-        loadingMessage.value = `Loading ${exampleName.toUpperCase()} demo...`
+        loadingMessage.value = `Orchestrating ${exampleName.toUpperCase()} demo via Google Gemini 3...`
         error.value = null
 
         try {
-            // Try API first
-            const response = await endpoints.loadExample(exampleName)
-            const data = response.data
+            // Stage 6: Real-time Updates via WebSocket
+            // Generate a unique client ID
+            const clientId = typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-            uploadId.value = data.upload_id
-            uploadedPdfUrl.value = null // No actual PDF for pre-loaded examples
-            hasUploadedFiles.value = true
+            // Connect to WebSocket
+            await wsService.connect(clientId)
 
-            addLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `Loaded pre-configured ${exampleName.toUpperCase()} example`
+            // Setup Listeners
+            const consoleStore = useConsoleStore()
+
+            // Agent Thoughts/Stream
+            wsService.on('agent_stream', (data) => {
+                consoleStore.appendAgentMessage(data.agent.toLowerCase(), data.chunk)
             })
 
-            // Fetch study design for the loaded example
-            await fetchStudyDesignFromApi(data.upload_id)
+            // Status Updates
+            wsService.on('status_update', (data) => {
+                consoleStore.addSystemMessage(data.message)
+                loadingMessage.value = data.message // Sync loading message
+            })
+
+            // Use Orchestration API
+            const pdfPath = "/app/examples/mama-mia/1.pdf"
+            const repoPath = "/app/examples/mama-mia"
+
+            // Pass clientId to backend
+            const response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, clientId)
+            const data = response.data
+            console.log("Orchestration Response: ", data);
+
+            console.log("data.status: ", data.status);
+            console.log("data.result: ", data.result);
+            console.log(data.status === 'completed' && data.result)
+
+
+            if (data.status === 'completed' && data.result) {
+                // Generate a pseudo upload ID
+                uploadId.value = `orch_${Date.now()}`
+                uploadedPdfUrl.value = null
+                hasUploadedFiles.value = true
+
+                // Map ISA JSON to Hierarchy
+                // The orchestration result structure: { studyDesign: { ... } }
+                // We need to map this to our Investigation interface
+                const isa = data.result.isa_json
+                console.log("ISA: ", isa);
+                if (isa && isa.studyDesign) {
+                    const sd = isa.studyDesign
+                    const inv = sd.investigation || {}
+                    console.log("Investigation: ", inv);
+                    // Construct Hierarchy
+                    hierarchy.value = {
+                        identifier: inv.id || 'inv_orchestrated',
+                        title: inv.title || 'Orchestrated Investigation',
+                        description: inv.description || '',
+                        studies: [
+                            {
+                                identifier: sd.study?.id || 'study_orchestrated',
+                                title: sd.study?.title || 'Main Study',
+                                description: sd.study?.description || '',
+                                assays: (sd.assays || []).map((assay: any) => ({
+                                    identifier: assay.id,
+                                    filename: assay.name || 'Assay',
+                                    name: assay.name,
+                                    description: assay.name, // Mapping name to description for now or create new field
+                                    steps: assay.workflowSteps || [],
+                                    measurementType: { term: 'N/A' },
+                                    technologyType: { term: 'N/A' }
+                                }))
+                            }
+                        ]
+                    }
+                    console.log("Hierarchy: ", hierarchy.value);
+                    addLog({
+                        timestamp: new Date().toISOString(),
+                        level: 'INFO',
+                        message: `Orchestration complete. ISA extracted.`
+                    })
+                }
+
+                // Store Generated Code (Optional: could store in a new state variable)
+                if (data.result.generated_code) {
+                    addLog({
+                        timestamp: new Date().toISOString(),
+                        level: 'INFO',
+                        message: `Generated Artifacts: ${Object.keys(data.result.generated_code).join(', ')}`
+                    })
+                }
+
+            } else {
+                throw new Error(data.message || 'Orchestration failed')
+            }
 
         } catch (err: any) {
-            console.warn('API loadExample failed, falling back to mock data', err)
-
-            // Mock Fallback
-            uploadId.value = 'mock-mama-mia-id'
-            uploadedPdfUrl.value = null
-            hasUploadedFiles.value = true
+            console.error('Orchestration failed:', err)
+            error.value = err.response?.data?.detail || err.message || 'Orchestration failed'
 
             addLog({
                 timestamp: new Date().toISOString(),
-                level: 'WARNING',
-                message: `Backend unavailable. Loaded local mock data for ${exampleName}`
+                level: 'ERROR',
+                message: `Orchestration failed: ${error.value}`
             })
 
-            // Use fetchStudyDesign which has its own mock fallback
-            await fetchStudyDesign(uploadId.value)
-
+            // No fallback to mock data - we want to see the real error in this new flow
         } finally {
             isLoading.value = false
             loadingMessage.value = null

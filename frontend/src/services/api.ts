@@ -3,7 +3,7 @@ import axios from 'axios'
 const api = axios.create({
     // Use relative path to leverage Vite proxy (dev) and Nginx proxy (prod)
     baseURL: '/api/v1',
-    timeout: 2000, // Fail fast (2s) to allow fallbacks to kick in
+    timeout: 0, // No timeout for long-running orchestration processes
     headers: {
         'Content-Type': 'application/json'
     }
@@ -95,7 +95,23 @@ export const endpoints = {
 
     // Viewers
     getSourceSnippet: (sourceId: string) =>
-        api.get(`/sources/${sourceId}`)
+        api.get(`/sources/${sourceId}`),
+
+    // Orchestrate Workflow
+    orchestrateWorkflow: (pdfPath: string, repoPath: string, clientId?: string) =>
+        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, client_id: clientId })
+}
+
+export interface OrchestrationResponse {
+    status: string
+    message: string
+    result: {
+        isa_json: any
+        generated_code: any
+        review_decision: string
+        review_feedback: string
+        errors: string[]
+    }
 }
 
 export default api

@@ -21,6 +21,7 @@ class AgentState(TypedDict):
     # Validation & Self-Healing
     validation_errors: List[str]
     retry_count: int
+    client_id: Optional[str] # For WebSocket updates
     
     # Step 3: Reviewer Output
     review_decision: Optional[str]      # 'approved' or 'rejected'

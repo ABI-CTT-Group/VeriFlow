@@ -8,10 +8,40 @@ from typing import Dict, Any, List
 # Service Imports
 from app.services.gemini_client import GeminiClient
 from app.services.prompt_manager import prompt_manager
+import logging
+from pathlib import Path
+from typing import Dict, Any, List
+
+# Service Imports
+from app.services.gemini_client import GeminiClient
+from app.services.prompt_manager import prompt_manager
+from app.services.websocket_manager import manager # WebSocket Manager
 from app.config import config
 from app.state import AgentState
 
 logger = logging.getLogger(__name__)
+
+# --- Helper Functions ---
+
+def _create_stream_callback(client_id: str, agent_name: str):
+    """Creates a callback to stream agent thoughts/output to the client."""
+    async def callback(chunk: str):
+        if client_id:
+            await manager.send_message(client_id, {
+                "type": "agent_stream",
+                "agent": agent_name,
+                "chunk": chunk
+            })
+    return callback if client_id else None
+
+async def _notify_status(client_id: str, message: str, status: str = "running"):
+    """Sends a status update to the client."""
+    if client_id:
+        await manager.send_message(client_id, {
+            "type": "status_update",
+            "status": status,
+            "message": message
+        })
 
 # --- Logging Helper ---
 
@@ -93,7 +123,10 @@ def _mock_validate_artifacts(artifacts: Dict[str, str]) -> List[str]:
 async def scholar_node(state: AgentState) -> Dict[str, Any]:
     """Scholar Agent: Extracts ISA JSON from PDF."""
     run_id = state.get("run_id", str(uuid.uuid4()))
+    client_id = state.get("client_id")
     step_name = "1_scholar"
+    
+    await _notify_status(client_id, "Scholar Agent: Analyzing publication...", status="running")
     
     client = GeminiClient()
     model_name = _resolve_model_name("scholar")
@@ -102,6 +135,10 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     system_prompt = prompt_manager.get_prompt("scholar_system", version=prompt_version)
     extraction_prompt = prompt_manager.get_prompt("scholar_extraction", version=prompt_version)
     full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
+    
+    # Note: analyze_file doesn't support streaming yet in this implementation plan 
+    # but we can add it later. For now, we notify start/end.
+    # To support streaming in analyze_file, we'd need to update it similar to generate_content.
     
     response = await client.analyze_file(
         file_path=state["pdf_path"],
@@ -119,13 +156,18 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
         "final_output": result
     })
     
+    await _notify_status(client_id, "Scholar Agent: Analysis complete.", status="completed")
+    
     return {"isa_json": result, "run_id": run_id}
 
 
 async def engineer_node(state: AgentState) -> Dict[str, Any]:
     """Engineer Agent: Generates CWL/Dockerfile."""
     run_id = state.get("run_id")
+    client_id = state.get("client_id")
     step_name = f"2_engineer_retry_{state.get('retry_count', 0)}"
+
+    await _notify_status(client_id, "Engineer Agent: Generating workflow artifacts...", status="running")
     
     client = GeminiClient()
     model_name = _resolve_model_name("engineer")
@@ -146,8 +188,11 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     
     response = await client.generate_content(
         prompt=prompt,
-        model=model_name
+        model=model_name,
+        stream_callback=_create_stream_callback(client_id, "Engineer")
     )
+    
+    await _notify_status(client_id, "Engineer Agent: Generation complete.", status="completed")
     
     result = response["result"]
     thoughts = response["thought_signatures"]
@@ -189,7 +234,10 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
 async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     """Reviewer Agent: Critiques the solution."""
     run_id = state.get("run_id")
+    client_id = state.get("client_id")
     step_name = "4_reviewer"
+
+    await _notify_status(client_id, "Reviewer Agent: Validating solution...", status="running")
     
     client = GeminiClient()
     model_name = _resolve_model_name("reviewer")
@@ -211,8 +259,11 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     
     response = await client.generate_content(
         prompt=prompt,
-        model=model_name
+        model=model_name,
+        stream_callback=_create_stream_callback(client_id, "Reviewer")
     )
+    
+    await _notify_status(client_id, "Reviewer Agent: Review complete.", status="completed")
     
     result = response["result"]
     thoughts = response["thought_signatures"]

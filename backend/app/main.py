@@ -24,9 +24,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Import Routers
+from app.api import publications, workflows, websockets
+
+app.include_router(publications.router, prefix="/api/v1")
+app.include_router(workflows.router, prefix="/api/v1")
+app.include_router(websockets.router) # WebSocket endpoint /ws/{client_id}
+
 class OrchestrationRequest(BaseModel):
     pdf_path: str
     repo_path: str
+    client_id: Optional[str] = None # Optional client_id for real-time updates
 
 class OrchestrationResponse(BaseModel):
     status: str
@@ -53,6 +61,7 @@ async def orchestrate_workflow(request: OrchestrationRequest):
     initial_state: AgentState = {
         "pdf_path": request.pdf_path,
         "repo_path": request.repo_path,
+        "client_id": request.client_id, # Pass client_id to graph state
         "isa_json": None,
         "repo_context": None,
         "generated_code": {},
