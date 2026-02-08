@@ -337,7 +337,7 @@ function handleExportResults() {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 flex flex-col overflow-y-auto">
     <!-- Dataset Navigation Panel -->
     <ResizablePanel 
       orientation="vertical" 
