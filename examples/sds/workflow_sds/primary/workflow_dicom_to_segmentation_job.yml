@@ -1,0 +1,14 @@
+# Job file for workflow_dicom_to_segmentation.cwl workflow
+# Converts DICOM to NIfTI, then runs nnUNet inference
+
+dicom_images:
+  class: Directory
+  path: /data
+
+pre_trained_network:
+  class: Directory
+  path: /data/nnUNet_results
+
+# Optional - using defaults:
+# dataset_name: "new_dataset"
+# configuration: "3d_fullres"

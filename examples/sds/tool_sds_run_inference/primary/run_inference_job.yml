@@ -1,0 +1,14 @@
+# Sample job file for run_inference.cwl
+# Update paths to match your actual data locations
+
+input_images:
+  class: Directory
+  path: /data
+
+pre_trained_network:
+  class: Directory
+  path: /data/nnUNet_results
+
+# Optional - using defaults:
+# dataset_name: "new_dataset"
+# configuration: "3d_fullres"

@@ -1,0 +1,3 @@
+dicom_images:
+  class: Directory
+  path: /data
