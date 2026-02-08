@@ -7,7 +7,7 @@
  * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
 import { ref, computed } from 'vue'
-import { Upload, File, X, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
+import { Upload, File, X, ChevronLeft, Loader2, Beaker, Plus, Info } from 'lucide-vue-next'
 import { endpoints } from '../../services/api'
 import { useWorkflowStore } from '../../stores/workflow'
 import AdditionalInfoModal from './AdditionalInfoModal.vue'
@@ -184,8 +184,8 @@ function removeFile(index: number) {
 </script>
 
 <template>
-  <div class="border-b border-slate-200 bg-white flex-shrink-0">
-    <div class="flex items-center">
+  <div class="h-full flex flex-col border-b border-slate-200 bg-white">
+    <div class="flex-shrink-0 flex items-center">
       <!-- Collapse left panel button -->
       <button
         @click="emit('collapseLeftPanel')"
@@ -207,7 +207,21 @@ function removeFile(index: number) {
     </div>
     
     <!-- Expanded content -->
-    <div class="p-4 space-y-4">
+    <div class="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col items-center justify-center">
+      <div class="w-full max-w-lg space-y-6 2xl:space-y-12">
+      <!-- Testing Hint -->
+      <div class="p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
+        <Info class="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+        <p class="text-xs text-blue-700 leading-relaxed">
+          <span class="font-semibold block mb-0.5">Need a testing example?</span>
+          You can get the example PDF from this 
+          <a href="https://www.nature.com/articles/s41597-025-04707-4" target="_blank" class="font-medium underline hover:text-blue-800">
+            Nature article
+          </a>
+          and upload it in the box below to start the analysis.
+        </p>
+      </div>
+
       <!-- Drop zone -->
       <div
         :class="[
@@ -227,10 +241,10 @@ function removeFile(index: number) {
       </div>
 
       <!-- Divider with "or" -->
-      <div class="flex items-center gap-3">
-        <div class="flex-1 border-t border-slate-200"></div>
-        <span class="text-xs text-slate-400">or</span>
-        <div class="flex-1 border-t border-slate-200"></div>
+      <div class="flex items-center gap-4">
+        <div class="flex-1 border-t border-slate-300"></div>
+        <span class="text-sm font-medium text-slate-500">OR</span>
+        <div class="flex-1 border-t border-slate-300"></div>
       </div>
 
       <!-- Load Demo Button -->
@@ -290,6 +304,7 @@ function removeFile(index: number) {
         @change="handleFileInput"
         class="hidden"
       />
+      </div>
     </div>
   </div>
 
