@@ -8,8 +8,16 @@ type MessageHandler = (data: any) => void
 class WebSocketService {
     private socket: WebSocket | null = null
     private handlers: Record<string, MessageHandler[]> = {}
-    private isConnected = false
-    private clientId: string | null = null
+    private isConnectedInternal = false
+    private clientId = null as string | null
+
+    get isConnected() {
+        return this.isConnectedInternal
+    }
+
+    getClientId() {
+        return this.clientId
+    }
 
     constructor() {
         this.handlers = {
@@ -45,7 +53,7 @@ class WebSocketService {
 
                 this.socket.onopen = () => {
                     console.log('WebSocket Connected')
-                    this.isConnected = true
+                    this.isConnectedInternal = true
                     resolve()
                 }
 
@@ -66,7 +74,7 @@ class WebSocketService {
 
                 this.socket.onclose = () => {
                     console.log('WebSocket Disconnected')
-                    this.isConnected = false
+                    this.isConnectedInternal = false
                     this.clientId = null
                 }
             } catch (err) {
@@ -80,7 +88,7 @@ class WebSocketService {
             this.socket.close()
             this.socket = null
         }
-        this.isConnected = false
+        this.isConnectedInternal = false
         this.clientId = null
     }
 
@@ -118,6 +126,18 @@ class WebSocketService {
     private notifyHandlers(type: string, data: any) {
         if (this.handlers[type]) {
             this.handlers[type].forEach(handler => handler(data))
+        }
+    }
+
+    /**
+     * Send a message to the backend
+     */
+    send(data: any) {
+        if (this.socket && this.isConnected) {
+            this.socket.send(JSON.stringify(data))
+        } else {
+            console.warn('Cannot send message: WebSocket not connected')
+            this.notifyHandlers('error', { message: 'Cannot send: WebSocket disconnected' })
         }
     }
 }

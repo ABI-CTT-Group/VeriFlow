@@ -115,7 +115,53 @@ export const useWorkflowStore = defineStore('workflow', () => {
         fetchStudyDesign(id)
     }
 
-    // Stage 6: Load pre-loaded MAMA-MIA example
+    // Stage 6: Real-time Updates via WebSocket
+    const clientId = ref<string | null>(null)
+
+    async function initWebSocket() {
+        if (!clientId.value) {
+            clientId.value = typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        }
+
+        if (wsService.isConnected && wsService.getClientId() === clientId.value) {
+            return
+        }
+
+        await wsService.connect(clientId.value)
+
+        // Setup Listeners
+        const consoleStore = useConsoleStore()
+
+        // Agent Thoughts/Stream
+        wsService.on('agent_stream', (data) => {
+            consoleStore.appendAgentMessage(data.agent.toLowerCase(), data.chunk)
+        })
+
+        // Status Updates
+        wsService.on('status_update', (data) => {
+            // Check if message starts with "Agent Name:"
+            const agentMatch = data.message.match(/^([a-zA-Z]+) Agent:/)
+
+            if (agentMatch) {
+                const agentName = agentMatch[1].toLowerCase()
+                consoleStore.addMessage({
+                    type: 'agent',
+                    agent: agentName as any,
+                    content: data.message.replace(`${agentMatch[0]} `, ''),
+                    timestamp: new Date()
+                })
+            } else {
+                consoleStore.addSystemMessage(data.message)
+            }
+
+            // Only update loading message if we are actually loading something
+            if (isLoading.value) {
+                loadingMessage.value = data.message
+            }
+        })
+    }
     async function loadExample(exampleName: string = 'mama-mia') {
         isLoading.value = true
         loadingMessage.value = `Orchestrating ${exampleName.toUpperCase()} demo via Google Gemini 3...`
@@ -123,48 +169,22 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
         try {
             // Stage 6: Real-time Updates via WebSocket
-            // Generate a unique client ID
-            const clientId = typeof crypto !== 'undefined' && crypto.randomUUID
-                ? crypto.randomUUID()
-                : `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+            // Ensure we are connected
+            if (!wsService.isConnected && clientId.value) {
+                await initWebSocket()
+            } else if (!clientId.value) {
+                await initWebSocket()
+            }
 
-            // Connect to WebSocket
-            await wsService.connect(clientId)
-
-            // Setup Listeners
-            const consoleStore = useConsoleStore()
-
-            // Agent Thoughts/Stream
-            wsService.on('agent_stream', (data) => {
-                consoleStore.appendAgentMessage(data.agent.toLowerCase(), data.chunk)
-            })
-
-            // Status Updates
-            wsService.on('status_update', (data) => {
-                // Check if message starts with "Agent Name:"
-                const agentMatch = data.message.match(/^([a-zA-Z]+) Agent:/)
-
-                if (agentMatch) {
-                    const agentName = agentMatch[1].toLowerCase()
-                    consoleStore.addMessage({
-                        type: 'agent',
-                        agent: agentName as any,
-                        content: data.message.replace(`${agentMatch[0]} `, ''),
-                        timestamp: new Date()
-                    })
-                } else {
-                    consoleStore.addSystemMessage(data.message)
-                }
-
-                loadingMessage.value = data.message // Sync loading message
-            })
+            // Use existing clientId
+            const currentClientId = clientId.value!
 
             // Use Orchestration API
             const pdfPath = "/app/examples/mama-mia/1.pdf"
             const repoPath = "/app/examples/mama-mia"
 
             // Pass clientId to backend
-            const response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, clientId)
+            const response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, currentClientId)
             const data = response.data
             console.log("Orchestration Response: ", data);
 
@@ -580,5 +600,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         fetchStudyDesignFromApi,
         exportResults,
         clearError,
+        clientId,
+        initWebSocket,
     }
 })

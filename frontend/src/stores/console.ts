@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { wsService } from '../services/websocket'
 
 export interface Message {
     id: string
@@ -30,13 +31,22 @@ export const useConsoleStore = defineStore('console', () => {
         })
     }
 
-    function sendMessage(content: string) {
+    function sendMessage(content: string, agent?: string) {
         if (!content.trim()) return
 
+        // 1. Add to local store (optimistic UI)
         addMessage({
             type: 'user',
             content,
+            agent: agent as any, // Store target agent if any
             timestamp: new Date()
+        })
+
+        // 2. Send to backend
+        wsService.send({
+            type: 'user_message',
+            content,
+            agent: agent || 'system'
         })
     }
 

@@ -180,6 +180,12 @@ function handleMouseUp() {
 watch(isDatasetNavCollapsed, (val) => {
   store.isRightPanelCollapsed = val
 })
+
+import { onMounted } from 'vue'
+
+onMounted(() => {
+  store.initWebSocket()
+})
 </script>
 
 <template>
