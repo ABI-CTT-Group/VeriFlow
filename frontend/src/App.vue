@@ -178,6 +178,10 @@ function handleMouseUp() {
 watch(isDatasetNavCollapsed, (val) => {
   store.isRightPanelCollapsed = val
 })
+
+watch(hasUploadedFiles, (val) => {
+  isStudyDesignVisible.value = val
+})
 </script>
 
 <template>

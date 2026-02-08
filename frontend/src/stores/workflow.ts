@@ -9,6 +9,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Node, Edge } from '@vue-flow/core'
 import { endpoints } from '../services/api'
+import { veriflowApi } from '../services/veriflowApi'
+import { useConsoleStore } from './console'
 import { getLayoutedElements } from '../utils/layout'
 
 // Types per SPEC.md Section 3
@@ -59,6 +61,8 @@ export interface LogEntry {
 }
 
 export const useWorkflowStore = defineStore('workflow', () => {
+    const consoleStore = useConsoleStore()
+
     // Upload state
     const uploadId = ref<string | null>(null)
     const uploadedPdfUrl = ref<string | null>(null)
@@ -83,6 +87,10 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const nodeStatuses = ref<Record<string, NodeStatus>>({})
     const logs = ref<LogEntry[]>([])
     const pollingInterval = ref<number | undefined>(undefined)
+
+    // VeriFlow state
+    const veriflowRunId = ref<string | null>(null)
+    const veriflowSocket = ref<WebSocket | null>(null)
 
     // UI state
     const isLeftPanelCollapsed = ref(false)
@@ -302,54 +310,129 @@ export const useWorkflowStore = defineStore('workflow', () => {
         nodeStatuses.value[nodeId] = status
     }
 
+    // Helper to process study design results from various sources (API, WebSocket, Demo)
+    function processStudyDesignResult(data: { hierarchy: any, confidence_scores: any, upload_id?: string }) {
+        if (data.hierarchy) {
+            const inv = data.hierarchy.investigation
+            hierarchy.value = {
+                identifier: inv.id || 'inv_1',
+                title: inv.title || 'Unknown Investigation',
+                description: inv.description || '',
+                studies: (inv.studies || []).map((study: any) => ({
+                    identifier: study.id || 'study_1',
+                    title: study.title || 'Unknown Study',
+                    description: study.description || '',
+                    assays: (study.assays || []).map((assay: any) => ({
+                        identifier: assay.id,
+                        filename: assay.name || 'Unknown Assay',
+                        name: assay.name,
+                        description: assay.description,
+                        steps: assay.steps,
+                        measurementType: { term: assay.measurement_type || 'Unknown' },
+                        technologyType: { term: assay.technology_type || 'Unknown' }
+                    }))
+                }))
+            }
+        }
+
+        if (data.confidence_scores) {
+            confidenceScores.value = {
+                upload_id: data.upload_id || uploadId.value || 'unknown',
+                generated_at: new Date().toISOString(),
+                scores: data.confidence_scores
+            }
+        }
+
+        addLog({
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            message: `Study design loaded: ${hierarchy.value?.title || 'Unknown'}`
+        })
+        hasUploadedFiles.value = true // Indicate that study design data is available
+    }
+
     function addLog(entry: LogEntry) {
         logs.value.push(entry)
+        consoleStore.addMessage({
+            type: 'system',
+            content: entry.message
+        })
     }
 
-    async function runWorkflow() {
-        if (!workflowId.value) return
-
+    async function runVeriflowWorkflow(pdfFile: File, contextFile?: File) {
+        reset(); // Clear previous state
         try {
+            isLoading.value = true
+            loadingMessage.value = "Analyzing document..."
+            const response = await veriflowApi.runVeriflow(pdfFile, contextFile)
+            veriflowRunId.value = response.data.run_id
             isWorkflowRunning.value = true
-            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Starting workflow execution...' })
-
-            // Mock execution start
-            executionId.value = `exec_${Date.now()}`
-
-            startPolling()
-        } catch (error) {
-            console.error('Execution failed:', error)
-            isWorkflowRunning.value = false
-            addLog({ timestamp: new Date().toISOString(), level: 'ERROR', message: 'Execution failed to start' })
-        }
-    }
-
-    function startPolling() {
-        if (pollingInterval.value) clearInterval(pollingInterval.value)
-
-        pollingInterval.value = window.setInterval(async () => {
-            if (!executionId.value) return
-            simulateProgress()
-        }, 2000)
-    }
-
-    function simulateProgress() {
-        // Mock progress
-        const nodeIds = nodes.value.map(n => n.id)
-        const randomNode = nodeIds[Math.floor(Math.random() * nodeIds.length)]
-
-        if (randomNode) {
-            updateNodeStatus(randomNode, {
-                status: 'running',
-                progress: Math.floor(Math.random() * 100)
-            })
+            connectToVeriflowSocket(response.data.run_id)
+        } catch (err: any) {
+            error.value = err.response?.data?.detail || err.message || 'Failed to start VeriFlow workflow'
             addLog({
                 timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `Node ${randomNode} progress update`,
-                node_id: randomNode
+                level: 'ERROR',
+                message: `Failed to start VeriFlow workflow: ${error.value}`
             })
+            isLoading.value = false
+            loadingMessage.value = null
         }
+    }
+
+    function connectToVeriflowSocket(runId: string) {
+        if (veriflowSocket.value) {
+            veriflowSocket.value.close()
+        }
+
+        veriflowSocket.value = veriflowApi.connectToWebSocket(runId, (event) => {
+            console.log("WebSocket message received:", event)
+            if (event.type === 'scholar_result') {
+                processStudyDesignResult(event.data)
+                isLoading.value = false // Hide loading indicator after scholar result
+                loadingMessage.value = null
+            } else if (event.type === 'node_update') {
+                let agent = 'system';
+                if (event.data.node.includes('scholar')) agent = 'scholar';
+                if (event.data.node.includes('engineer')) agent = 'engineer';
+                if (event.data.node.includes('reviewer')) agent = 'reviewer';
+                
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Step: ${event.data.node} is complete.`,
+                    agent: agent
+                })
+            } else if (event.type === 'workflow_complete') {
+                const final_decision = event.data?.reviewer?.review_decision || 'unknown';
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Workflow completed. Final decision: ${final_decision}`,
+                    agent: 'system'
+                })
+                isWorkflowRunning.value = false
+                isLoading.value = false
+                loadingMessage.value = null
+                veriflowSocket.value?.close()
+            } else if (event.type === 'error') {
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'ERROR',
+                    message: `Workflow error: ${event.data}`,
+                    agent: 'system'
+                })
+                isWorkflowRunning.value = false
+                isLoading.value = false
+                loadingMessage.value = null
+                veriflowSocket.value?.close()
+            } else {
+                consoleStore.addMessage({
+                    type: 'system',
+                    content: `Unhandled WebSocket event: ${JSON.stringify(event)}`
+                })
+            }
+        })
     }
 
     function toggleLeftPanel() {
@@ -458,6 +541,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
         isLoading,
         loadingMessage,
         error,
+        veriflowRunId,
+        veriflowSocket,
 
         // Computed
         graph,
@@ -471,7 +556,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         setWorkflow,
         updateNodeStatus,
         addLog,
-        runWorkflow,
+        runVeriflowWorkflow,
         toggleLeftPanel,
         toggleRightPanel,
         toggleConsole,

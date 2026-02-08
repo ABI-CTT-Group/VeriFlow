@@ -7,8 +7,7 @@
  * Stage 6: Added "Load Demo" button for MAMA-MIA example.
  */
 import { ref, computed } from 'vue'
-import { Upload, File, X, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
-import { endpoints } from '../../services/api'
+import { Upload, File as FileIcon, X, ChevronLeft, Loader2, Beaker, Plus } from 'lucide-vue-next'
 import { useWorkflowStore } from '../../stores/workflow'
 import AdditionalInfoModal from './AdditionalInfoModal.vue'
 
@@ -30,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useWorkflowStore()
-const files = ref<string[]>([])
+const files = ref<File[]>([])
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -46,33 +45,26 @@ const fileCountText = computed(() => {
   return 'Upload a scientific paper (PDF)'
 })
 
+const pdfFile = computed(() => files.value.find(f => f.name.toLowerCase().endsWith('.pdf')))
+const contextFile = computed(() => files.value.find(f => f.name.toLowerCase().endsWith('.zip')))
+
 function handleDrop(e: DragEvent) {
   e.preventDefault()
   setIsDragging(false)
   
   if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files)
-      const fileNames = droppedFiles.map(f => f.name)
-      files.value.push(...fileNames)
+      files.value = droppedFiles // Replace instead of push
       
-      const pdfFile = droppedFiles.find(f => f.name.toLowerCase().endsWith('.pdf'))
-      if (pdfFile) {
-          const objectUrl = URL.createObjectURL(pdfFile)
+      const pdf = droppedFiles.find(f => f.name.toLowerCase().endsWith('.pdf'))
+      if (pdf) {
+          const objectUrl = URL.createObjectURL(pdf)
           previewPdfUrl.value = objectUrl
-          emit('pdfUpload', pdfFile.name)
+          emit('pdfUpload', pdf.name)
           
-           // Auto-collapse and show modal after PDF upload
-
           isDemoMode.value = false
           showInfoModal.value = true
       }
-  } else {
-      // Fallback for mock/testing if needed
-      const mockPdf = 'breast_cancer_segmentation.pdf'
-      files.value.push(mockPdf)
-      emit('pdfUpload', mockPdf)
-
-      setTimeout(() => { showInfoModal.value = true }, 500)
   }
 }
 
@@ -94,23 +86,19 @@ function handleFileInput(e: Event) {
   const uploadedFiles = target.files
   if (uploadedFiles && uploadedFiles.length > 0) {
     const fileList = Array.from(uploadedFiles)
-    const fileNames = fileList.map(f => f.name)
-    files.value.push(...fileNames)
+    files.value = fileList // Replace instead of push
     
     // Find and notify about PDF
-    const pdfFile = fileList.find(f => f.name.toLowerCase().endsWith('.pdf'))
-    if (pdfFile) {
-      const objectUrl = URL.createObjectURL(pdfFile)
+    const pdf = fileList.find(f => f.name.toLowerCase().endsWith('.pdf'))
+    if (pdf) {
+      const objectUrl = URL.createObjectURL(pdf)
       previewPdfUrl.value = objectUrl
-      emit('pdfUpload', pdfFile.name)
+      emit('pdfUpload', pdf.name)
       
       // Auto-open modal after PDF upload
       isDemoMode.value = false
       showInfoModal.value = true
     }
-    
-    // Auto-collapse after file upload
-
   }
 }
 
@@ -122,39 +110,22 @@ function handleLoadDemo() {
 }
 
 async function handleModalSubmit(info: string) {
-  // Handle Demo Mode
-  if (isDemoMode.value) {
-    emit('loadDemo')
-    showInfoModal.value = false
-    
-    // Expand console automatically
-    if (store.isConsoleCollapsed) {
-      store.isConsoleCollapsed = false
-    }
-    emit('uploadComplete')
-    return
-  }
-
-  if (!store.uploadId) {
-    console.warn("No upload ID available to attach info")
-    // Use timeout to simulate "waiting for backend to give ID" or just proceed if strictly separate
-    // For now, assume ID might be there or this is a "best effort"
-  }
-
-  // If we have an ID, send it. If not, maybe we should queue it? 
-  // For this Refactor, I'll keep existing logic: try to send if ID exists.
-  if (store.uploadId) {
-      try {
-        await endpoints.sendAdditionalInfo(store.uploadId, info)
-        console.log("Additional info submitted")
-      } catch (error) {
-        console.error("Failed to submit additional info", error)
-      }
-  } else {
-      console.warn("Skipping additional info submission: No uploadId")
-  }
-  
   showInfoModal.value = false
+  // TODO: The 'info' parameter is not used in the new flow. Decide if it should be.
+  // For now, we trigger the workflow regardless.
+
+  if (isDemoMode.value) {
+    await store.loadExample('mama-mia');
+    emit('uploadComplete');
+  } else {
+    // This is the new PDF upload flow
+    if (pdfFile.value) {
+      await store.runVeriflowWorkflow(pdfFile.value, contextFile.value);
+      emit('uploadComplete');
+    } else {
+      console.error("Tried to submit modal without a PDF file.");
+    }
+  }
   
   // Expand console automatically
   if (store.isConsoleCollapsed) {
@@ -162,11 +133,20 @@ async function handleModalSubmit(info: string) {
   }
 }
 
-function handleModalSkip() {
-  if (isDemoMode.value) {
-    emit('loadDemo')
-  }
+async function handleModalSkip() {
   showInfoModal.value = false
+  if (isDemoMode.value) {
+    await store.loadExample('mama-mia');
+    emit('uploadComplete');
+  } else {
+    // This is the new PDF upload flow
+    if (pdfFile.value) {
+      await store.runVeriflowWorkflow(pdfFile.value, contextFile.value);
+      emit('uploadComplete');
+    } else {
+      console.error("Tried to skip modal without a PDF file.");
+    }
+  }
   
   // Expand console automatically
   if (store.isConsoleCollapsed) {
@@ -178,9 +158,10 @@ function removeFile(index: number) {
   files.value.splice(index, 1)
   
   // Update PDF if removed
-  const pdfFile = files.value.find(f => f.endsWith('.pdf'))
-  emit('pdfUpload', pdfFile || '')
+  const pdf = files.value.find(f => f.name.endsWith('.pdf'))
+  emit('pdfUpload', pdf?.name || '')
 }
+
 </script>
 
 <template>
@@ -223,7 +204,7 @@ function removeFile(index: number) {
           Drop files here or 
           <span class="text-blue-600 cursor-pointer" @click="handleBrowseClick">browse</span>
         </p>
-        <p class="text-xs text-slate-400 mt-1">PDF, ZIP, or code repositories</p>
+        <p class="text-xs text-slate-400 mt-1">PDF & (optional) ZIP context</p>
       </div>
 
       <!-- Divider with "or" -->
@@ -260,8 +241,8 @@ function removeFile(index: number) {
             class="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-200"
           >
             <div class="flex items-center gap-2">
-              <File class="w-4 h-4 text-slate-400" />
-              <span class="text-sm text-slate-700">{{ file }}</span>
+              <FileIcon class="w-4 h-4 text-slate-400" />
+              <span class="text-sm text-slate-700">{{ file.name }}</span>
             </div>
             <button
               @click="removeFile(index)"
@@ -271,22 +252,14 @@ function removeFile(index: number) {
             </button>
           </div>
         </div>
-
-        <!-- Add info button (only visible when files exist) -->
-        <button
-          @click="showInfoModal = true"
-          class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 border border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-        >
-          <Plus class="w-4 h-4" />
-          <span>Add additional information</span>
-        </button>
       </div>
       
       <!-- Hidden file input -->
       <input
         ref="fileInputRef"
         type="file"
-        accept=".pdf,application/pdf"
+        multiple
+        accept=".pdf,.zip,application/pdf,application/zip"
         @change="handleFileInput"
         class="hidden"
       />

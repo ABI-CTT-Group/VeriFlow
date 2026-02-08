@@ -146,7 +146,7 @@ class GeminiClient:
         target_model = model or self.model_name
         
         # Check Cache
-        if False:
+        if self.cache_enabled:
             cache_key = self._calculate_hash(prompt, target_model, str(response_schema))
             cached = self._get_from_cache(cache_key)
             if cached:
@@ -207,7 +207,7 @@ class GeminiClient:
         Analyzes a local file (Multimodal).
         """
         target_model = model or self.model_name
-        if False: #This should be configurable
+        if self.cache_enabled: #This should be configurable
             file_hash = self._calculate_file_hash(file_path)
             cache_key = self._calculate_hash(file_hash, prompt, target_model)
             cached = self._get_from_cache(cache_key)
@@ -244,7 +244,7 @@ class GeminiClient:
                 "result": result,
                 "thought_signatures": thoughts
             }
-            if False:
+            if self.cache_enabled:
                 self._save_to_cache(cache_key, output)
             return output
 
