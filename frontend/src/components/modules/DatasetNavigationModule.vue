@@ -381,10 +381,15 @@ function handleExportResults() {
               Close
             </button>
           </div>
-          <div class="bg-slate-900 rounded aspect-video flex items-center justify-center">
-            <p class="text-slate-400 text-sm">
-              <span v-if="activePlugin === 'volview'">3D Visualization Placeholder</span>
-              <span v-else-if="activePlugin === 'editor'">Code Editor Placeholder</span>
+          <div class="bg-slate-900 rounded aspect-video flex items-center justify-center overflow-hidden">
+            <img 
+              v-if="activePlugin === 'volview'" 
+              src="/volview.jpg" 
+              class="w-full h-full object-cover" 
+              alt="VolView Visualization" 
+            />
+            <p v-else class="text-slate-400 text-sm">
+              <span v-if="activePlugin === 'editor'">Code Editor Placeholder</span>
               <span v-else-if="activePlugin === 'image'">Image Preview Placeholder</span>
             </p>
           </div>
