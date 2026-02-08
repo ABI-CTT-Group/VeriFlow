@@ -365,19 +365,19 @@ function handleExportResults() {
     >
       <div class="p-4">
         <div v-if="activePlugin" class="border border-slate-200 rounded-lg p-4 bg-slate-50">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <Eye v-if="activePlugin === 'volview'" class="w-5 h-5 text-blue-600" />
-              <Edit v-else-if="activePlugin === 'editor'" class="w-5 h-5 text-blue-600" />
-              <Image v-else-if="activePlugin === 'image'" class="w-5 h-5 text-blue-600" />
-              <div>
-                <span class="text-sm font-medium text-slate-900">
+          <div class="flex items-center justify-between mb-3 gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <Eye v-if="activePlugin === 'volview'" class="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <Edit v-else-if="activePlugin === 'editor'" class="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <Image v-else-if="activePlugin === 'image'" class="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <div class="min-w-0">
+                <span class="text-sm font-medium text-slate-900 truncate block">
                   {{ plugins.find(p => p.id === activePlugin)?.name }}
                 </span>
-                <p v-if="selectedFile" class="text-xs text-slate-500">{{ selectedFile }}</p>
+                <p v-if="selectedFile" class="text-xs text-slate-500 truncate" :title="selectedFile">{{ selectedFile }}</p>
               </div>
             </div>
-            <button @click="selectedFile = null" class="text-xs text-slate-500 hover:text-slate-700">
+            <button @click="selectedFile = null" class="text-xs text-slate-500 hover:text-slate-700 flex-shrink-0">
               Close
             </button>
           </div>
