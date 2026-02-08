@@ -47,3 +47,7 @@ out/
 
 # data
 data/
+test_workflows/
+
+# others
+trigger_dag.py
