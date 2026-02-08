@@ -72,12 +72,10 @@ class EngineerAgent:
             system_instruction = prompt_manager.get_prompt("engineer_system", self.prompt_version)
 
             # Generate with Gemini 3 structured output
-            response = self.client.generate_text(
+            response = await self.client.generate_content(
                 prompt=prompt,
-                system_instruction=system_instruction,
-                temperature=self.temperature,
+                model=self.client.model_name,
                 response_schema=WorkflowResult,
-                thinking_level=self.thinking_level,
             )
 
             # Parse and enhance the response

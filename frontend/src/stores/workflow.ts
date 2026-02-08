@@ -85,6 +85,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const executionId = ref<string | null>(null)
     const isWorkflowRunning = ref(false)
     const nodeStatuses = ref<Record<string, NodeStatus>>({})
+    const nodeValidationStatus = ref<Record<string, any>>({})
     const logs = ref<LogEntry[]>([])
     const pollingInterval = ref<number | undefined>(undefined)
 
@@ -131,17 +132,18 @@ export const useWorkflowStore = defineStore('workflow', () => {
             const data = response.data
 
             uploadId.value = data.upload_id
-            uploadedPdfUrl.value = null // No actual PDF for pre-loaded examples
+            veriflowRunId.value = data.upload_id // Use upload_id as the run_id for demos
+            uploadedPdfUrl.value = null
             hasUploadedFiles.value = true
 
             addLog({
                 timestamp: new Date().toISOString(),
                 level: 'INFO',
-                message: `Loaded pre-configured ${exampleName.toUpperCase()} example`
+                message: `Loaded pre-configured ${exampleName.toUpperCase()} example. Fetching results...`
             })
 
-            // Fetch study design for the loaded example
-            await fetchStudyDesignFromApi(data.upload_id)
+            // Immediately fetch the results using the new stateful architecture
+            await fetchAndProcessResults(data.upload_id);
 
         } catch (err: any) {
             error.value = err.response?.data?.detail || err.message || 'Failed to load example'
@@ -385,36 +387,28 @@ export const useWorkflowStore = defineStore('workflow', () => {
             veriflowSocket.value.close()
         }
 
-        veriflowSocket.value = veriflowApi.connectToWebSocket(runId, (event) => {
+        veriflowSocket.value = veriflowApi.connectToWebSocket(runId, async (event) => {
             console.log("WebSocket message received:", event)
-            if (event.type === 'scholar_result') {
-                processStudyDesignResult(event.data)
-                isLoading.value = false // Hide loading indicator after scholar result
-                loadingMessage.value = null
-            } else if (event.type === 'node_update') {
-                let agent = 'system';
-                if (event.data.node.includes('scholar')) agent = 'scholar';
-                if (event.data.node.includes('engineer')) agent = 'engineer';
-                if (event.data.node.includes('reviewer')) agent = 'reviewer';
-                
+            
+            // Log progress
+            if (event.type === 'node_update' || event.type.endsWith('_complete')) {
                 addLog({
                     timestamp: new Date().toISOString(),
                     level: 'INFO',
-                    message: `Step: ${event.data.node} is complete.`,
-                    agent: agent
+                    message: `Status: ${event.type}`
                 })
-            } else if (event.type === 'workflow_complete') {
-                const final_decision = event.data?.reviewer?.review_decision || 'unknown';
-                addLog({
-                    timestamp: new Date().toISOString(),
-                    level: 'INFO',
-                    message: `Workflow completed. Final decision: ${final_decision}`,
-                    agent: 'system'
-                })
+            }
+
+            // When workflow is complete, fetch the final results via REST
+            if (event.type === 'workflow_complete') {
                 isWorkflowRunning.value = false
                 isLoading.value = false
                 loadingMessage.value = null
                 veriflowSocket.value?.close()
+                
+                // Fetch the full results
+                await fetchAndProcessResults(runId);
+
             } else if (event.type === 'error') {
                 addLog({
                     timestamp: new Date().toISOString(),
@@ -426,13 +420,66 @@ export const useWorkflowStore = defineStore('workflow', () => {
                 isLoading.value = false
                 loadingMessage.value = null
                 veriflowSocket.value?.close()
-            } else {
-                consoleStore.addMessage({
-                    type: 'system',
-                    content: `Unhandled WebSocket event: ${JSON.stringify(event)}`
-                })
             }
         })
+    }
+
+    async function fetchAndProcessResults(runId: string) {
+        try {
+            isLoading.value = true;
+            loadingMessage.value = "Fetching final results...";
+            
+            const response = await endpoints.getVeriflowResults(runId);
+            const results = response.data;
+
+            // Process Scholar results
+            if (results.scholar) {
+                const scholarData = {
+                    hierarchy: { investigation: results.scholar.isa_json || {} },
+                    confidence_scores: results.scholar.confidence_scores || {}
+                };
+                processStudyDesignResult(scholarData);
+            }
+
+            // Process Engineer results
+            if (results.engineer) {
+                const engineerData = {
+                    graph: results.engineer.graph,
+                    validation_report: results.engineer.validation_report
+                };
+                
+                // Reuse the logic from the old 'workflow_assembled' handler
+                const { graph, validation_report } = engineerData;
+                nodeValidationStatus.value = validation_report || {};
+                let finalEdges = graph.edges || [];
+
+                if (validation_report) {
+                    const invalidNodeIds = new Set(
+                        Object.entries(validation_report)
+                            .filter(([_, result]) => (result as any).status === 'invalid')
+                            .map(([key, _]) => key.replace('.cwl', ''))
+                    );
+                    finalEdges = (graph.edges || []).filter((edge: Edge) => 
+                        !invalidNodeIds.has(edge.source) && !invalidNodeIds.has(edge.target)
+                    );
+                }
+                const layouted = getLayoutedElements(graph.nodes || [], finalEdges, 'LR');
+                nodes.value = layouted.nodes;
+                edges.value = layouted.edges;
+                isAssembled.value = true;
+            }
+
+        } catch (err: any) {
+            error.value = err.response?.data?.detail || err.message || 'Failed to fetch results';
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: `Result fetch failed: ${error.value}`
+            });
+        } finally {
+            isLoading.value = false;
+            loadingMessage.value = null;
+        }
     }
 
     function toggleLeftPanel() {
@@ -510,6 +557,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         executionId.value = null
         isWorkflowRunning.value = false
         nodeStatuses.value = {}
+        nodeValidationStatus.value = {}
         logs.value = []
         if (pollingInterval.value) clearInterval(pollingInterval.value)
     }
@@ -531,6 +579,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         executionId,
         isWorkflowRunning,
         nodeStatuses,
+        nodeValidationStatus,
         logs,
         isLeftPanelCollapsed,
         isRightPanelCollapsed,

@@ -8,6 +8,7 @@ from typing import Dict, Any, List
 # Service Imports
 from app.services.gemini_client import GeminiClient
 from app.services.prompt_manager import prompt_manager
+from app.services.database_sqlite import database_service
 from app.config import config
 from app.state import AgentState
 
@@ -72,21 +73,47 @@ def _read_repo_context(repo_path: str) -> str:
         return "Error reading repository context."
     return "\n".join(context)
 
-def _mock_validate_artifacts(artifacts: Dict[str, str]) -> List[str]:
-    """Mocks the build/validation process."""
-    errors = []
-    # If parsing failed earlier, artifacts might be None or Error dict
-    if not isinstance(artifacts, dict):
-        return ["Artifact generation failed or returned invalid format."]
-        
-    dockerfile = artifacts.get("dockerfile", "")
-    cwl = artifacts.get("cwl", "")
+def _mock_validate_artifacts(artifacts: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Mocks the build/validation process and returns a structured report.
+    """
+    report = {}
     
-    if not dockerfile or "FROM" not in str(dockerfile):
-        errors.append("Dockerfile is missing or invalid (no FROM instruction).")
-    if not cwl or "cwlVersion" not in str(cwl):
-        errors.append("CWL is missing or invalid (no cwlVersion declared).")
-    return errors
+    if not isinstance(artifacts, dict):
+        return {"workflow": {"status": "invalid", "errors": ["Artifact generation failed or returned invalid format."]}}
+
+    # Validate each tool CWL file
+    tool_cwls = artifacts.get("tool_cwls", {})
+    if isinstance(tool_cwls, dict):
+        for filename, content in tool_cwls.items():
+            errors = []
+            if "cwlVersion" not in str(content):
+                errors.append("Missing or invalid 'cwlVersion'.")
+            if "class: CommandLineTool" not in str(content):
+                errors.append("Missing or invalid 'class: CommandLineTool'.")
+            
+            status = "invalid" if errors else "valid"
+            report[filename] = {"status": status, "errors": errors}
+
+    # Validate the main workflow CWL
+    workflow_cwl = artifacts.get("workflow_cwl", "")
+    wf_errors = []
+    if "cwlVersion" not in str(workflow_cwl):
+        wf_errors.append("Missing or invalid 'cwlVersion'.")
+    if "class: Workflow" not in str(workflow_cwl):
+        wf_errors.append("Missing or invalid 'class: Workflow'.")
+    
+    report["workflow.cwl"] = {"status": "invalid" if wf_errors else "valid", "errors": wf_errors}
+
+    # Validate Dockerfile
+    dockerfile = artifacts.get("dockerfiles", {}).get("Dockerfile", "")
+    docker_errors = []
+    if "FROM" not in str(dockerfile):
+        docker_errors.append("Dockerfile is missing a 'FROM' instruction.")
+    
+    report["Dockerfile"] = {"status": "invalid" if docker_errors else "valid", "errors": docker_errors}
+
+    return report
 
 # --- Node Implementations ---
 
@@ -109,15 +136,26 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
         model=model_name
     )
     
-    result = response["result"]
-    thoughts = response["thought_signatures"]
+    result = response
     
     _log_node_execution(run_id, step_name, {
         "inputs": {"pdf_path": state["pdf_path"]},
         "prompt_truncated": full_prompt[:200] + "...",
-        "model_thoughts": thoughts,
         "final_output": result
     })
+    
+    # --- Persist to DB ---
+    pdf_path = Path(state["pdf_path"])
+    log_dir = Path("logs") / run_id
+    isa_json_path = log_dir / "scholar_isa.json"
+    with open(isa_json_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+    
+    database_service.create_or_update_agent_session(
+        run_id=run_id,
+        scholar_extraction_complete=True,
+        scholar_isa_json_path=str(isa_json_path.resolve())
+    )
     
     return {"isa_json": result, "run_id": run_id}
 
@@ -149,8 +187,7 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
         model=model_name
     )
     
-    result = response["result"]
-    thoughts = response["thought_signatures"]
+    result = response
     
     _log_node_execution(run_id, step_name, {
         "inputs": {
@@ -158,9 +195,20 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
             "repo_path": repo_path
         },
         "prompt_truncated": prompt[:200] + "...",
-        "model_thoughts": thoughts,
         "final_output": result
     })
+    
+    # --- Persist to DB ---
+    log_dir = Path("logs") / run_id
+    engineer_code_path = log_dir / "engineer_code.json"
+    with open(engineer_code_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+
+    database_service.create_or_update_agent_session(
+        run_id=run_id,
+        engineer_workflow_id=f"wf_{run_id}",
+        engineer_cwl_path=str(engineer_code_path.resolve())
+    )
     
     return {
         "repo_context": repo_context,
@@ -174,16 +222,22 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
     run_id = state.get("run_id")
     step_name = f"3_validate_retry_{state.get('retry_count', 0)}"
     
-    # Correct Key Usage: generated_code
     generated_code = state.get("generated_code", {})
-    errors = _mock_validate_artifacts(generated_code)
+    report = _mock_validate_artifacts(generated_code)
     
+    # Check if there are any invalid statuses in the report
+    has_errors = any(v["status"] == "invalid" for v in report.values() if isinstance(v, dict))
+
     _log_node_execution(run_id, step_name, {
         "inputs": {"generated_code_keys": list(generated_code.keys()) if isinstance(generated_code, dict) else "Invalid Format"},
-        "final_output": {"errors": errors}
+        "final_output": report
     })
     
-    return {"validation_errors": errors}
+    return {
+        "generated_code": generated_code, # Pass through for the service layer
+        "validation_report": report,
+        "validation_errors": ["Validation failed"] if has_errors else [] # Keep for conditional logic
+    }
 
 
 async def reviewer_node(state: AgentState) -> Dict[str, Any]:
@@ -214,8 +268,7 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
         model=model_name
     )
     
-    result = response["result"]
-    thoughts = response["thought_signatures"]
+    result = response
     
     # Normalize Decision
     decision = "rejected"
@@ -235,10 +288,14 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
             "validation_errors": validation_errors
         },
         "prompt_truncated": prompt[:200] + "...",
-        "model_thoughts": thoughts,
         "raw_output": result,
         "derived_decision": decision
     })
+    
+    database_service.create_or_update_agent_session(
+        run_id=run_id,
+        workflow_complete=True
+    )
     
     return {
         "review_decision": decision,

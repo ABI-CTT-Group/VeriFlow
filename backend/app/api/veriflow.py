@@ -2,7 +2,7 @@
 VeriFlow API - VeriFlow Router
 Handles the execution of the langraph-based workflow.
 """
-import uuid
+import uuid, json
 import tempfile
 import zipfile
 import shutil
@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 from app.services.veriflow_service import veriflow_service
+from app.services.database_sqlite import database_service
 
 router = APIRouter()
 
@@ -111,6 +112,29 @@ async def run_veriflow(
         message="VeriFlow workflow execution has been queued.",
     )
 
+@router.get("/veriflow/results/{run_id}")
+def get_veriflow_results(run_id: str):
+    """
+    Retrieve the complete results of a VeriFlow run.
+    """
+    session = database_service.get_agent_session(run_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Run not found.")
+
+    results = {"run_id": run_id, "scholar": None, "engineer": None}
+    
+    scholar_path = session.get("scholar_isa_json_path")
+    if scholar_path and Path(scholar_path).exists():
+        with open(scholar_path, "r") as f:
+            results["scholar"] = json.load(f)
+
+    engineer_path = session.get("engineer_cwl_path")
+    if engineer_path and Path(engineer_path).exists():
+        with open(engineer_path, "r") as f:
+            results["engineer"] = json.load(f)
+
+    return results
+
 @router.get("/veriflow/health")
 async def health_check():
     """
@@ -121,9 +145,16 @@ async def health_check():
 @router.websocket("/ws/veriflow/{run_id}")
 async def websocket_endpoint(websocket: WebSocket, run_id: str):
     await manager.connect(websocket, run_id)
+    
+    # Check if the workflow is already complete
+    session = database_service.get_agent_session(run_id)
+    if session and session.get("workflow_complete"):
+        # If so, immediately notify the client so it can fetch the results
+        await websocket.send_json({"type": "workflow_complete", "data": {"run_id": run_id}})
+
     try:
         while True:
-            # Keep the connection alive
+            # Keep the connection alive to receive subsequent messages if the workflow wasn't complete
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, run_id)

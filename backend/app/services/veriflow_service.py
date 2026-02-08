@@ -48,38 +48,27 @@ class VeriFlowService:
             "review_feedback": None
         }
 
-        final_state = {}
         try:
             async for event in app_graph.astream(initial_state):
                 if not stream_callback:
                     continue
 
                 node_name = list(event.keys())[0]
-                node_state = event[node_name]
                 
-                if "scholar" in event and event["scholar"].get("isa_json"):
-                    isa_json_result = event["scholar"]["isa_json"]
-                    confidence_scores = event["scholar"].get("confidence_scores", {})
-                    
-                    await stream_callback({
-                        "type": "scholar_result",
-                        "data": {
-                            "run_id": run_id,
-                            "hierarchy": {"investigation": isa_json_result},
-                            "confidence_scores": confidence_scores
-                        }
-                    }, run_id)
-                
-                await stream_callback({
-                    "type": "node_update",
-                    "data": { "node": node_name, "state_keys": list(node_state.keys()) }
-                }, run_id)
-            
-            final_state = event
+                # Send lightweight notifications for major steps
+                if "scholar" in event:
+                    await stream_callback({"type": "scholar_complete", "data": {"run_id": run_id}}, run_id)
+                elif "engineer" in event:
+                    await stream_callback({"type": "engineer_complete", "data": {"run_id": run_id}}, run_id)
+                elif "validate" in event:
+                    await stream_callback({"type": "validation_complete", "data": {"run_id": run_id}}, run_id)
+                else:
+                    # Generic update for other steps
+                    await stream_callback({"type": "node_update", "data": {"node": node_name}}, run_id)
 
             logger.info(f"[{run_id}] Workflow finished.")
             if stream_callback:
-                await stream_callback({"type": "workflow_complete", "data": final_state}, run_id)
+                await stream_callback({"type": "workflow_complete", "data": {"run_id": run_id}}, run_id)
 
         except Exception as e:
             logger.error(f"[{run_id}] Workflow execution failed: {e}", exc_info=True)

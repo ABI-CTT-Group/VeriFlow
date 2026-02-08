@@ -8,7 +8,8 @@
  */
 import { Database, Beaker, Box, CheckCircle, Loader, Clock, AlertCircle } from 'lucide-vue-next'
 import { Handle, Position } from '@vue-flow/core'
-import { inject } from 'vue'
+import { inject, computed } from 'vue'
+import { useWorkflowStore } from '../../stores/workflow'
 
 // Vue Flow passes node data via `data` prop, and other props like `selected`
 interface Props {
@@ -18,6 +19,11 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const store = useWorkflowStore()
+
+const validationStatus = computed(() => store.nodeValidationStatus[props.id] || null)
+const hasValidationErrors = computed(() => validationStatus.value?.status === 'invalid')
+const validationErrors = computed(() => validationStatus.value?.errors || [])
 
 // Emits from Vue Flow custom nodes don't easily bubble, so we use injected handlers
 const onDatasetSelect = inject<(datasetId: string) => void>('onDatasetSelect')
@@ -32,6 +38,11 @@ function getSampleDisplayName(samplePath: string): string {
 }
 
 function getStatusColor(): string {
+  // Validation error state takes precedence
+  if (hasValidationErrors.value) {
+    return 'border-red-400 border-dashed bg-red-50'
+  }
+  
   if (props.data.type !== 'tool') return 'border-slate-300'
   
   switch (props.data.status) {
@@ -53,13 +64,14 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
 <template>
   <div
     :class="[
-      'bg-white rounded-xl border-2 transition-all duration-200 ease-in-out',
+      'bg-white rounded-xl border-2 transition-all duration-200 ease-in-out group',
       selected ? 'border-blue-500 shadow-xl ring-1 ring-blue-500/20' : getStatusColor() + ' shadow-sm hover:border-blue-300 hover:shadow-md',
       data.type === 'measurement' ? 'cursor-default' : 'cursor-pointer'
     ]"
     :style="{ 
       width: '280px'
     }"
+    :title="hasValidationErrors ? `Validation Errors:\n- ${validationErrors.join('\n- ')}` : ''"
   >
     <!-- Header -->
     <div class="px-4 py-3 border-b border-slate-200">
@@ -82,7 +94,8 @@ function handleDatasetSelect(datasetId: string, event: MouseEvent) {
         </div>
         
         <!-- Status Icon -->
-        <CheckCircle v-if="data.status === 'completed'" class="w-4 h-4 text-green-600" />
+        <AlertCircle v-if="hasValidationErrors" class="w-4 h-4 text-red-600" />
+        <CheckCircle v-else-if="data.status === 'completed'" class="w-4 h-4 text-green-600" />
         <Loader v-else-if="data.status === 'running'" class="w-4 h-4 text-blue-600 animate-spin" />
         <Clock v-else-if="data.status === 'pending'" class="w-4 h-4 text-slate-400" />
         <AlertCircle v-else-if="data.status === 'error'" class="w-4 h-4 text-red-600" />

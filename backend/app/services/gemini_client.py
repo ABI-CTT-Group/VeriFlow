@@ -150,6 +150,7 @@ class GeminiClient:
             cache_key = self._calculate_hash(prompt, target_model, str(response_schema))
             cached = self._get_from_cache(cache_key)
             if cached:
+                logger.info(f"generate_content Cache hit")
                 return cached
 
         # Config
@@ -185,17 +186,15 @@ class GeminiClient:
                 else:
                     result = {"error": "Empty response text"}
 
-            output = {
-                "result": result,
-                "thought_signatures": thoughts
-            }
-            if False:
+            output = result
+            
+            if self.cache_enabled:
                 self._save_to_cache(cache_key, output)
             return output
 
         except Exception as e:
             logger.error(f"Gemini generate_content error: {e}")
-            return {"result": {"error": str(e)}, "thought_signatures": []}
+            return {"error": str(e)}
 
     async def analyze_file(
         self, 
@@ -212,6 +211,7 @@ class GeminiClient:
             cache_key = self._calculate_hash(file_hash, prompt, target_model)
             cached = self._get_from_cache(cache_key)
             if cached:
+                logger.info(f"Analyse file Cache hit")
                 return cached
 
         try:
@@ -240,14 +240,11 @@ class GeminiClient:
             # Robust Parse
             result = self._robust_parse_json(response.text)
 
-            output = {
-                "result": result,
-                "thought_signatures": thoughts
-            }
+            output = result
             if self.cache_enabled:
                 self._save_to_cache(cache_key, output)
             return output
 
         except Exception as e:
             logger.error(f"Gemini analyze_file error: {e}")
-            return {"result": {"error": str(e)}, "thought_signatures": []}
+            return {"error": str(e)}

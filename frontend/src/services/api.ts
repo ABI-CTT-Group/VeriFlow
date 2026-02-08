@@ -92,6 +92,10 @@ export const endpoints = {
     exportExecution: (executionId: string) =>
         api.get(`/executions/${executionId}/export`, { responseType: 'blob' }),
 
+    // VeriFlow Agentic Workflow
+    getVeriflowResults: (runId: string) =>
+        api.get(`/veriflow/results/${runId}`),
+        
     // Viewers
     getSourceSnippet: (sourceId: string) =>
         api.get(`/sources/${sourceId}`)

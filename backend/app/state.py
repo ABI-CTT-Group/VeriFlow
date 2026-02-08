@@ -1,5 +1,10 @@
 from typing import TypedDict, List, Dict, Optional, Any
 
+try:
+    from typing import NotRequired
+except ImportError:
+    from typing_extensions import NotRequired
+
 class AgentState(TypedDict):
     """
     Shared state for the VeriFlow LangGraph workflow.
@@ -20,6 +25,7 @@ class AgentState(TypedDict):
     
     # Validation & Self-Healing
     validation_errors: List[str]
+    validation_report: NotRequired[Dict[str, Any]]
     retry_count: int
     
     # Step 3: Reviewer Output

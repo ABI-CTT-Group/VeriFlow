@@ -77,7 +77,7 @@ class ScholarAgent:
             full_prompt = f"{base_prompt}\nContext: {context_content or ''}"
 
             # Execute with Gemini 3 features
-            response_data = self.client.analyze_file(
+            response_data = await self.client.analyze_file(
                 file_path=pdf_path,
                 prompt=full_prompt,
                 system_instruction=system_instruction,
