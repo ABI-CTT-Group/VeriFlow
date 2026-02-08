@@ -172,7 +172,7 @@ class GeminiClient:
                 )
                 
                 full_text = ""
-                async for chunk in response_stream:
+                for chunk in response_stream:
                     if chunk.text:
                         full_text += chunk.text
                         # Stream the raw text chunk to the callback
@@ -230,10 +230,12 @@ class GeminiClient:
         self, 
         file_path: str, 
         prompt: str, 
-        model: str = None
+        model: str = None,
+        stream_callback: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Analyzes a local file (Multimodal).
+        Supports streaming if stream_callback is provided.
         """
         target_model = model or self.model_name
         if False: #This should be configurable
@@ -258,11 +260,35 @@ class GeminiClient:
                 response_mime_type="application/json"
             )
 
-            response = self.client.models.generate_content(
-                model=target_model,
-                contents=[types.Content(parts=[file_part, text_part])],
-                config=gen_config
-            )
+            contents = [types.Content(parts=[file_part, text_part])]
+
+            if stream_callback:
+                response_stream = self.client.models.generate_content_stream(
+                    model=target_model,
+                    contents=contents,
+                    config=gen_config
+                )
+                
+                full_text = ""
+                for chunk in response_stream:
+                    if chunk.text:
+                        full_text += chunk.text
+                        await stream_callback(chunk.text)
+                
+                # Mock response object for parsing
+                class MockResponse:
+                    def __init__(self, text):
+                        self.text = text
+                        self.candidates = []
+                        self.parsed = None
+                
+                response = MockResponse(full_text)
+            else:
+                response = self.client.models.generate_content(
+                    model=target_model,
+                    contents=contents,
+                    config=gen_config
+                )
 
             thoughts = self._extract_thoughts(response)
             

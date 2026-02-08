@@ -141,7 +141,21 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
             // Status Updates
             wsService.on('status_update', (data) => {
-                consoleStore.addSystemMessage(data.message)
+                // Check if message starts with "Agent Name:"
+                const agentMatch = data.message.match(/^([a-zA-Z]+) Agent:/)
+
+                if (agentMatch) {
+                    const agentName = agentMatch[1].toLowerCase()
+                    consoleStore.addMessage({
+                        type: 'agent',
+                        agent: agentName as any,
+                        content: data.message.replace(`${agentMatch[0]} `, ''),
+                        timestamp: new Date()
+                    })
+                } else {
+                    consoleStore.addSystemMessage(data.message)
+                }
+
                 loadingMessage.value = data.message // Sync loading message
             })
 

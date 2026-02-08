@@ -140,10 +140,13 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     # but we can add it later. For now, we notify start/end.
     # To support streaming in analyze_file, we'd need to update it similar to generate_content.
     
+    # Updated to support streaming
+    
     response = await client.analyze_file(
         file_path=state["pdf_path"],
         prompt=full_prompt,
-        model=model_name
+        model=model_name,
+        stream_callback=_create_stream_callback(client_id, "Scholar")
     )
     
     result = response["result"]
@@ -167,7 +170,9 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     client_id = state.get("client_id")
     step_name = f"2_engineer_retry_{state.get('retry_count', 0)}"
 
-    await _notify_status(client_id, "Engineer Agent: Generating workflow artifacts...", status="running")
+    retry_count = state.get('retry_count', 0)
+    msg = f"Engineer Agent: Refining artifacts (Attempt {retry_count + 1})..." if retry_count > 0 else "Engineer Agent: Generating workflow artifacts..."
+    await _notify_status(client_id, msg, status="running")
     
     client = GeminiClient()
     model_name = _resolve_model_name("engineer")
@@ -218,6 +223,9 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
     """Validation Node: Mocks execution."""
     run_id = state.get("run_id")
     step_name = f"3_validate_retry_{state.get('retry_count', 0)}"
+    client_id = state.get("client_id")
+    
+    await _notify_status(client_id, "System: Validating generated artifacts...", status="running")
     
     # Correct Key Usage: generated_code
     generated_code = state.get("generated_code", {})
@@ -227,6 +235,11 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
         "inputs": {"generated_code_keys": list(generated_code.keys()) if isinstance(generated_code, dict) else "Invalid Format"},
         "final_output": {"errors": errors}
     })
+    
+    if errors:
+        await _notify_status(client_id, f"System: Validation failed with {len(errors)} errors.", status="completed")
+    else:
+        await _notify_status(client_id, "System: Validation successful.", status="completed")
     
     return {"validation_errors": errors}
 
