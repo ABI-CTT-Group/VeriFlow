@@ -124,6 +124,8 @@ function handleRunWorkflow() {
   runWorkflow()
   collapseAllExceptSelected.value = true
   isDatasetNavCollapsed.value = false // Auto-expand results panel
+  isStudyDesignCollapsed.value = true
+  shouldCollapseViewer.value = true
 }
 
 function handleSelectNode(node: any) {
