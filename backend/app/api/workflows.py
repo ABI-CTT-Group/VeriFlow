@@ -1,13 +1,16 @@
 """
 VeriFlow API - Workflows Router
-Handles workflow assembly, retrieval, and saving.
-Per PLAN.md Stage 2/4 and SPEC.md Section 5.3
+Handles workflow assembly, retrieval, saving (Design Mode), 
+AND execution restart/status (Execution Mode).
 """
 
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
 
+# --- Imports from Original File (Design Mode) ---
 from app.models.workflow import (
     NodeType,
     Position,
@@ -21,6 +24,11 @@ from app.models.workflow import (
     SaveWorkflowRequest,
     NodeStatus,
 )
+
+# --- Imports for New Functionality (Execution Mode) ---
+from app.services.veriflow_service import veriflow_service
+from app.services.database_sqlite import database_service
+from app.services.websocket_manager import manager
 
 # Stage 4: Import Engineer and Reviewer agents (Gemini 3 SDK)
 try:
@@ -41,22 +49,26 @@ except ImportError:
 
 router = APIRouter()
 
-
-# In-memory workflow storage
+# In-memory workflow storage (Design Mode)
 _workflows: dict[str, dict] = {}
 
+# --- New Models for Restart Logic ---
+class RestartRequest(BaseModel):
+    # Optional: Update user context or options on restart
+    user_context: Optional[str] = None
+    
+    # Optional: Clear previous directives if just retrying
+    clear_directives: bool = False
+
+# ==============================================================================
+# EXISTING ENDPOINTS (Design & Assembly)
+# ==============================================================================
 
 @router.post("/workflows/assemble", response_model=AssembleResponse)
 async def assemble_workflow(request: AssembleRequest):
     """
     Assemble a workflow from an assay.
     Triggers the Engineer Agent to generate CWL and Vue Flow graph.
-    
-    Per SPEC.md Section 5.3:
-    - Takes assay_id and generates workflow graph
-    - Returns nodes with auto-layout positions
-    - Uses Engineer Agent for CWL generation
-    - Uses Reviewer Agent for validation
     """
     workflow_id = f"wf_{uuid.uuid4().hex[:12]}"
     
@@ -142,7 +154,7 @@ async def assemble_workflow(request: AssembleRequest):
                 # Fall through to mock data
                 pass
     
-    # Fallback: Generate mock workflow graph based on MAMA-MIA example (matching frontend mock)
+    # Fallback: Generate mock workflow graph based on MAMA-MIA example
     nodes = [
         VueFlowNode(
             id="input-1",
@@ -158,7 +170,7 @@ async def assemble_workflow(request: AssembleRequest):
                     PortDefinition(
                         id="out-0", 
                         label="MRI Scan", 
-                        type="application/dicom", # Type is required by model but not primarily used by UI mock which had datasetId
+                        type="application/dicom",
                         datasetId="dce-mri-scans",
                         sampleId="Subject_001/T1w.nii.gz"
                     ),
@@ -285,11 +297,7 @@ async def assemble_workflow(request: AssembleRequest):
 @router.get("/workflows/{workflow_id}")
 async def get_workflow(workflow_id: str):
     """
-    Get the current state of a workflow.
-    
-    Per SPEC.md Section 5.3:
-    - Returns workflow graph with current node positions
-    - Includes workflow metadata
+    Get the current state of a workflow (Design Mode).
     """
     if workflow_id not in _workflows:
         raise HTTPException(status_code=404, detail=f"Workflow {workflow_id} not found")
@@ -300,11 +308,7 @@ async def get_workflow(workflow_id: str):
 @router.put("/workflows/{workflow_id}")
 async def save_workflow(workflow_id: str, request: SaveWorkflowRequest):
     """
-    Save workflow graph state.
-    
-    Per SPEC.md Section 5.3:
-    - Saves node positions and connections
-    - Updates workflow timestamp
+    Save workflow graph state (Design Mode).
     """
     if workflow_id not in _workflows:
         # Create new workflow if it doesn't exist
@@ -323,4 +327,73 @@ async def save_workflow(workflow_id: str, request: SaveWorkflowRequest):
         "workflow_id": workflow_id,
         "updated_at": _workflows[workflow_id]["updated_at"],
         "message": "Workflow saved successfully",
+    }
+
+
+# ==============================================================================
+# NEW ENDPOINTS (Execution & Restart)
+# ==============================================================================
+
+@router.get("/workflows/{run_id}/status")
+async def get_workflow_status(run_id: str):
+    """
+    Get the current state of a workflow run (Execution Mode).
+    Retrieved from the SQLite database.
+    """
+    session = database_service.get_agent_session(run_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Run ID not found")
+        
+    # Reconstruct a summary of the state
+    state = database_service.get_full_state_mock(run_id)
+    
+    return {
+        "run_id": run_id,
+        "status": "completed" if session.get("workflow_complete") else "in_progress",
+        "current_errors": state.get("validation_errors", []),
+        "review_decision": state.get("review_decision"),
+        "generated_artifacts": list(state.get("generated_code", {}).keys())
+    }
+
+
+@router.post("/workflows/{run_id}/restart")
+async def restart_workflow_execution(
+    run_id: str, 
+    start_node: str = Query(..., description="The agent node to restart from (e.g., 'engineer', 'scholar')"),
+    request: Optional[RestartRequest] = None,
+    background_tasks: BackgroundTasks = BackgroundTasks() 
+):
+    """
+    Explicitly restart a workflow execution from a specific agent node.
+    This supports the 'Plan & Apply' pattern.
+    """
+    # 1. Validate Run Exists
+    session = database_service.get_agent_session(run_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Run ID not found")
+
+    # 2. Update Context if provided
+    if request:
+        updates = {}
+        if request.user_context:
+            updates["user_context"] = request.user_context
+        
+        if request.clear_directives:
+            updates["agent_directives"] = {} # Clear chat history/instructions
+            
+        if updates:
+            database_service.create_or_update_agent_session(run_id, **updates)
+
+    # 3. Trigger Restart (Background Task)
+    background_tasks.add_task(
+        veriflow_service.restart_workflow,
+        run_id=run_id,
+        start_node=start_node,
+        stream_callback=manager.broadcast
+    )
+
+    return {
+        "status": "accepted", 
+        "message": f"Workflow restart initiated from '{start_node}'", 
+        "run_id": run_id
     }

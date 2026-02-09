@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 # Service Imports
 from app.services.gemini_client import GeminiClient
 from app.services.prompt_manager import prompt_manager
-from app.services.websocket_manager import manager # WebSocket Manager
+from app.services.websocket_manager import manager 
 from app.config import config
 from app.state import AgentState
 
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 # --- Helper Functions ---
 
 def _create_stream_callback(client_id: str, agent_name: str):
-    """Creates a callback to stream agent thoughts/output to the client."""
     async def callback(chunk: str):
         if client_id:
             await manager.send_message(client_id, {
@@ -28,7 +27,6 @@ def _create_stream_callback(client_id: str, agent_name: str):
     return callback if client_id else None
 
 async def _notify_status(client_id: str, message: str, status: str = "running"):
-    """Sends a status update to the client."""
     if client_id:
         await manager.send_message(client_id, {
             "type": "status_update",
@@ -98,9 +96,7 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     client_id = state.get("client_id")
     user_context = state.get("user_context", None)
     
-    # Check for Directives
     directive = state.get("agent_directives", {}).get("scholar")
-    
     step_name = "1_scholar"
     
     await _notify_status(client_id, "Scholar Agent: Analyzing publication...", status="running")
@@ -115,7 +111,7 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
     
     if user_context:
-        full_prompt += f"\n\nINITIAL USER CONTEXT:\n{user_context}"
+        full_prompt += f"\n\CRITICAL USER CONTEXT THAT SHOULD BE INCLUDED IN YOUR ANALYSIS AND EXTRACTION:\n{user_context}"
         
     if directive:
         full_prompt += f"\n\nIMPORTANT UPDATE - USER DIRECTIVE:\nThe user has reviewed previous outputs and provided this instruction:\n'{directive}'\nPlease adjust your analysis to strictly follow this directive."
@@ -128,7 +124,6 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     )
     
     result = response["result"]
-    thoughts = response["thought_signatures"]
     
     _log_node_execution(run_id, step_name, {
         "inputs": {"pdf_path": state["pdf_path"], "directive": directive},
@@ -145,13 +140,16 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     """Engineer Agent: Generates CWL/Dockerfile."""
     run_id = state.get("run_id")
     client_id = state.get("client_id")
-    step_name = f"2_engineer_retry_{state.get('retry_count', 0)}"
+    
+    # FIX: Safe access with default value
+    current_retry_count = state.get("retry_count", 0)
+    
+    step_name = f"2_engineer_retry_{current_retry_count}"
 
     # Check for Directives
     directive = state.get("agent_directives", {}).get("engineer")
 
-    retry_count = state.get('retry_count', 0)
-    msg = f"Engineer Agent: Refining artifacts (Attempt {retry_count + 1})..." if retry_count > 0 else "Engineer Agent: Generating workflow artifacts..."
+    msg = f"Engineer Agent: Refining artifacts (Attempt {current_retry_count + 1})..." if current_retry_count > 0 else "Engineer Agent: Generating workflow artifacts..."
     if directive:
         msg = "Engineer Agent: Applying user directives..."
         
@@ -186,7 +184,6 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     await _notify_status(client_id, "Engineer Agent: Generation complete.", status="completed")
     
     result = response["result"]
-    thoughts = response["thought_signatures"]
     
     _log_node_execution(run_id, step_name, {
         "inputs": {"isa_summary": "ISA JSON present", "directive": directive},
@@ -197,7 +194,7 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     return {
         "repo_context": repo_context,
         "generated_code": result,
-        "retry_count": state["retry_count"] + 1
+        "retry_count": current_retry_count + 1 # FIX: Use local variable
     }
 
 
@@ -205,7 +202,8 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
     """Validation Node: Mocks execution."""
     run_id = state.get("run_id")
     client_id = state.get("client_id")
-    step_name = f"3_validate_retry_{state.get('retry_count', 0)}"
+    current_retry_count = state.get("retry_count", 0) # FIX: Safe access
+    step_name = f"3_validate_retry_{current_retry_count}"
     
     await _notify_status(client_id, "System: Validating generated artifacts...", status="running")
     
@@ -231,7 +229,6 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     client_id = state.get("client_id")
     step_name = "4_reviewer"
     
-    # Check for Directives
     directive = state.get("agent_directives", {}).get("reviewer")
 
     await _notify_status(client_id, "Reviewer Agent: Validating solution...", status="running")
@@ -264,7 +261,6 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     await _notify_status(client_id, "Reviewer Agent: Review complete.", status="completed")
     
     result = response["result"]
-    thoughts = response["thought_signatures"]
     
     decision = "rejected"
     feedback_text = str(result)
