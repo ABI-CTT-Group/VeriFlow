@@ -2,7 +2,7 @@
 
 **Version**: 2.0.0
 **Status**: Implementation Specification
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-09
 **Target**: Engineers and AI Agents
 **Hackathon**: [Gemini 3 Hackathon](https://gemini3.devpost.com/)
 
@@ -55,7 +55,7 @@ VeriFlow is an autonomous Research Reliability Engineer that:
 | Execution | Apache Airflow 3.0.6 (LocalExecutor) |
 | CWL Runner | cwltool via Docker-in-Docker |
 | Database | PostgreSQL 15 |
-| Containerization | Docker Compose (10 services) |
+| Containerization | Docker Compose (9 services) |
 
 ---
 
@@ -412,6 +412,7 @@ from google.genai import types
 | **Native PDF Upload** | Multimodal file analysis via `client.files.upload()` for publication ingestion |
 | **Thought Signature Preservation** | Multi-turn reasoning via `types.Part(thought=True, text=sig)` for iterative workflows |
 | **Agentic Vision** | Page image extraction with PyMuPDF for visual analysis of methodology diagrams |
+| **Agentic Function Calling** | Think-Act-Observe loops for iterative CWL generation with validation feedback |
 
 ### 5.3 GeminiClient
 
@@ -495,12 +496,17 @@ Response: 200 OK
 
 #### Load Pre-configured Example
 ```http
-POST /api/v1/publications/examples/{example_name}
+POST /api/v1/publications/load-example
+{
+  "example_name": "mama-mia"
+}
 
 Response: 200 OK
 {
   "upload_id": "example_mama-mia_...",
-  "status": "completed"
+  "filename": "mama-mia",
+  "status": "completed",
+  "message": "Pre-loaded example"
 }
 ```
 
@@ -564,6 +570,20 @@ Response: 200 OK
 GET /api/v1/executions/{execution_id}/export
 
 Response: 200 OK (application/zip)
+```
+
+#### Real-time Logs (WebSocket)
+```
+WebSocket /ws/logs
+
+Messages (JSON):
+{
+  "timestamp": "2026-02-09T12:00:00Z",
+  "level": "INFO",
+  "message": "Node preprocessing completed",
+  "node_id": "step_1",
+  "agent": "engineer"
+}
 ```
 
 ---
@@ -842,7 +862,7 @@ Error Detected
 
 ## Appendix A: Docker Compose Configuration
 
-See `docker-compose.yml` for the full 10-service configuration:
+See `docker-compose.yml` for the full 9-service configuration:
 
 ```yaml
 services:
@@ -916,4 +936,4 @@ CREATE TABLE executions (
 
 **Document End**
 
-*This specification reflects the current implementation as of 2026-02-08, built for the Gemini 3 Hackathon.*
+*This specification reflects the current implementation as of 2026-02-09, built for the Gemini 3 Hackathon.*
