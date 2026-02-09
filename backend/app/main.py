@@ -8,6 +8,8 @@ from typing import Optional, Dict, Any
 
 from app.graph.workflow import app_graph
 from app.state import AgentState
+from app.services.veriflow_service import veriflow_service
+from app.services.websocket_manager import manager
 
 # Setup Logger
 logging.basicConfig(level=logging.INFO)
@@ -25,18 +27,19 @@ app.add_middleware(
 )
 
 # Import Routers
-from app.api import publications, workflows, websockets, mamamia_cache
+from app.api import publications, workflows, websockets, mamamia_cache, chat
 
 app.include_router(publications.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(mamamia_cache.router, prefix="/api/v1")
-app.include_router(websockets.router) # WebSocket endpoint /ws/{client_id}
+app.include_router(chat.router, prefix="/api/v1")
+app.include_router(websockets.router)
 
 class OrchestrationRequest(BaseModel):
     pdf_path: str
     repo_path: str
-    user_context: Optional[str] = None #Optional user provided context for the agent
-    client_id: Optional[str] = None # Optional client_id for real-time updates
+    user_context: Optional[str] = None  # Captured here
+    client_id: Optional[str] = None 
 
 class OrchestrationResponse(BaseModel):
     status: str
@@ -48,55 +51,33 @@ def read_root():
     return {"message": "VeriFlow Orchestrator is operational."}
 
 @app.post("/api/v1/orchestrate", response_model=OrchestrationResponse)
-async def orchestrate_workflow(request: OrchestrationRequest):
+async def orchestrate_workflow(request: OrchestrationRequest, background_tasks: BackgroundTasks):
     """
     Asynchronously invokes the VeriFlow LangGraph.
-    Generates Docker/CWL/Airflow artifacts from PDF and Repo.
     """
-    print(request)
-    # 1. Validate Paths
     if not os.path.exists(request.pdf_path):
         raise HTTPException(status_code=404, detail=f"PDF not found at {request.pdf_path}")
     if not os.path.exists(request.repo_path):
         raise HTTPException(status_code=404, detail=f"Repo not found at {request.repo_path}")
 
-    # 2. Initialize State
-    initial_state: AgentState = {
-        "pdf_path": request.pdf_path,
-        "repo_path": request.repo_path,
-        "client_id": request.client_id, # Pass client_id to graph state
-        "user_context":request.user_context,
-        "isa_json": None,
-        "repo_context": None,
-        "generated_code": {},
-        "validation_errors": [],
-        "retry_count": 0,
-        "review_decision": None,
-        "review_feedback": None
-    }
+    import uuid
+    run_id = f"run_{uuid.uuid4().hex[:8]}"
 
     try:
-        logger.info(f"Starting workflow for {request.pdf_path}")
-        
-        # 3. Invoke Graph (Async)
-        # Using ainvoke directly awaits the result. 
-        # In a real heavy-load scenario, we would use BackgroundTasks and a DB 
-        # to store state, but for this specific instruction we await execution.
-        final_state = await app_graph.ainvoke(initial_state)
-        
-        # 4. Process Result
-        decision = final_state.get("review_decision", "unknown")
+        # Pass user_context explicitly to the service
+        await veriflow_service.run_workflow(
+            run_id=run_id,
+            pdf_path=request.pdf_path,
+            repo_path=request.repo_path,
+            stream_callback=manager.broadcast,
+            user_context=request.user_context,  # <--- CRITICAL PASS
+            client_id=request.client_id
+        )
         
         return OrchestrationResponse(
             status="completed",
-            message=f"Workflow finished with decision: {decision}",
-            result={
-                "isa_json": final_state.get("isa_json"),
-                "generated_code": final_state.get("generated_code"),
-                "review_decision": decision,
-                "review_feedback": final_state.get("review_feedback"),
-                "errors": final_state.get("validation_errors")
-            }
+            message=f"Workflow run {run_id} finished.",
+            result={"run_id": run_id}
         )
 
     except Exception as e:

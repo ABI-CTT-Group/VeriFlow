@@ -30,38 +30,46 @@ def decide_next_step(state: AgentState) -> Literal["engineer", "reviewer"]:
     
     return "reviewer" # Success path
 
-# --- Graph Construction ---
+# --- Graph Factory ---
 
-workflow = StateGraph(AgentState)
+def create_workflow(entry_point: str = "scholar"):
+    """
+    Creates a new instance of the workflow graph.
+    Allows setting a dynamic entry point for 'Plan & Apply' restarts.
+    """
+    workflow = StateGraph(AgentState)
 
-# Add Nodes
-workflow.add_node("scholar", scholar_node)
-workflow.add_node("engineer", engineer_node)
-workflow.add_node("validate", validate_node)
-workflow.add_node("reviewer", reviewer_node)
+    # Add Nodes
+    workflow.add_node("scholar", scholar_node)
+    workflow.add_node("engineer", engineer_node)
+    workflow.add_node("validate", validate_node)
+    workflow.add_node("reviewer", reviewer_node)
 
-# Set Entry Point
-workflow.set_entry_point("scholar")
+    # Set Entry Point
+    # Valid entry points: "scholar", "engineer", "reviewer"
+    workflow.set_entry_point(entry_point)
 
-# Add Edges
-# 1. Scholar always feeds into Engineer
-workflow.add_edge("scholar", "engineer")
+    # Add Edges
+    # 1. Scholar always feeds into Engineer
+    workflow.add_edge("scholar", "engineer")
 
-# 2. Engineer always feeds into Validate
-workflow.add_edge("engineer", "validate")
+    # 2. Engineer always feeds into Validate
+    workflow.add_edge("engineer", "validate")
 
-# 3. Validate branches based on errors/retries
-workflow.add_conditional_edges(
-    "validate",
-    decide_next_step,
-    {
-        "engineer": "engineer",
-        "reviewer": "reviewer"
-    }
-)
+    # 3. Validate branches based on errors/retries
+    workflow.add_conditional_edges(
+        "validate",
+        decide_next_step,
+        {
+            "engineer": "engineer",
+            "reviewer": "reviewer"
+        }
+    )
 
-# 4. Reviewer is the terminal node (Decision recorded in state)
-workflow.add_edge("reviewer", END)
+    # 4. Reviewer is the terminal node (Decision recorded in state)
+    workflow.add_edge("reviewer", END)
 
-# Compile Graph
-app_graph = workflow.compile()
+    return workflow.compile()
+
+# Default instance for standard runs
+app_graph = create_workflow("scholar")
