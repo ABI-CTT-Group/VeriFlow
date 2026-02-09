@@ -195,6 +195,7 @@ async function handleModalSubmit(info: string) {
       endpoints.orchestrateWorkflow(
           uploadedPdfPath.value, 
           uploadedRepoPath.value,
+          info, // Pass additional info as userContext
           clientId 
       ).then(async response => {
           console.log("Orchestration Started:", response.data)
@@ -270,16 +271,7 @@ async function handleModalSubmit(info: string) {
       })
   }
   
-  if (store.uploadId) {
-      try {
-        await endpoints.sendAdditionalInfo(store.uploadId, info)
-        console.log("Additional info submitted")
-      } catch (error) {
-        console.error("Failed to submit additional info", error)
-      }
-  } else {
-      console.warn("Skipping additional info submission: No uploadId")
-  }
+
   
   showInfoModal.value = false
   

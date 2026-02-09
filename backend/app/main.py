@@ -10,6 +10,8 @@ from typing import Optional, Dict, Any
 
 from app.graph.workflow import app_graph
 from app.state import AgentState
+from app.services.veriflow_service import veriflow_service
+from app.services.websocket_manager import manager
 
 # Setup Logger
 logging.basicConfig(level=logging.INFO)
@@ -27,17 +29,19 @@ app.add_middleware(
 )
 
 # Import Routers
-from app.api import publications, workflows, websockets, mamamia_cache
+from app.api import publications, workflows, websockets, mamamia_cache, chat
 
 app.include_router(publications.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(mamamia_cache.router, prefix="/api/v1")
-app.include_router(websockets.router) # WebSocket endpoint /ws/{client_id}
+app.include_router(chat.router, prefix="/api/v1")
+app.include_router(websockets.router)
 
 class OrchestrationRequest(BaseModel):
     pdf_path: str
     repo_path: str
-    client_id: Optional[str] = None # Optional client_id for real-time updates
+    user_context: Optional[str] = None  # Captured here
+    client_id: Optional[str] = None 
 
 class OrchestrationResponse(BaseModel):
     status: str
@@ -52,7 +56,6 @@ def read_root():
 async def orchestrate_workflow(request: OrchestrationRequest, background_tasks: BackgroundTasks):
     """
     Asynchronously invokes the VeriFlow LangGraph.
-    Generates Docker/CWL/Airflow artifacts from PDF and Repo.
     """
     # 1. Validate Paths
     if not os.path.exists(request.pdf_path):
@@ -61,42 +64,26 @@ async def orchestrate_workflow(request: OrchestrationRequest, background_tasks: 
         raise HTTPException(status_code=404, detail=f"Repo not found at {request.repo_path}")
 
     # 2. Generate Run ID
-    run_id = str(uuid.uuid4())
-    
-    # 3. Initialize State
-    initial_state: AgentState = {
-        "run_id": run_id, # Pass run_id to graph state
-        "pdf_path": request.pdf_path,
-        "repo_path": request.repo_path,
-        "client_id": request.client_id, # Pass client_id to graph state
-        "isa_json": None,
-        "repo_context": None,
-        "generated_code": {},
-        "validation_errors": [],
-        "retry_count": 0,
-        "review_decision": None,
-        "review_feedback": None
-    }
+    # Use the more specific run_ID format from the incoming changes
+    run_id = f"run_{uuid.uuid4().hex[:8]}"
 
-    # 4. Start Background Task
-    background_tasks.add_task(run_orchestration_background, initial_state)
+    # 3. Start Background Task
+    # Use veriflow_service.run_workflow directly in background task
+    background_tasks.add_task(
+        veriflow_service.run_workflow,
+        run_id=run_id,
+        pdf_path=request.pdf_path,
+        repo_path=request.repo_path,
+        stream_callback=manager.broadcast,
+        user_context=request.user_context,
+        client_id=request.client_id
+    )
 
     return OrchestrationResponse(
         status="started",
         message=f"Orchestration started in background with run_id: {run_id}",
         result={"run_id": run_id}
     )
-
-async def run_orchestration_background(initial_state: AgentState):
-    """
-    Executes the workflow graph in the background.
-    """
-    try:
-        logger.info(f"Starting background workflow for run_id: {initial_state.get('run_id')}")
-        await app_graph.ainvoke(initial_state)
-        logger.info(f"Background workflow completed for run_id: {initial_state.get('run_id')}")
-    except Exception as e:
-        logger.error(f"Background workflow failed: {e}")
 
 @app.get("/api/v1/orchestrate/{run_id}/artifacts/{agent_name}")
 async def get_orchestration_artifact(run_id: str, agent_name: str):

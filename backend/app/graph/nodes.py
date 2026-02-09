@@ -8,14 +8,7 @@ from typing import Dict, Any, List
 # Service Imports
 from app.services.gemini_client import GeminiClient
 from app.services.prompt_manager import prompt_manager
-import logging
-from pathlib import Path
-from typing import Dict, Any, List
-
-# Service Imports
-from app.services.gemini_client import GeminiClient
-from app.services.prompt_manager import prompt_manager
-from app.services.websocket_manager import manager # WebSocket Manager
+from app.services.websocket_manager import manager 
 from app.config import config
 from app.state import AgentState
 
@@ -24,7 +17,6 @@ logger = logging.getLogger(__name__)
 # --- Helper Functions ---
 
 def _create_stream_callback(client_id: str, agent_name: str):
-    """Creates a callback to stream agent thoughts/output to the client."""
     async def callback(chunk: str):
         if client_id:
             await manager.send_message(client_id, {
@@ -35,7 +27,6 @@ def _create_stream_callback(client_id: str, agent_name: str):
     return callback if client_id else None
 
 async def _notify_status(client_id: str, message: str, status: str = "running"):
-    """Sends a status update to the client."""
     if client_id:
         await manager.send_message(client_id, {
             "type": "status_update",
@@ -43,32 +34,18 @@ async def _notify_status(client_id: str, message: str, status: str = "running"):
             "message": message
         })
 
-# --- Logging Helper ---
-
 def _log_node_execution(run_id: str, step_name: str, data: Dict[str, Any]):
-    """
-    Saves node execution details to logs/<run_id>/<step_name>.json.
-    Standardized observability for all nodes.
-    """
     try:
-        if not run_id:
-            run_id = "unknown_run"
-            
+        if not run_id: run_id = "unknown_run"
         log_dir = Path("logs") / run_id
         log_dir.mkdir(parents=True, exist_ok=True)
-        
         file_path = log_dir / f"{step_name}.json"
-        
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, default=str)
-            
     except Exception as e:
         logger.error(f"Failed to log node execution for {step_name}: {e}")
 
-# --- Helper Functions ---
-
 def _resolve_model_name(agent_name: str) -> str:
-    """Resolves correct API model name from config."""
     agent_conf = config.get_agent_config(agent_name)
     model_alias = agent_conf.get("default_model", "gemini-2.0-flash")
     model_params = config.get_model_params(model_alias)
@@ -84,8 +61,7 @@ def _read_repo_context(repo_path: str) -> str:
     total_chars = 0
     try:
         for root, _, files in os.walk(repo_path):
-            if total_chars >= MAX_CHARS:
-                break
+            if total_chars >= MAX_CHARS: break
             for file in files:
                 if file.endswith(('.py', '.txt', '.md', '.sh', '.yaml', '.yml', 'Dockerfile')):
                     file_path = os.path.join(root, file)
@@ -96,22 +72,16 @@ def _read_repo_context(repo_path: str) -> str:
                             entry = f"--- File: {rel_path} ---\n{content}\n"
                             context.append(entry)
                             total_chars += len(entry)
-                    except Exception:
-                        continue 
-    except Exception:
-        return "Error reading repository context."
+                    except Exception: continue 
+    except Exception: return "Error reading repository context."
     return "\n".join(context)
 
 def _mock_validate_artifacts(artifacts: Dict[str, str]) -> List[str]:
-    """Mocks the build/validation process."""
     errors = []
-    # If parsing failed earlier, artifacts might be None or Error dict
     if not isinstance(artifacts, dict):
         return ["Artifact generation failed or returned invalid format."]
-        
     dockerfile = artifacts.get("dockerfile", "")
     cwl = artifacts.get("cwl", "")
-    
     if not dockerfile or "FROM" not in str(dockerfile):
         errors.append("Dockerfile is missing or invalid (no FROM instruction).")
     if not cwl or "cwlVersion" not in str(cwl):
@@ -124,6 +94,9 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     """Scholar Agent: Extracts ISA JSON from PDF."""
     run_id = state.get("run_id", str(uuid.uuid4()))
     client_id = state.get("client_id")
+    user_context = state.get("user_context", None)
+    
+    directive = state.get("agent_directives", {}).get("scholar")
     step_name = "1_scholar"
     
     await _notify_status(client_id, "Scholar Agent: Analyzing publication...", status="running")
@@ -134,13 +107,14 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     
     system_prompt = prompt_manager.get_prompt("scholar_system", version=prompt_version)
     extraction_prompt = prompt_manager.get_prompt("scholar_extraction", version=prompt_version)
+    
     full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
     
-    # Note: analyze_file doesn't support streaming yet in this implementation plan 
-    # but we can add it later. For now, we notify start/end.
-    # To support streaming in analyze_file, we'd need to update it similar to generate_content.
-    
-    # Updated to support streaming
+    if user_context:
+        full_prompt += f"\n\CRITICAL USER CONTEXT THAT SHOULD BE INCLUDED IN YOUR ANALYSIS AND EXTRACTION:\n{user_context}"
+        
+    if directive:
+        full_prompt += f"\n\nIMPORTANT UPDATE - USER DIRECTIVE:\nThe user has reviewed previous outputs and provided this instruction:\n'{directive}'\nPlease adjust your analysis to strictly follow this directive."
     
     response = await client.analyze_file(
         file_path=state["pdf_path"],
@@ -150,12 +124,10 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     )
     
     result = response["result"]
-    thoughts = response["thought_signatures"]
     
     _log_node_execution(run_id, step_name, {
-        "inputs": {"pdf_path": state["pdf_path"]},
+        "inputs": {"pdf_path": state["pdf_path"], "directive": directive},
         "prompt_truncated": full_prompt[:200] + "...",
-        "model_thoughts": thoughts,
         "final_output": result
     })
     
@@ -168,10 +140,19 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     """Engineer Agent: Generates CWL/Dockerfile."""
     run_id = state.get("run_id")
     client_id = state.get("client_id")
-    step_name = f"2_engineer_retry_{state.get('retry_count', 0)}"
+    
+    # FIX: Safe access with default value
+    current_retry_count = state.get("retry_count", 0)
+    
+    step_name = f"2_engineer_retry_{current_retry_count}"
 
-    retry_count = state.get('retry_count', 0)
-    msg = f"Engineer Agent: Refining artifacts (Attempt {retry_count + 1})..." if retry_count > 0 else "Engineer Agent: Generating workflow artifacts..."
+    # Check for Directives
+    directive = state.get("agent_directives", {}).get("engineer")
+
+    msg = f"Engineer Agent: Refining artifacts (Attempt {current_retry_count + 1})..." if current_retry_count > 0 else "Engineer Agent: Generating workflow artifacts..."
+    if directive:
+        msg = "Engineer Agent: Applying user directives..."
+        
     await _notify_status(client_id, msg, status="running")
     
     client = GeminiClient()
@@ -191,6 +172,9 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
         previous_errors=state.get("validation_errors", [])
     )
     
+    if directive:
+        prompt += f"\n\nIMPORTANT USER DIRECTIVE:\nThe user has reviewed your previous work and requests the following changes:\n'{directive}'\nPlease regenerate the code strictly following this directive."
+    
     response = await client.generate_content(
         prompt=prompt,
         model=model_name,
@@ -200,34 +184,29 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     await _notify_status(client_id, "Engineer Agent: Generation complete.", status="completed")
     
     result = response["result"]
-    thoughts = response["thought_signatures"]
     
     _log_node_execution(run_id, step_name, {
-        "inputs": {
-            "isa_summary": "ISA JSON present",
-            "repo_path": repo_path
-        },
+        "inputs": {"isa_summary": "ISA JSON present", "directive": directive},
         "prompt_truncated": prompt[:200] + "...",
-        "model_thoughts": thoughts,
         "final_output": result
     })
     
     return {
         "repo_context": repo_context,
         "generated_code": result,
-        "retry_count": state["retry_count"] + 1
+        "retry_count": current_retry_count + 1 # FIX: Use local variable
     }
 
 
 async def validate_node(state: AgentState) -> Dict[str, Any]:
     """Validation Node: Mocks execution."""
     run_id = state.get("run_id")
-    step_name = f"3_validate_retry_{state.get('retry_count', 0)}"
     client_id = state.get("client_id")
+    current_retry_count = state.get("retry_count", 0) # FIX: Safe access
+    step_name = f"3_validate_retry_{current_retry_count}"
     
     await _notify_status(client_id, "System: Validating generated artifacts...", status="running")
     
-    # Correct Key Usage: generated_code
     generated_code = state.get("generated_code", {})
     errors = _mock_validate_artifacts(generated_code)
     
@@ -249,6 +228,8 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     run_id = state.get("run_id")
     client_id = state.get("client_id")
     step_name = "4_reviewer"
+    
+    directive = state.get("agent_directives", {}).get("reviewer")
 
     await _notify_status(client_id, "Reviewer Agent: Validating solution...", status="running")
     
@@ -257,19 +238,20 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     prompt_version = _get_prompt_version("reviewer")
     
     isa_json = state.get("isa_json")
-    # Correct Key Usage: generated_code (Fixes crash)
     generated_code = state.get("generated_code")
     validation_errors = state.get("validation_errors", [])
     
     prompt_template = prompt_manager.get_prompt("reviewer_critique", version=prompt_version)
     
-    # Format prompt safely even if generated_code is malformed
     prompt = prompt_template.format(
         isa_json=json.dumps(isa_json, indent=2),
         generated_code=json.dumps(generated_code, indent=2),
         validation_errors=validation_errors
     )
     
+    if directive:
+        prompt += f"\n\nIMPORTANT USER DIRECTIVE:\nThe user has provided specific criteria for approval:\n'{directive}'\nPlease review the output against this directive."
+
     response = await client.generate_content(
         prompt=prompt,
         model=model_name,
@@ -279,9 +261,7 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     await _notify_status(client_id, "Reviewer Agent: Review complete.", status="completed")
     
     result = response["result"]
-    thoughts = response["thought_signatures"]
     
-    # Normalize Decision
     decision = "rejected"
     feedback_text = str(result)
     
@@ -294,13 +274,8 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
         decision = "approved"
 
     _log_node_execution(run_id, step_name, {
-        "inputs": {
-            "validation_status": "Passed" if not validation_errors else "Failed",
-            "validation_errors": validation_errors
-        },
+        "inputs": {"validation_status": "Passed" if not validation_errors else "Failed", "directive": directive},
         "prompt_truncated": prompt[:200] + "...",
-        "model_thoughts": thoughts,
-        "raw_output": result,
         "derived_decision": decision
     })
     
