@@ -41,12 +41,16 @@ venv/
 # archive
 archive/
 
+# tmp
+tmp/
+
 # output
 output/
 out/
 
 # data
-data/
+cwl/input_data/
+data/*
 test_workflows/
 
 # others
