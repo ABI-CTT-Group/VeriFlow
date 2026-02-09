@@ -10,9 +10,9 @@ services:
     networks:
       - veriflow-network
     volumes:
-      - ./cwl:/opt/airflow/cwl
-      - ./cwl/workflows:/workflows
-      - ./cwl/input_data:/input_data
+      - cwl-data:/opt/airflow/cwl
+      - cwl-workflows:/workflows
+      - cwl-input-data:/input_data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
 
@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - veriflow-network
 
@@ -134,8 +136,8 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
-      - ./cwl:/opt/airflow/cwl
-      - ./airflow/data:/opt/airflow/data
+      - cwl-data:/opt/airflow/cwl
+      - airflow-data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -178,8 +180,8 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
-      - ./cwl:/opt/airflow/cwl
-      - ./airflow/data:/opt/airflow/data
+      - cwl-data:/opt/airflow/cwl
+      - airflow-data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -199,13 +201,26 @@ services:
       - TMPDIR=/tmp
       - HOME=/tmp
     volumes:
-      - ./cwl/workflows:/workflows
-      - ./cwl/input_data:/input_data
-      - ./cwl/output:/output
+      - cwl-workflows:/workflows
+      - cwl-input-data:/input_data
+      - cwl-output:/output
       - cwl-tmp:/tmp
     working_dir: /workflows
     depends_on:
       - dind
+    networks:
+      - veriflow-network
+
+  # Sandbox for script execution
+  veriflow-sandbox:
+    image: clin864/veriflow-sandbox:latest
+    container_name: veriflow-sandbox
+    restart: unless-stopped
+    stdin_open: true # Keep container running
+    tty: true
+    volumes:
+      - sandbox-scripts:/app/scripts
+      - sandbox-outputs:/app/outputs
     networks:
       - veriflow-network
 
@@ -214,8 +229,14 @@ volumes:
   minio-data:
   airflow-dags:
   airflow-logs:
+  airflow-data:
+  cwl-data:
+  cwl-workflows:
+  cwl-input-data:
   cwl-output:
   cwl-tmp:
+  sandbox-scripts:
+  sandbox-outputs:
 
 
 networks:

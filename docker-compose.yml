@@ -38,6 +38,7 @@ services:
         condition: service_started
     volumes:
       - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     # Enable hot-reload for development
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
     networks:
@@ -217,6 +218,18 @@ services:
     working_dir: /workflows
     depends_on:
       - dind
+    networks:
+      - veriflow-network
+
+  # Sandbox for script execution
+  veriflow-sandbox:
+    image: clin864/veriflow-sandbox:latest
+    container_name: veriflow-sandbox
+    stdin_open: true # Keep container running
+    tty: true
+    volumes:
+      - ./backend/scripts:/app/scripts # Host scripts mapped to container
+      - ./backend/outputs:/app/outputs # Output directory
     networks:
       - veriflow-network
 
