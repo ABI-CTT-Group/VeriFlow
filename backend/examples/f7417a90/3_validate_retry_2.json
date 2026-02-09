@@ -1,0 +1,19 @@
+{
+  "inputs": {
+    "generated_code_keys": [
+      "Dockerfile",
+      "step1_dicom_convert.cwl",
+      "step2_standardize.cwl",
+      "step3_inference.cwl",
+      "step4_correction.cwl",
+      "step5_metrics.cwl",
+      "workflow.cwl"
+    ]
+  },
+  "final_output": {
+    "errors": [
+      "Dockerfile is missing or invalid (no FROM instruction).",
+      "CWL is missing or invalid (no cwlVersion declared)."
+    ]
+  }
+}

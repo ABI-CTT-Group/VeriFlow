@@ -58,11 +58,13 @@ function toggleViewer() {
 // Initialize or reset
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
-    if (props.isDemoMode) {
-      additionalInfo.value = 'The MAMA-MIA demo additional inputs have been configured.'
-    } else {
-      additionalInfo.value = ''
-    }
+    // Pre-fill context for both Demo and Upload flows as requested
+    additionalInfo.value = `- We are interested in the pre-trained model inference assay for MRI segmentation 
+- Interested in the first subject of the Duke University dataset which is located in this location in dicom format: https://github.com/ABI-CTT-Group/VeriFlow/tree/main/examples/raw_dicoms/DUKE_MRI_001 
+- Can use the Dicom to nifti library 
+- Result of workflow should be segmentation result using the 3D pre-network in nifti format 
+- We will use cpu for executing nnunet 
+- Here is the path to the pre-trained nnunet mode which is located in the local file system where the python script tools will be run: /app/nnUNet_results`
     // Reset PDF state
     pdfPage.value = 1
     pdfScale.value = 1.0
@@ -139,7 +141,7 @@ function handleClose() {
       <div class="flex-1 flex overflow-hidden">
         
         <!-- Left Panel: Hybrid PDF Viewer -->
-        <div class="w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col relative group">
+        <div data-tour="modal-pdf-preview" class="w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col relative group">
           
           <!-- Case A: Custom Web Viewer (VuePdfEmbed) - For iOS/Touch/Fallback -->
           <template v-if="useCustomViewer">
@@ -209,6 +211,7 @@ function handleClose() {
                   Additional Context
                 </label>
                 <textarea
+                  data-tour="modal-context-input"
                   v-model="additionalInfo"
                   :disabled="isDemoMode"
                   rows="12"
@@ -235,6 +238,7 @@ function handleClose() {
               Skip
             </button>
             <button
+              data-tour="modal-continue-button"
               @click="handleSubmit"
               class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200 transition-all active:scale-95"
             >

@@ -3,7 +3,7 @@ import axios from 'axios'
 const api = axios.create({
     // Use relative path to leverage Vite proxy (dev) and Nginx proxy (prod)
     baseURL: '/api/v1',
-    timeout: 2000, // Fail fast (2s) to allow fallbacks to kick in
+    timeout: 0, // No timeout for long-running orchestration processes
     headers: {
         'Content-Type': 'application/json'
     }
@@ -15,6 +15,8 @@ export interface UploadResponse {
     filename: string
     status: string
     message: string
+    pdf_path?: string
+    folder_path?: string
 }
 
 export interface HierarchyResponse {
@@ -52,6 +54,15 @@ export const endpoints = {
         })
     },
 
+    uploadPublicationWithId: (file: File, pdfId: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('pdf_id', pdfId)
+        return api.post<UploadResponse>('/publications/upload_with_id', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+    },
+
     // Stage 6: Load pre-loaded example (MAMA-MIA demo)
     loadExample: (exampleName: string = 'mama-mia') =>
         api.post<UploadResponse>('/publications/load-example', { example_name: exampleName }),
@@ -66,8 +77,11 @@ export const endpoints = {
         api.post(`/publications/${uploadId}/additional-info`, { info }),
 
     // Workflow Management
-    assembleWorkflow: (assayId: string) =>
-        api.post<WorkflowResponse>('/workflows/assemble', { assay_id: assayId }),
+    assembleWorkflow: (assayId: string, runId: string) =>
+        api.post<WorkflowResponse>('/workflows/assemble', { run_id: runId, assay_id: assayId }),
+
+    assembleMamaMia: (assayId: string) =>
+        api.post<WorkflowResponse>('/workflows/mama-mia/assemble', { assay_id: assayId }),
 
     getWorkflow: (workflowId: string) =>
         api.get<WorkflowResponse>(`/workflows/${workflowId}`),
@@ -95,7 +109,40 @@ export const endpoints = {
 
     // Viewers
     getSourceSnippet: (sourceId: string) =>
-        api.get(`/sources/${sourceId}`)
+        api.get(`/sources/${sourceId}`),
+
+    // Orchestrate Workflow
+    orchestrateWorkflow: (pdfPath: string, repoPath: string, userContext?: string, clientId?: string) =>
+        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, user_context: userContext, client_id: clientId }),
+
+    // Cached MAMA-MIA Demo
+    mamaMiaCache: (clientId?: string) =>
+        api.get<OrchestrationResponse>('/mama-mia-cache', { params: { client_id: clientId } }),
+
+    // Artifact Retrieval (Polling)
+    getArtifact: (runId: string, agentName: string) =>
+        api.get(`/orchestrate/${runId}/artifacts/${agentName}`),
+
+    // Chat Validation (Plan & Apply)
+    chatWithAgent: (runId: string, agentName: string, message: string) =>
+        api.post<{ reply: string }>(`/chat/${runId}/${agentName}`, {
+            messages: [{ role: 'user', content: message }]
+        }),
+
+    applyAndRestart: (runId: string, agentName: string, directive: string) =>
+        api.post(`/chat/${runId}/${agentName}/apply`, { directive })
+}
+
+export interface OrchestrationResponse {
+    status: string
+    message: string
+    result: {
+        isa_json: any
+        generated_code: any
+        review_decision: string
+        review_feedback: string
+        errors: string[]
+    }
 }
 
 export default api

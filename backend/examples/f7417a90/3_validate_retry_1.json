@@ -1,0 +1,19 @@
+{
+  "inputs": {
+    "generated_code_keys": [
+      "Dockerfile",
+      "dicom_convert.cwl",
+      "orient_std.cwl",
+      "nnunet_pred.cwl",
+      "expert_verify.cwl",
+      "calc_metrics.cwl",
+      "workflow.cwl"
+    ]
+  },
+  "final_output": {
+    "errors": [
+      "Dockerfile is missing or invalid (no FROM instruction).",
+      "CWL is missing or invalid (no cwlVersion declared)."
+    ]
+  }
+}

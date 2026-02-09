@@ -1,0 +1,19 @@
+{
+  "inputs": {
+    "generated_code_keys": [
+      "Dockerfile",
+      "tool1_dicom_convert.cwl",
+      "tool2_standardize.cwl",
+      "tool3_segmentation.cwl",
+      "tool4_manual_correction.cwl",
+      "tool5_metrics.cwl",
+      "workflow.cwl"
+    ]
+  },
+  "final_output": {
+    "errors": [
+      "Dockerfile is missing or invalid (no FROM instruction).",
+      "CWL is missing or invalid (no cwlVersion declared)."
+    ]
+  }
+}

@@ -10,6 +10,8 @@ import { ref, computed } from 'vue'
 import type { Node, Edge } from '@vue-flow/core'
 import { endpoints } from '../services/api'
 import { getLayoutedElements } from '../utils/layout'
+import { wsService } from '../services/websocket'
+import { useConsoleStore } from './console'
 
 // Types per SPEC.md Section 3
 export interface ConfidenceScore {
@@ -29,6 +31,15 @@ export interface Investigation {
     title: string
     description: string
     studies: Study[]
+    paper?: Paper // Stage 6: Paper metadata from orchestration
+}
+
+export interface Paper {
+    id: string
+    title: string
+    authors: string
+    year: string
+    abstract: string
 }
 
 export interface Study {
@@ -43,6 +54,7 @@ export interface Assay {
     filename: string
     measurementType: { term: string }
     technologyType: { term: string }
+    steps?: any[]
 }
 
 export interface NodeStatus {
@@ -96,6 +108,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const isLoading = ref(false)
     const loadingMessage = ref<string | null>(null)
     const error = ref<string | null>(null)
+    const currentRunId = ref<string | null>(null)
+    const isDemoMode = ref(false)
 
     // Computed
     const graph = computed(() => ({
@@ -112,50 +126,227 @@ export const useWorkflowStore = defineStore('workflow', () => {
         fetchStudyDesign(id)
     }
 
-    // Stage 6: Load pre-loaded MAMA-MIA example
+    // Stage 6: Real-time Updates via WebSocket
+    const clientId = ref<string | null>(null)
+
+    async function initWebSocket() {
+        if (!clientId.value) {
+            clientId.value = typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        }
+
+        if (wsService.isConnected && wsService.getClientId() === clientId.value) {
+            return
+        }
+
+        await wsService.connect(clientId.value)
+
+        // Setup Listeners
+        const consoleStore = useConsoleStore()
+
+        // Agent Thoughts/Stream
+        wsService.on('agent_stream', (data) => {
+            consoleStore.appendAgentMessage(data.agent.toLowerCase(), data.chunk)
+        })
+
+        // Status Updates
+        wsService.on('status_update', (data) => {
+            // Check if message starts with "Agent Name:"
+            const agentMatch = data.message.match(/^([a-zA-Z]+) Agent:/)
+
+            if (agentMatch) {
+                const agentName = agentMatch[1].toLowerCase()
+                consoleStore.addMessage({
+                    type: 'agent',
+                    agent: agentName as any,
+                    content: data.message.replace(`${agentMatch[0]} `, ''),
+                    timestamp: new Date()
+                })
+            } else {
+                consoleStore.addSystemMessage(data.message)
+            }
+
+            // Only update loading message if we are actually loading something
+            if (isLoading.value) {
+                loadingMessage.value = data.message
+            }
+        })
+    }
     async function loadExample(exampleName: string = 'mama-mia') {
         isLoading.value = true
-        loadingMessage.value = `Loading ${exampleName.toUpperCase()} demo...`
+        loadingMessage.value = `Orchestrating ${exampleName.toUpperCase()} demo...`
         error.value = null
 
         try {
-            // Try API first
-            const response = await endpoints.loadExample(exampleName)
+            // Stage 6: Real-time Updates via WebSocket
+            // Ensure we are connected
+            if (!wsService.isConnected && clientId.value) {
+                await initWebSocket()
+            } else if (!clientId.value) {
+                await initWebSocket()
+            }
+
+            // Use existing clientId
+            const currentClientId = clientId.value!
+            let response;
+
+            if (exampleName === 'mama-mia') {
+                isDemoMode.value = true
+                response = await endpoints.mamaMiaCache(currentClientId)
+                if ((response.data.result as any)?.run_id) {
+                    currentRunId.value = (response.data.result as any).run_id
+                }
+            } else {
+                // Use Orchestration API
+                const pdfPath = "/app/examples/mama-mia/1.pdf"
+                const repoPath = "/app/examples/mama-mia"
+
+                // Pass clientId to backend
+                // 1. Start Orchestration
+                response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, currentClientId)
+                console.log("Orchestration Started:", response.data)
+
+                if (response.data.status === 'started' && (response.data.result as any)?.run_id) {
+                    const runId = (response.data.result as any).run_id
+                    currentRunId.value = runId
+
+                    // Log to Console
+                    const consoleStore = useConsoleStore()
+                    consoleStore.addSystemMessage(`Orchestration started (Run ID: ${runId}). Waiting for Scholar...`)
+
+                    // 2. Poll for Scholar Result
+                    const pollForArtifact = async (attempt = 1) => {
+                        if (attempt > 60) {
+                            throw new Error("Timeout waiting for Scholar results")
+                        }
+
+                        try {
+                            if (attempt <= 2) {
+                                consoleStore.addSystemMessage(`Checking for Scholar results... (Attempt ${attempt})`)
+                            }
+                            const artifactRes = await endpoints.getArtifact(runId, 'scholar')
+
+                            if (artifactRes.status === 200 && artifactRes.data) {
+                                consoleStore.addSystemMessage("Scholar results received.")
+
+                                // Process Result
+                                const scholarData = artifactRes.data
+                                const processedRes = {
+                                    status: 'completed',
+                                    result: {
+                                        isa_json: scholarData.final_output || scholarData.isa_json,
+                                        generated_code: {}
+                                    }
+                                }
+                                processOrchestrationResult(processedRes)
+                                return
+                            }
+                        } catch (e: any) {
+                            if (e.response && e.response.status === 404) {
+                                // Not ready yet, wait and retry
+                                await new Promise(resolve => setTimeout(resolve, 5000))
+                                await pollForArtifact(attempt + 1)
+                            } else {
+                                throw e
+                            }
+                        }
+                    }
+
+                    await pollForArtifact()
+                    return // polling handles the rest
+                } else {
+                    // Fallback check if it somehow completed immediately (unlikely with new logic but safe)
+                    if (response.data.status !== 'completed') {
+                        throw new Error("Failed to start orchestration")
+                    }
+                }
+            }
+
             const data = response.data
-
-            uploadId.value = data.upload_id
-            uploadedPdfUrl.value = null // No actual PDF for pre-loaded examples
-            hasUploadedFiles.value = true
-
-            addLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `Loaded pre-configured ${exampleName.toUpperCase()} example`
-            })
-
-            // Fetch study design for the loaded example
-            await fetchStudyDesignFromApi(data.upload_id)
+            processOrchestrationResult(data)
 
         } catch (err: any) {
-            console.warn('API loadExample failed, falling back to mock data', err)
-
-            // Mock Fallback
-            uploadId.value = 'mock-mama-mia-id'
-            uploadedPdfUrl.value = null
-            hasUploadedFiles.value = true
+            console.error('Orchestration failed:', err)
+            error.value = err.response?.data?.detail || err.message || 'Orchestration failed'
 
             addLog({
                 timestamp: new Date().toISOString(),
-                level: 'WARNING',
-                message: `Backend unavailable. Loaded local mock data for ${exampleName}`
+                level: 'ERROR',
+                message: `Orchestration failed: ${error.value}`
             })
 
-            // Use fetchStudyDesign which has its own mock fallback
-            await fetchStudyDesign(uploadId.value)
-
+            // No fallback to mock data - we want to see the real error in this new flow
         } finally {
             isLoading.value = false
             loadingMessage.value = null
+        }
+    }
+
+    function processOrchestrationResult(data: any) {
+        console.log("Orchestration Response: ", data);
+
+        console.log("data.status: ", data.status);
+        console.log("data.result: ", data.result);
+        console.log(data.status === 'completed' && data.result)
+
+
+        if (data.status === 'completed' && data.result) {
+            // Generate a pseudo upload ID
+            uploadId.value = `orch_${Date.now()}`
+            uploadedPdfUrl.value = null
+            hasUploadedFiles.value = true
+
+            // Map ISA JSON to Hierarchy
+            // The orchestration result structure: { studyDesign: { ... } }
+            // We need to map this to our Investigation interface
+            const isa = data.result.isa_json
+            console.log("ISA: ", isa);
+            if (isa && isa.studyDesign) {
+                const sd = isa.studyDesign
+                const inv = sd.investigation || {}
+                console.log("Investigation: ", inv);
+                // Construct Hierarchy
+                hierarchy.value = {
+                    identifier: inv.id || 'inv_orchestrated',
+                    title: inv.title || 'Orchestrated Investigation',
+                    description: inv.description || '',
+                    studies: [
+                        {
+                            identifier: sd.study?.id || 'study_orchestrated',
+                            title: sd.study?.title || 'Main Study',
+                            description: sd.study?.description || '',
+                            assays: (sd.assays || []).map((assay: any) => ({
+                                identifier: assay.id,
+                                filename: assay.name || 'Assay',
+                                name: assay.name,
+                                description: assay.name, // Mapping name to description for now or create new field
+                                steps: assay.workflowSteps || [],
+                                measurementType: { term: 'N/A' },
+                                technologyType: { term: 'N/A' }
+                            }))
+                        }
+                    ]
+                }
+                console.log("Hierarchy: ", hierarchy.value);
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Orchestration complete. ISA extracted.`
+                })
+            }
+
+            // Store Generated Code (Optional: could store in a new state variable)
+            if (data.result.generated_code) {
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Generated Artifacts: ${Object.keys(data.result.generated_code).join(', ')}`
+                })
+            }
+
+        } else {
+            throw new Error(data.message || 'Orchestration failed')
         }
     }
 
@@ -246,19 +437,73 @@ export const useWorkflowStore = defineStore('workflow', () => {
         hierarchy.value = data
     }
 
+    function setHierarchyFromOrchestration(isa: any) {
+        if (isa && isa.studyDesign) {
+            const sd = isa.studyDesign
+            const inv = sd.investigation || {}
+            const paper = sd.paper || {} // Extract paper data
+
+            console.log('Orchestration response:', sd);
+            console.log('Isa:', isa);
+
+            // Construct Hierarchy
+            hierarchy.value = {
+                identifier: inv.id || 'inv_orchestrated',
+                title: inv.title || 'Orchestrated Investigation',
+                description: inv.description || '',
+                paper: {
+                    id: paper.id || 'root',
+                    title: paper.title || 'Unknown Paper',
+                    authors: paper.authors || 'Unknown Authors',
+                    year: paper.year || new Date().getFullYear().toString(),
+                    abstract: paper.abstract || ''
+                },
+                studies: [
+                    {
+                        identifier: sd.study?.id || 'study_orchestrated',
+                        title: sd.study?.title || 'Main Study',
+                        description: sd.study?.description || '',
+                        assays: (sd.assays || []).map((assay: any) => ({
+                            identifier: assay.id,
+                            filename: assay.name || 'Assay',
+                            name: assay.name,
+                            description: assay.name,
+                            steps: assay.workflowSteps || [],
+                            measurementType: { term: 'N/A' },
+                            technologyType: { term: 'N/A' }
+                        }))
+                    }
+                ]
+            }
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                message: `Orchestration complete. Hierarchy updated.`
+            })
+        }
+    }
+
     function selectAssay(assayId: string) {
         selectedAssay.value = assayId
     }
 
     async function assembleWorkflow(assayId: string) {
-        console.log('Assembling workflow for assay:', assayId)
+        console.log('Assembling workflow for assay:', assayId, 'isDemoMode:', isDemoMode.value, 'runId:', currentRunId.value)
 
         isLoading.value = true
         loadingMessage.value = 'Assembling workflow with AI Agents...'
         error.value = null
 
         try {
-            const response = await endpoints.assembleWorkflow(assayId)
+            let response
+            if (isDemoMode.value) {
+                response = await endpoints.assembleMamaMia(assayId)
+            } else {
+                if (!currentRunId.value) {
+                    throw new Error('No run_id available for workflow assembly')
+                }
+                response = await endpoints.assembleWorkflow(assayId, currentRunId.value)
+            }
             const data = response.data
 
             // Update store with graph data from backend
@@ -311,6 +556,45 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
     function updateNodeStatus(nodeId: string, status: NodeStatus) {
         nodeStatuses.value[nodeId] = status
+
+        // Update node data for reactivity in GraphNode
+        const nodeIndex = nodes.value.findIndex(n => n.id === nodeId)
+        if (nodeIndex !== -1) {
+            console.log(`Updating Status for ${nodeId} to ${status.status}`)
+            // Create a new object to ensure reactivity triggers
+            const node = nodes.value[nodeIndex]
+            nodes.value[nodeIndex] = {
+                ...node,
+                data: {
+                    ...node.data,
+                    status: status.status,
+                    progress: status.progress
+                }
+            }
+            // Force array update for deep watchers (Vue Flow might need this)
+            nodes.value = [...nodes.value]
+
+            // Update edge animations based on node status
+            updateEdgeAnimations(nodeId, status.status)
+        } else {
+            console.warn(`Node ${nodeId} not found for status update`)
+        }
+    }
+
+    function updateEdgeAnimations(nodeId: string, status: 'pending' | 'running' | 'completed' | 'error') {
+        // Rule: When a tool card is running, animate all connected edges
+        // When a tool card is not running, remove animation
+        const isRunning = status === 'running'
+
+        edges.value = edges.value.map(edge => {
+            // Check if this edge is connected to the node
+            const isConnected = edge.source === nodeId || edge.target === nodeId
+
+            if (isConnected) {
+                return { ...edge, animated: isRunning }
+            }
+            return edge
+        })
     }
 
     function addLog(entry: LogEntry) {
@@ -322,12 +606,91 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
         try {
             isWorkflowRunning.value = true
-            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Starting workflow execution...' })
+            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Starting MAMA-MIA workflow execution...' })
 
-            // Mock execution start
+            // Find all nodes by type and position
+            const tools = nodes.value.filter(n => n.type === 'tool').sort((a, b) => a.position.x - b.position.x)
+            const outputMeasurement = nodes.value.find(n => n.type === 'measurement' && n.data.role === 'output')
+            const inputMeasurements = nodes.value.filter(n => n.type === 'measurement' && n.data.role === 'input')
+
+            console.log('Starting MAMA-MIA Execution')
+            console.log('Tools:', tools.map(t => t.id))
+            console.log('Output Measurement:', outputMeasurement?.id)
+
+            if (tools.length === 0) {
+                console.warn('No tools found to run!')
+                return
+            }
+
+            // Set input measurements to completed immediately
+            inputMeasurements.forEach(node => {
+                updateNodeStatus(node.id, { status: 'completed', progress: 100 })
+            })
+
+            // Mock execution ID
             executionId.value = `exec_${Date.now()}`
 
-            startPolling()
+            // Step 1: First tool -> running
+            updateNodeStatus(tools[0].id, { status: 'running', progress: 0 })
+            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[0].data.name} started...` })
+
+            // Step 2: After 3s, first tool -> complete, second tool -> running
+            setTimeout(() => {
+                if (!isWorkflowRunning.value) return
+                updateNodeStatus(tools[0].id, { status: 'completed', progress: 100 })
+                addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[0].data.name} completed` })
+
+                if (tools.length > 1) {
+                    updateNodeStatus(tools[1].id, { status: 'running', progress: 0 })
+                    addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[1].data.name} started...` })
+                }
+            }, 3000)
+
+            // Step 3: After 6s (3s + 3s), second tool -> complete
+            setTimeout(() => {
+                if (!isWorkflowRunning.value) return
+                if (tools.length > 1) {
+                    updateNodeStatus(tools[1].id, { status: 'completed', progress: 100 })
+                    addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[1].data.name} completed` })
+                }
+            }, 6000)
+
+            // Step 4: After 11s (3s + 3s + 5s), output measurement -> complete
+            setTimeout(() => {
+                if (!isWorkflowRunning.value) return
+                if (outputMeasurement) {
+                    updateNodeStatus(outputMeasurement.id, { status: 'completed', progress: 100 })
+                    addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Workflow execution completed successfully!' })
+
+                    // Auto-select output node and dataset
+                    // First, deselect all nodes
+                    nodes.value = nodes.value.map(n => ({ ...n, selected: false } as any))
+
+                    // Then select the output measurement node (for visual highlight)
+                    const outputNodeIndex = nodes.value.findIndex(n => n.id === outputMeasurement.id)
+                    if (outputNodeIndex !== -1) {
+                        nodes.value[outputNodeIndex] = {
+                            ...nodes.value[outputNodeIndex],
+                            selected: true
+                        } as any
+                        nodes.value = [...nodes.value] // Force reactivity
+                    }
+
+                    // Set selected node ID for DataObjectCatalogue
+                    selectedNode.value = outputMeasurement.id
+
+                    // Find the output dataset from the node's outputs
+                    const outputData = outputMeasurement.data.outputs?.[0]
+                    if (outputData?.datasetId) {
+                        selectedDatasetId.value = outputData.datasetId
+                    }
+
+                    // Open the Dataset Navigation panel (right panel)
+                    isRightPanelCollapsed.value = false
+                }
+                isWorkflowRunning.value = false
+            }, 8000)
+
         } catch (error) {
             console.error('Execution failed:', error)
             isWorkflowRunning.value = false
@@ -335,32 +698,19 @@ export const useWorkflowStore = defineStore('workflow', () => {
         }
     }
 
-    function startPolling() {
-        if (pollingInterval.value) clearInterval(pollingInterval.value)
+    function stopWorkflow() {
+        if (!isWorkflowRunning.value) return
 
-        pollingInterval.value = window.setInterval(async () => {
-            if (!executionId.value) return
-            simulateProgress()
-        }, 2000)
-    }
+        isWorkflowRunning.value = false
+        addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Workflow execution stopped by user' })
 
-    function simulateProgress() {
-        // Mock progress
-        const nodeIds = nodes.value.map(n => n.id)
-        const randomNode = nodeIds[Math.floor(Math.random() * nodeIds.length)]
+        // Set all nodes to completed
+        nodes.value.forEach(node => {
+            updateNodeStatus(node.id, { status: 'completed', progress: 100 })
+        })
 
-        if (randomNode) {
-            updateNodeStatus(randomNode, {
-                status: 'running',
-                progress: Math.floor(Math.random() * 100)
-            })
-            addLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `Node ${randomNode} progress update`,
-                node_id: randomNode
-            })
-        }
+        // Remove all edge animations
+        edges.value = edges.value.map(edge => ({ ...edge, animated: false }))
     }
 
     function toggleLeftPanel() {
@@ -439,6 +789,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
         isWorkflowRunning.value = false
         nodeStatuses.value = {}
         logs.value = []
+        currentRunId.value = null
+        isDemoMode.value = false
         if (pollingInterval.value) clearInterval(pollingInterval.value)
     }
 
@@ -483,13 +835,19 @@ export const useWorkflowStore = defineStore('workflow', () => {
         updateNodeStatus,
         addLog,
         runWorkflow,
+        stopWorkflow,
         toggleLeftPanel,
         toggleRightPanel,
         toggleConsole,
         reset,
         loadExample,
         fetchStudyDesignFromApi,
+        setHierarchyFromOrchestration,
         exportResults,
         clearError,
+        clientId,
+        initWebSocket,
+        currentRunId,
+        isDemoMode
     }
 })

@@ -1,0 +1,15 @@
+{
+  "inputs": {
+    "validation_status": "Failed",
+    "validation_errors": [
+      "Dockerfile is missing or invalid (no FROM instruction).",
+      "CWL is missing or invalid (no cwlVersion declared)."
+    ]
+  },
+  "prompt_truncated": "You are a Senior Systems Architect and Scientific Workflow Validator.\n\nYour goal is to compare the Theoretical Study Design (what should happen) with the Generated Infrastructure Code (what will happe...",
+  "model_thoughts": [],
+  "raw_output": {
+    "raw_parsed": ""
+  },
+  "derived_decision": "rejected"
+}

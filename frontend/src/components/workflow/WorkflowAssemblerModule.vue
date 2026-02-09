@@ -65,12 +65,12 @@ const store = useWorkflowStore()
 const { 
   nodes, 
   edges: storeEdges, 
-  isAssembled 
+  isAssembled,
+  isWorkflowRunning
 } = storeToRefs(store)
-const { runWorkflow } = store
+const { runWorkflow, stopWorkflow } = store
 
 // Local UI state
-const isRunning = ref(false)
 const numSubjects = ref(1)
 const isViewerCollapsed = ref(!props.isViewerVisible)
 const isCatalogueCollapsed = ref(false)
@@ -111,9 +111,12 @@ watch(() => props.shouldCollapseViewer, (shouldCollapse) => {
 
 // Handlers
 function handleRunWorkflow() {
-  isRunning.value = true
   runWorkflow() // Call store action
   emit('runWorkflow') // Keep emit for parent UI updates if needed
+}
+
+function handleStopWorkflow() {
+  stopWorkflow() // Call store action
 }
 
 function onPaneReady(instance: any) {
@@ -196,7 +199,7 @@ function handleNodeClick(event: any) {
 
 <template>
   <!-- Empty state - no assay selected -->
-  <div v-if="!selectedAssay" class="h-full flex items-center justify-center text-slate-400 bg-slate-50">
+  <div v-if="!selectedAssay" class="h-full flex items-center justify-center text-slate-400 bg-slate-50" data-tour="workflow-canvas">
     <div class="text-center">
       <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -206,7 +209,7 @@ function handleNodeClick(event: any) {
   </div>
 
   <!-- Ready to assemble state -->
-  <div v-else-if="!isAssembled && !isViewerVisible" class="h-full flex items-center justify-center text-slate-400 bg-slate-50">
+  <div v-else-if="!isAssembled && !isViewerVisible" class="h-full flex items-center justify-center text-slate-400 bg-slate-50" data-tour="workflow-canvas">
     <div class="text-center">
       <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -217,7 +220,7 @@ function handleNodeClick(event: any) {
   </div>
 
   <!-- Main workflow view -->
-  <div v-else class="flex-1 flex flex-col overflow-hidden bg-white min-h-0">
+  <div v-else class="flex-1 flex flex-col overflow-hidden bg-white min-h-0" data-tour="workflow-canvas">
     <!-- Header -->
     <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
       <div>
@@ -232,16 +235,17 @@ function handleNodeClick(event: any) {
           <input
             type="number"
             min="1"
-            max="384"
+            max="2"
             v-model="numSubjects"
             class="w-16 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <span class="text-xs text-slate-500">/ 384</span>
+          <span class="text-xs text-slate-500">/ 2</span>
         </div>
         <div class="w-px h-6 bg-slate-200"></div>
         <div class="flex items-center gap-2">
           <button
-            v-if="!isRunning"
+            data-tour="run-workflow-button"
+            v-if="!isWorkflowRunning"
             @click="handleRunWorkflow"
             class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors flex items-center gap-1.5"
           >
@@ -250,7 +254,7 @@ function handleNodeClick(event: any) {
           </button>
           <button
             v-else
-            @click="isRunning = false"
+            @click="handleStopWorkflow"
             class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors flex items-center gap-1.5"
           >
             <Square class="w-3.5 h-3.5" />

@@ -1,342 +1,341 @@
-# System prompt per SPEC.md Section 4.3
 scholar_system:
-  v1_standard: |
-    You are the Scholar Agent for VeriFlow, a Research Reliability Engineer system.
+  v1_standard: |-
+    You are an expert Scientific Data Curator.
+    Analyze the PDF and extract the experimental design into ISA JSON format.
 
-    Your role is to:
+    CRITICAL:
+    - Identify if steps require 'File' inputs or 'Directory' inputs based on the context (e.g. "iterating over a folder" implies Directory).
+  v2_standard: |
+    You are an expert Scientific Data Curator and Bioinformatician.
+    Your task is to analyze scientific PDF documents and extract the underlying experimental design into a structured ISA (Investigation, Study, Assay) JSON format.
+    Focus on identifying the sequence of processing steps, the inputs (data files), and the outputs (results).
+scholar_extraction:
+  v1_standard: |-
+    Here are examples:
 
-    1. Parse scientific publications (PDF text, figures, diagrams)
-    2. Extract the ISA hierarchy:
-       - Investigation: Overall research context (title, description, publications, contacts)
-       - Study: Experimental design (subjects, factors, protocols)
-       - Assay: Specific measurement process (measurement type, technology, samples)
-    3. Identify data objects:
-       - Measurements (input data - e.g., MRI scans, genomic data)
-       - Tools (processing software - e.g., preprocessing scripts, analysis tools)
-       - Models (pre-trained weights - e.g., neural network models)
-    4. Generate confidence scores (0-100%) for each extracted property based on:
-       - Explicit mention in text: 90-100%
-       - Strongly implied: 70-89%
-       - Weakly implied or inferred: 50-69%
-       - Uncertain or assumed: Below 50%
-    5. Output in strict ISA-JSON format
+    --- EXAMPLE 1 ---
+    PDF_FILE:
+    <<<PDF_ARTIFACT:A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations.pdf>>>
 
-    When a Context File is provided, use it to supplement ambiguous information and increase confidence scores for properties it clarifies.
-
-    IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt.
-
-  v2_multimodal: |
-    You are the Scholar Agent V2. You have the ability to natively read PDF documents, including their layout, figures, charts, and diagrams.
-
-    Your role is to:
-    1. Analyze the ATTACHED PDF file (text and visual elements).
-    2. Extract the ISA hierarchy (Investigation -> Study -> Assay).
-    3. Identify data objects (Measurements, Tools, Models).
-    4. Pay special attention to METHODOLOGY DIAGRAMS or FLOWCHARTS in the PDF to accurately reconstruct the workflow steps.
-    5. Output strictly in the specified ISA-JSON format.
-
-
-scholar_analysis:
-  v1_standard: |
-    Analyze the following scientific publication and extract the ISA (Investigation-Study-Assay) hierarchy.
-
-    {context_section}
-
-    PUBLICATION TEXT:
-    ---
-    {pdf_text}
-    ---
-
-    Extract and return a JSON object with the following structure:
-
+    STUDY_DESIGN_JSON:
     {{
-      "investigation": {{
-        "id": "inv_1",
-        "title": "string - main title of the research",
-        "description": "string - overall research description",
-        "properties": [
+      "studyDesign": {{
+        "paper": {{
+          "id": "root",
+          "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+          "authors": "Smith, J., et al.",
+          "year": "2023",
+          "abstract": "This study presents a novel approach to automated breast cancer segmentation using deep learning techniques on DCE-MRI scans."
+        }},
+        "investigation": {{
+          "id": "inv-1",
+          "title": "Automated Tumor Detection Investigation",
+          "description": "Investigation of automated deep learning methods for breast tumor detection and segmentation in DCE-MRI images",
+          "submissionDate": "2023-01-15"
+        }},
+        "study": {{
+          "id": "study-1",
+          "title": "MRI-based Segmentation Study",
+          "description": "Comprehensive study of U-Net based segmentation on breast MRI scans",
+          "numSubjects": 384,
+          "design": "Retrospective cohort study"
+        }},
+        "assays": [
           {{
-            "id": "string - unique property id like inv-title",
-            "name": "string - property name",
-            "value": "string - extracted value",
-            "source_page": number or null,
-            "source_text": "string - quoted text from source",
-            "confidence": number 0-100
-          }}
-        ],
-        "studies": [
-          {{
-            "id": "study_1",
-            "title": "string",
-            "description": "string",
-            "properties": [
+            "id": "assay-1",
+            "name": "Model Inference Assay",
+            "stepCount": 2,
+            "workflowSteps": [
               {{
-                "id": "string",
-                "name": "string",
-                "value": "string",
-                "source_page": number or null,
-                "source_text": "string",
-                "confidence": number 0-100
-              }}
-            ],
-            "assays": [
-              {{
-                "id": "assay_1",
-                "name": "string - assay name like 'Training Pipeline'",
-                "description": "string",
-                "measurement_type": "string - e.g., 'segmentation', 'classification'",
-                "technology_type": "string - e.g., 'deep learning', 'image processing'",
-                "steps": [
+                "id": "step-1",
+                "description": "Converts DICOM to NIfTI",
+                "tool": {{
+                  "id": "tool-1",
+                  "name": "create_nifti"
+                }},
+                "input": [
                   {{
-                    "id": "step_1",
-                    "name": "string",
-                    "description": "string"
+                    "name": "dicom_images",
+                    "type": "Directory"
+                  }}
+                ],
+                "output": [
+                  {{
+                    "name": "nifti_image",
+                    "type": "File"
+                  }}
+                ]
+              }},
+              {{
+                "id": "step-2",
+                "description": "Run inference",
+                "tool": {{
+                  "id": "tool-2",
+                  "name": "run_inference"
+                }},
+                "input": [
+                  {{
+                    "name": "nifti_image",
+                    "type": "File"
+                  }},
+                  {{
+                    "name": "pre_trained_network",
+                    "type": "Directory"
+                  }}
+                ],
+                "output": [
+                  {{
+                    "name": "segmentation",
+                    "type": "File"
                   }}
                 ]
               }}
             ]
           }}
         ]
-      }},
-      "confidence_scores": {{
-        "property_id": {{
-          "value": number 0-100,
-          "source_page": number or null,
-          "source_text": "string"
-        }}
-      }},
-      "identified_tools": [
-        {{
-          "id": "tool_1",
-          "name": "string - tool name",
-          "description": "string",
-          "source_url": "string or null - GitHub, documentation link",
-          "confidence": number 0-100
-        }}
-      ],
-      "identified_models": [
-        {{
-          "id": "model_1",
-          "name": "string - model name",
-          "architecture": "string - e.g., U-Net, ResNet",
-          "pretrained": boolean,
-          "source_url": "string or null",
-          "confidence": number 0-100
-        }}
-      ],
-      "identified_measurements": [
-        {{
-          "id": "measurement_1",
-          "name": "string - data type name",
-          "data_type": "string - e.g., 'DCE-MRI', 'CT scan', 'genomic data'",
-          "format": "string - e.g., 'DICOM', 'NIfTI', 'FASTQ'",
-          "confidence": number 0-100
-        }}
-      ]
-    }}
-
-    Be thorough in extracting:
-    1. All processing steps mentioned in Methods section
-    2. All software tools and their versions
-    3. All data types and formats
-    4. Sample sizes and subject information
-    5. Model architectures and training details
-
-    Ensure all confidence scores accurately reflect how certain the information is based on the source text.
-
-
-  v2_multimodal: |
-    Analyze the attached scientific publication PDF.
-    
-    {context_section}
-    
-    Look closely at any figures or diagrams that explain the experimental process or pipeline. 
-    Combine visual information with the text to ensure high accuracy.
-
-    Extract and return a JSON object with the following structure:
-
-    {{
-      "investigation": {{
-        "id": "inv_1",
-        "title": "string - main title",
-        "description": "string - abstract/summary",
-        "studies": [
-          {{
-            "id": "study_1",
-            "title": "string",
-            "assays": [
-              {{
-                "id": "assay_1",
-                "name": "string",
-                "measurement_type": "string",
-                "technology_type": "string",
-                "steps": [
-                  {{
-                    "id": "step_1", 
-                    "name": "string",
-                    "description": "string"
-                  }}
-                ]
-              }}
-            ]
-          }}
-        ]
-      }},
-      "identified_tools": [],
-      "identified_models": [],
-      "identified_measurements": [],
-      "confidence_scores": {{}}
-    }}
-    
-    Ensure the JSON matches the schema exactly.
-
-# System prompt per SPEC.md Section 4.4
-engineer_system:
-  v1_standard: |
-    You are the Engineer Agent for VeriFlow, a Research Reliability Engineer system.
-
-    Your role is to:
-
-    1. Generate CWL v1.3 workflow definitions from extracted methodology
-    2. Create Dockerfiles for each tool
-    3. Infer dependencies from:
-       - requirements.txt (if available)
-       - import statements in code
-       - Code timestamps for version inference
-    4. Generate adapters for type mismatches:
-       - Check additional_type (MIME type) compatibility
-       - Insert conversion tools (e.g., DICOM → NIfTI)
-    5. Map SDS inputs/outputs to CWL ports
-
-    Use CommandLineTool for executable tools, Workflow for orchestration.
-
-    CWL Best Practices:
-    - Use cwlVersion: v1.3
-    - Define clear input/output types with format specifications
-    - Use DockerRequirement for containerized execution
-    - Include meaningful labels and documentation
-    - Handle scatter operations for batch processing
-
-    IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt.
-
-engineer_workflow:
-  v1_standard: |
-    Generate a CWL v1.3 workflow for the following assay and components.
-
-    ASSAY INFORMATION:
-    {assay_info}
-
-    IDENTIFIED TOOLS:
-    {identified_tools}
-
-    IDENTIFIED MODELS:
-    {identified_models}
-
-    IDENTIFIED MEASUREMENTS (INPUT DATA TYPES):
-    {identified_measurements}
-
-    Generate a complete workflow with the following structure:
-
-    {{
-      "workflow_cwl": "string - Complete CWL v1.3 workflow YAML",
-      "tool_cwls": {{
-        "tool_id": "string - CWL CommandLineTool YAML for each tool"
-      }},
-      "dockerfiles": {{
-        "tool_id": "string - Dockerfile content for each tool"
-      }},
-      "adapters": [
-        {{
-          "id": "adapter_1",
-          "name": "string",
-          "source_type": "string - MIME type like application/dicom",
-          "target_type": "string - MIME type like application/x-nifti",
-          "cwl": "string - Adapter CWL",
-          "dockerfile": "string - Adapter Dockerfile"
-        }}
-      ],
-      "graph": {{
-        "nodes": [
-          {{
-            "id": "string - unique node id",
-            "type": "measurement" | "tool" | "model",
-            "position": {{"x": number, "y": number}},
-            "data": {{
-              "label": "string - display name",
-              "inputs": [{{"id": "string", "label": "string", "type": "string - MIME type"}}],
-              "outputs": [{{"id": "string", "label": "string", "type": "string - MIME type"}}]
-            }}
-          }}
-        ],
-        "edges": [
-          {{
-            "id": "string",
-            "source": "string - source node id",
-            "target": "string - target node id",
-            "sourceHandle": "string - output port id",
-            "targetHandle": "string - input port id"
-          }}
-        ]
       }}
     }}
 
-    REQUIREMENTS:
-    1. Create a logical workflow connecting inputs → processing → outputs
-    2. Include adapters for any type mismatches between connected nodes
-    3. Generate realistic Dockerfiles with proper base images and dependencies
-    4. Position nodes left-to-right based on processing order (x: 50, 250, 450, etc)
-    5. Include at least one measurement node (input data), tool nodes (processing), and output
-    6. Use proper CWL v1.3 syntax with DockerRequirement
 
-    For medical imaging workflows:
-    - Common conversions: DICOM → NIfTI, NIfTI → segmentation mask
-    - Common tools: dcm2niix, nnU-Net, ITK-SNAP
-    - Base images: python:3.10-slim, pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+    NOW ANALYZE THE ATTACHED FILE.
+  v2_standard: "Analyze the attached PDF file to understand the scientific workflow.\n\
+    \nYour goal is to map the scientific methodology into a strict Computational Workflow\
+    \ JSON structure.\n\nCRITICAL INSTRUCTION:\nMap the text descriptions in the paper\
+    \ to the logical steps required to execute this pipeline computationally. \nFor\
+    \ example, if the paper mentions \"converting DICOMs\", identify that as a distinct\
+    \ step named \"create_nifti\" or similar.\n\nOUTPUT FORMAT:\nReturn ONLY the valid\
+    \ JSON object matching this exact schema:\n{{\n  \"studyDesign\": {{\n    \"paper\"\
+    : {{\n      \"id\": \"root\",\n      \"title\": \"string\",\n      \"authors\"\
+    : \"string\",\n      \"year\": \"string\",\n      \"abstract\": \"string\"\n \
+    \   }},\n    \"investigation\": {{\n      \"id\": \"string\",\n      \"title\"\
+    : \"string\",\n      \"description\": \"string\"\n    }},\n    \"study\": {{\n\
+    \      \"id\": \"string\",\n      \"title\": \"string\",\n      \"description\"\
+    : \"string\",\n      \"numSubjects\": integer,\n      \"design\": \"string\"\n\
+    \    }},\n    \"assays\": [\n      {{\n        \"id\": \"string\",\n        \"\
+    name\": \"string\",\n        \"workflowSteps\": [\n          {{\n            \"\
+    id\": \"string\",\n            \"description\": \"string\",\n            \"tool\"\
+    : {{\n              \"id\": \"string\",\n              \"name\": \"string (e.g.,\
+    \ 'create_nifti', 'run_inference')\"\n            }},\n            \"input\":\
+    \ [{{\"name\": \"string\", \"type\": \"string\"}}],\n            \"output\": [{{\"\
+    name\": \"string\", \"type\": \"string\"}}]\n          }}\n        ]\n      }}\n\
+    \    ]\n  }}\n}}\n"
+engineer_chat:
+  v1_standard: |-
+    You are the Engineer Agent.
+    When communicating with the user, ALWAYS use Markdown.
+    Format code snippets in triple backticks.
+    Do not output raw JSON unless explicitly asked for a JSON file download.
+engineer_cwl_gen:
+  v1_standard: "You are a Principal DevOps Engineer. \nMap the Theoretical ISA Design\
+    \ to EXECUTABLE, SELF-CONTAINED CWL Code.\n\nCRITICAL REQUIREMENTS:\n1. **Self-Contained\
+    \ Scripts**: You MUST use `InitialWorkDirRequirement` to embed the Python script\
+    \ content directly into the CWL tool. \n   - DO NOT assume the .py file exists\
+    \ externally. \n   - Paste the script content into the `listing` section of `InitialWorkDirRequirement`.\n\
+    2. **Docker**: Include a `DockerRequirement` (e.g., python:3.9-slim).\n3. **Completeness**:\
+    \ Generate X Tool CWLs + 1 Workflow CWL + 1 Dockerfile.\n4. **Type Safety**: Ensure\
+    \ Workflow step outputs match the inputs of the next step (File vs Directory).\n\
+    \n--- FEW SHOT EXAMPLES ---\n--- EXAMPLE 1 ---\nISA_JSON:\n{{\n  \"studyDesign\"\
+    : {{\n    \"paper\": {{\n      \"id\": \"root\",\n      \"title\": \"A large-scale\
+    \ multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations\"\
+    ,\n      \"authors\": \"Smith, J., et al.\",\n      \"year\": \"2023\",\n    \
+    \  \"abstract\": \"This study presents a novel approach to automated breast cancer\
+    \ segmentation using deep learning techniques on DCE-MRI scans.\"\n    }},\n \
+    \   \"investigation\": {{\n      \"id\": \"inv-1\",\n      \"title\": \"Automated\
+    \ Tumor Detection Investigation\",\n      \"description\": \"Investigation of\
+    \ automated deep learning methods for breast tumor detection and segmentation\
+    \ in DCE-MRI images\",\n      \"submissionDate\": \"2023-01-15\"\n    }},\n  \
+    \  \"study\": {{\n      \"id\": \"study-1\",\n      \"title\": \"MRI-based Segmentation\
+    \ Study\",\n      \"description\": \"Comprehensive study of U-Net based segmentation\
+    \ on breast MRI scans\",\n      \"numSubjects\": 384,\n      \"design\": \"Retrospective\
+    \ cohort study\"\n    }},\n    \"assays\": [\n      {{\n        \"id\": \"assay-1\"\
+    ,\n        \"name\": \"Model Inference Assay\",\n        \"stepCount\": 2,\n \
+    \       \"workflowSteps\": [\n          {{\n            \"id\": \"step-1\",\n\
+    \            \"description\": \"Converts DICOM to NIfTI\",\n            \"tool\"\
+    : {{\n              \"id\": \"tool-1\",\n              \"name\": \"create_nifti\"\
+    \n            }},\n            \"input\": [\n              {{\n              \
+    \  \"name\": \"dicom_images\",\n                \"type\": \"Directory\"\n    \
+    \          }}\n            ],\n            \"output\": [\n              {{\n \
+    \               \"name\": \"nifti_image\",\n                \"type\": \"File\"\
+    \n              }}\n            ]\n          }},\n          {{\n            \"\
+    id\": \"step-2\",\n            \"description\": \"Run inference\",\n         \
+    \   \"tool\": {{\n              \"id\": \"tool-2\",\n              \"name\": \"\
+    run_inference\"\n            }},\n            \"input\": [\n              {{\n\
+    \                \"name\": \"nifti_image\",\n                \"type\": \"File\"\
+    \n              }},\n              {{\n                \"name\": \"pre_trained_network\"\
+    ,\n                \"type\": \"Directory\"\n              }}\n            ],\n\
+    \            \"output\": [\n              {{\n                \"name\": \"segmentation\"\
+    ,\n                \"type\": \"File\"\n              }}\n            ]\n     \
+    \     }}\n        ]\n      }}\n    ]\n  }}\n}}\n\nREPO_CONTEXT:\n--- File: create_nifti.py\
+    \ (Embedded) ---\nimport os\nimport dicom2nifti\nimport argparse\n\ndef convert_dicom_to_nifti(input_root,\
+    \ output_root):\n    if not os.path.exists(output_root):\n        os.makedirs(output_root)\n\
+    \        print(f\"Created output folder: {{output_root}}\")\n\n    for item in\
+    \ os.listdir(input_root):\n        folder_path = os.path.join(input_root, item)\n\
+    \        \n        if os.path.isdir(folder_path):\n            output_path = os.path.join(output_root,\
+    \ f\"{{item}}_0000.nii.gz\")\n            \n            try:\n               \
+    \ dicom2nifti.dicom_series_to_nifti(folder_path, output_path, reorient_nifti=True)\n\
+    \            except Exception as e:\n                print(f\"failed to convert\
+    \ {{item}}: {{e}}\")\n\nif __name__ == \"__main__\":\n    parser = argparse.ArgumentParser(description=\"\
+    convert nifti images\")\n    \n    parser.add_argument(\n        \"--input_folder\"\
+    , \n        type=str, \n        required=True, \n        help=\"Path to the folder\
+    \ containing input images\"\n    )\n\n    parser.add_argument(\n        \"--output_folder\"\
+    , \n        type=str, \n        required=True, \n        help=\"Path to the folder\
+    \ where converted NIfTI files will be saved\"\n    )\n    args = parser.parse_args()\n\
+    \    \n    convert_dicom_to_nifti(args.input_folder, args.output_folder)\n\n---\
+    \ File: run_inference.py (Embedded) ---\n#!/usr/bin/env python\nimport os\nimport\
+    \ subprocess\nimport sys\n\ndef run_nnunet_inference(input_folder: str, output_folder:\
+    \ str, dataset_name: str, configuration: str):\n    if not os.path.exists(output_folder):\n\
+    \        os.makedirs(output_folder)\n        print(f\"Created output directory:\
+    \ {{output_folder}}\")\n\n    command = [\n        \"nnUNetv2_predict\",\n   \
+    \     \"-i\", input_folder,\n        \"-o\", output_folder,\n        \"-d\", dataset_name,\n\
+    \        \"-c\", configuration\n    ]\n\n    print(f\"Running command: {{' '.join(command)}}\"\
+    )\n    subprocess.run(command, check=True)\n\ndef main():\n    if len(sys.argv)\
+    \ != 6:\n        print(\"Usage: run_inference.py <input_folder> <output_folder>\
+    \ <dataset_name> <configuration> <pre_trained_network>\")\n        sys.exit(1)\n\
+    \n    input_folder = sys.argv[1]\n    output_folder = sys.argv[2]\n    dataset_name\
+    \ = sys.argv[3]\n    configuration = sys.argv[4]\n    pre_trained_network = sys.argv[5]\n\
+    \n    # Set nnUNet_results environment variable\n    os.environ['nnUNet_results']\
+    \ = pre_trained_network\n    print(f\"Set nnUNet_results to: {{pre_trained_network}}\"\
+    )\n\n    run_nnunet_inference(\n        input_folder=input_folder,\n        output_folder=output_folder,\n\
+    \        dataset_name=dataset_name,\n        configuration=configuration\n   \
+    \ )\n\nif __name__ == \"__main__\":\n    main()\n\n\nINFRASTRUCTURE_CODE:\n{{\n\
+    \  \"create_nifti.cwl\": \"#!/usr/bin/env cwl-runner\\ncwlVersion: v1.2\\nclass:\
+    \ CommandLineTool\\n\\nlabel: DICOM to NIfTI Converter\\ndoc: |\\n  Converts DICOM\
+    \ image series to NIfTI format using dicom2nifti.\\n  Loops through subfolders\
+    \ in the input directory and converts each to a NIfTI file.\\n\\nbaseCommand:\
+    \ [\\\"python\\\", \\\"create_nifti.py\\\"]\\n\\nhints:\\n  SoftwareRequirement:\\\
+    n    packages:\\n      - package: dicom2nifti\\n        specs:\\n          - https://pypi.org/project/dicom2nifti/\\\
+    n\\nrequirements:\\n  DockerRequirement:\\n    dockerPull: python:3.9\\n    dockerImageId:\
+    \ dicom2nifti-tool\\n  NetworkAccess:\\n    networkAccess: true\\n  ShellCommandRequirement:\
+    \ {{}}\\n  InlineJavascriptRequirement: {{}}\\n  InitialWorkDirRequirement:\\\
+    n    listing:\\n      - entryname: create_nifti.py\\n        entry: |\\n     \
+    \     import os\\n          import dicom2nifti\\n          import argparse\\n\\\
+    n          def convert_dicom_to_nifti(input_root, output_root):\\n           \
+    \   if not os.path.exists(output_root):\\n                  os.makedirs(output_root)\\\
+    n                  print(f\\\"Created output folder: {{output_root}}\\\")\\n\\\
+    n              for item in os.listdir(input_root):\\n                  folder_path\
+    \ = os.path.join(input_root, item)\\n                  \\n                  if\
+    \ os.path.isdir(folder_path):\\n                      output_path = os.path.join(output_root,\
+    \ f\\\"{{item}}_0000.nii.gz\\\")\\n                      \\n                 \
+    \     try:\\n                          dicom2nifti.dicom_series_to_nifti(folder_path,\
+    \ output_path, reorient_nifti=True)\\n                      except Exception as\
+    \ e:\\n                          print(f\\\"failed to convert {{item}}: {{e}}\\\
+    \")\\n\\n          if __name__ == \\\"__main__\\\":\\n              parser = argparse.ArgumentParser(description=\\\
+    \"convert nifti images\\\")\\n              \\n              parser.add_argument(\\\
+    n                  \\\"--input_folder\\\", \\n                  type=str, \\n\
+    \                  required=True, \\n                  help=\\\"Path to the folder\
+    \ containing input images\\\"\\n              )\\n\\n              parser.add_argument(\\\
+    n                  \\\"--output_folder\\\", \\n                  type=str, \\\
+    n                  required=True, \\n                  help=\\\"Path to the folder\
+    \ where converted NIfTI files will be saved\\\"\\n              )\\n         \
+    \     args = parser.parse_args()\\n              \\n              convert_dicom_to_nifti(args.input_folder,\
+    \ args.output_folder)\\n\\ninputs:\\n  input_folder:\\n    type: Directory\\n\
+    \    inputBinding:\\n      prefix: --input_folder\\n    doc: Directory containing\
+    \ DICOM image subfolders to convert\\n\\n  output_folder:\\n    type: string\\\
+    n    default: \\\"nifti_output\\\"\\n    inputBinding:\\n      prefix: --output_folder\\\
+    n    doc: Name of the output directory for converted NIfTI files\\n\\noutputs:\\\
+    n  nifti_output:\\n    type: Directory\\n    outputBinding:\\n      glob: $(inputs.output_folder)\\\
+    n    doc: Directory containing the converted NIfTI files (.nii.gz)\\n\",\n  \"\
+    run_inference.cwl\": \"#!/usr/bin/env cwl-runner\\ncwlVersion: v1.2\\nclass: CommandLineTool\\\
+    n\\nlabel: nnUNet Inference\\ndoc: |\\n  Runs nnUNet inference on a dataset to\
+    \ generate segmentation results.\\n  Wraps the nnUNetv2_predict command with configurable\
+    \ parameters.\\n  Uses PyTorch CUDA base image with nnUNetv2 installed at runtime.\\\
+    n\\nbaseCommand: [\\\"bash\\\", \\\"-c\\\"]\\n\\narguments:\\n  - valueFrom: |\\\
+    n      pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu\
+    \ && pip install nnunetv2 && python run_inference.py $(inputs.input_folder.path)\
+    \ $(inputs.output_folder) $(inputs.dataset_name) $(inputs.configuration) $(inputs.pre_trained_network.path)\\\
+    n    shellQuote: false\\n\\nrequirements:\\n  DockerRequirement:\\n    dockerPull:\
+    \ python:3.10-slim\\n  InitialWorkDirRequirement:\\n    listing:\\n      - entryname:\
+    \ run_inference.py\\n        entry: |\\n          #!/usr/bin/env python\\n   \
+    \       import os\\n          import subprocess\\n          import sys\\n\\n \
+    \         def run_nnunet_inference(input_folder: str, output_folder: str, dataset_name:\
+    \ str, configuration: str):\\n              if not os.path.exists(output_folder):\\\
+    n                  os.makedirs(output_folder)\\n                  print(f\\\"\
+    Created output directory: {{output_folder}}\\\")\\n\\n              command =\
+    \ [\\n                  \\\"nnUNetv2_predict\\\",\\n                  \\\"-i\\\
+    \", input_folder,\\n                  \\\"-o\\\", output_folder,\\n          \
+    \        \\\"-d\\\", dataset_name,\\n                  \\\"-c\\\", configuration\\\
+    n              ]\\n\\n              print(f\\\"Running command: {{' '.join(command)}}\\\
+    \")\\n              subprocess.run(command, check=True)\\n\\n          def main():\\\
+    n              if len(sys.argv) != 6:\\n                  print(\\\"Usage: run_inference.py\
+    \ <input_folder> <output_folder> <dataset_name> <configuration> <pre_trained_network>\\\
+    \")\\n                  sys.exit(1)\\n\\n              input_folder = sys.argv[1]\\\
+    n              output_folder = sys.argv[2]\\n              dataset_name = sys.argv[3]\\\
+    n              configuration = sys.argv[4]\\n              pre_trained_network\
+    \ = sys.argv[5]\\n\\n              # Set nnUNet_results environment variable\\\
+    n              os.environ['nnUNet_results'] = pre_trained_network\\n         \
+    \     print(f\\\"Set nnUNet_results to: {{pre_trained_network}}\\\")\\n\\n   \
+    \           run_nnunet_inference(\\n                  input_folder=input_folder,\\\
+    n                  output_folder=output_folder,\\n                  dataset_name=dataset_name,\\\
+    n                  configuration=configuration\\n              )\\n\\n       \
+    \   if __name__ == \\\"__main__\\\":\\n              main()\\n\\ninputs:\\n  input_folder:\\\
+    n    type: Directory\\n    doc: Directory containing images for inference\\n\\\
+    n  output_folder:\\n    type: string\\n    default: \\\"inference_output\\\"\\\
+    n    doc: Name of the output directory for segmentation results\\n\\n  dataset_name:\\\
+    n    type: string?\\n    default: \\\"new_dataset\\\"\\n    doc: Name of the dataset\\\
+    n\\n  configuration:\\n    type: string?\\n    default: \\\"3d_fullres\\\"\\n\
+    \    doc: nnUNet configuration (e.g., 3d_fullres, 2d)\\n\\n  pre_trained_network:\\\
+    n    type: Directory\\n    doc: Path to the pre-trained network (nnUNet_results)\
+    \ directory\\n\\noutputs:\\n  segmentation_output:\\n    type: Directory\\n  \
+    \  outputBinding:\\n      glob: $(inputs.output_folder)\\n    doc: Directory containing\
+    \ the segmentation results\\n\",\n  \"workflow.cwl\": \"#!/usr/bin/env cwl-runner\\\
+    ncwlVersion: v1.2\\nclass: Workflow\\n\\nlabel: DICOM to Segmentation Pipeline\\\
+    ndoc: |\\n  A workflow that converts DICOM images to NIfTI format and then runs\\\
+    n  nnUNet inference to generate segmentation results.\\n\\ninputs:\\n  dicom_input:\\\
+    n    type: Directory\\n    doc: Directory containing DICOM image subfolders to\
+    \ process\\n\\n  dataset_name:\\n    type: string?\\n    default: \\\"new_dataset\\\
+    \"\\n    doc: Name of the dataset for nnUNet inference\\n\\n  configuration:\\\
+    n    type: string?\\n    default: \\\"3d_fullres\\\"\\n    doc: nnUNet configuration\
+    \ (e.g., 3d_fullres, 2d)\\n\\n\\n\\n  pre_trained_network:\\n    type: Directory\\\
+    n    doc: Path to the pre-trained network (nnUNet_results) directory\\n\\nsteps:\\\
+    n  create_nifti:\\n    run: create_nifti.cwl\\n    in:\\n      input_folder: dicom_input\\\
+    n    out: [nifti_output]\\n\\n  run_inference:\\n    run: run_inference.cwl\\\
+    n    in:\\n      input_folder: create_nifti/nifti_output\\n      dataset_name:\
+    \ dataset_name\\n      configuration: configuration\\n\\n      pre_trained_network:\
+    \ pre_trained_network\\n    out: [segmentation_output]\\n\\noutputs:\\n  nifti_files:\\\
+    n    type: Directory\\n    outputSource: create_nifti/nifti_output\\n    doc:\
+    \ Directory containing the converted NIfTI files\\n\\n  segmentation_results:\\\
+    n    type: Directory\\n    outputSource: run_inference/segmentation_output\\n\
+    \    doc: Directory containing the segmentation results\\n\"\n}}\n\n\n--- CURRENT\
+    \ TASK ---\nISA Design:\n{isa_json}\n\nRepository Context:\n{repo_context}\n\n\
+    Previous Errors:\n{previous_errors}\n\nGenerate the CWL infrastructure code now.\\n\\nIMPORTANT: Wrap the final JSON output in a ```json markdown code block."
+  v2_standard: "You are a Principal DevOps Engineer and CWL Expert.\n\nTASK:\nAnalyze\
+    \ the `Repository Context` to identify existing Python scripts (e.g., `create_nifti.py`,\
+    \ `run_inference.py`) that correspond to the steps in the `ISA Study Design`.\
+    \ \n\nYour job is NOT to write new python logic. Your job is to WRAP the existing\
+    \ scripts into CWL.\n\nINPUTS:\n1. ISA Study Design (Theory):\n{isa_json}\n\n\
+    2. Repository Context (Actual Code):\n{repo_context}\n\n3. Previous Validation\
+    \ Errors:\n{previous_errors}\n\nREQUIREMENTS:\n1. **Tool Identification**: Locate\
+    \ the specific python scripts in the `Repository Context` that perform the steps\
+    \ described in the ISA JSON.\n2. **CWL Generation**: Generate a separate `CommandLineTool`\
+    \ CWL definition for each script found.\n3. **Workflow Generation**: Generate\
+    \ a main `Workflow` CWL that connects these tools.\n4. **Dockerfile**: Must install\
+    \ dependencies found in `requirements.txt` or imports in the scripts.\n\nOUTPUT\
+    \ FORMAT:\nReturn a strict JSON object. Keys should be filenames.\n{{{{\n  \"\
+    dockerfile\": \"CONTENT_STRING\",\n  \"create_nifti.cwl\": \"CONTENT_STRING (wraps\
+    \ create_nifti.py)\",\n  \"run_inference.cwl\": \"CONTENT_STRING (wraps run_inference.py)\"\
+    ,\n  \"workflow.cwl\": \"CONTENT_STRING (orchestrates the above tools)\",\n  \"\
+    airflow_dag\": \"CONTENT_STRING\"\n}}}}\n\nCONSTRAINT:\n- Do NOT create a new\
+    \ \"pipeline.py\" or \"main.py\".\n- The CWL `baseCommand` must call the existing\
+    \ scripts from the repo (e.g., `python create_nifti.py`).\n"
+reviewer_critique:
+  v1_standard: |-
+    You are a Senior Systems Architect and Scientific Workflow Validator.
 
-# System prompt per SPEC.md Section 4.5
-reviewer_system:
-  v1_standard: |
-    You are the Reviewer Agent for VeriFlow, a Research Reliability Engineer system.
+    Your goal is to compare the Theoretical Study Design (what should happen) with the Generated Infrastructure Code (what will happen).
 
-    Your role is to:
+    Theory (ISA):
+    {isa_json}
 
-    1. Validate CWL syntax and semantics
-    2. Validate Airflow DAG structure
-    3. Check data format compatibility:
-       - Verify additional_type matches between connected nodes
-       - Ensure input data exists and is accessible
-    4. Check dependencies are resolvable
-    5. Translate technical errors to user-friendly advice
-    6. Communicate with user when issues arise
+    Reality (Generated Code):
+    {generated_code}
 
-    All validations must pass before execution. If validation fails:
-    - Attempt automatic fix/adapter generation
-    - Ask user for clarification if needed
-    - Allow user to abort if unresolvable
+    Validation Errors (Automatic Checks):
+    {validation_errors}
 
-    When translating errors:
-    - Be specific about what went wrong
-    - Suggest actionable fixes
-    - Use simple language, avoid jargon
-    - Link to documentation if helpful
+    INSTRUCTIONS:
+    1. Does the Dockerfile seem to install the necessary tools mentioned in the ISA?
+    2. Does the CWL expose the correct inputs/outputs?
+    3. Are there hardcoded paths that will break in a container?
 
-    IMPORTANT: Your response must be valid JSON following the exact schema provided in the prompt.
-
-reviewer_translate:
-  v1_standard: |
-    Translate these technical workflow errors into user-friendly messages with actionable suggestions.
-
-    ERRORS:
-    {errors_json}
-
-    Return a JSON array with objects for each error:
-    [
-      {{
-        "original": "the original error message",
-        "translated": "user-friendly explanation",
-        "suggestion": "what the user should do to fix it",
-        "severity": "error" | "warning" | "info"
-      }}
-    ]
-
-    Be specific and helpful. Use simple language.
+    If the code looks solid and deployable, end your response with "APPROVED".
+    If there are issues, list them clearly and end your response with "REJECTED".

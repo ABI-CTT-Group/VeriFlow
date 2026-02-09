@@ -48,6 +48,7 @@ function handleClick() {
 <template>
   <div>
     <div
+      :data-tour="node.extension === 'nii.gz' || node.extension === 'nii' ? 'nii-file' : undefined"
       class="flex items-center gap-2 px-2 py-1 cursor-pointer rounded transition-colors"
       :class="{ 
         'bg-blue-100/50 hover:bg-blue-100': selectedPath && node.path === selectedPath,
