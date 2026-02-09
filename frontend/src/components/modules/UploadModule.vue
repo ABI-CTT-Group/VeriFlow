@@ -124,7 +124,7 @@ async function processPdfUpload(file: File) {
     } catch (error: any) {
         console.error("Upload failed", error)
         if (error.response && error.response.status === 413) {
-            alert("File is too large. Please upload a smaller file (max 500MB).")
+            alert("File is too large. Please upload a smaller file (max 2GB).")
         } else {
             alert("Upload failed: " + (error.message || "Unknown error"))
         }

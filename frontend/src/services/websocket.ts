@@ -43,8 +43,16 @@ class WebSocketService {
             this.clientId = clientId
 
             // Determine WS URL
+
             // In Docker/Production this might need adjustment, but for now we assume localhost or relative to API
-            const wsUrl = url || `ws://localhost:8000/ws/${clientId}`
+            // const wsUrl = url || `ws://localhost:8000/ws/${clientId}`
+            // Use window.location to determine the host and protocol (ws/wss)
+            // This works for both:
+            // - Local dev (via Vite proxy): ws://localhost:5173/ws/... -> proxies to localhost:8000
+            // - Production/Cloud: wss://domain.com/ws/... -> goes to Nginx -> backend
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+            const host = window.location.host // Includes port if present
+            const wsUrl = url || `${protocol}//${host}/ws/${clientId}`
 
             console.log(`Connecting to WebSocket: ${wsUrl}`)
 
