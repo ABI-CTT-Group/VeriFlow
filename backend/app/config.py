@@ -23,7 +23,7 @@ class AppConfig:
         
         # Ensure default caching policy exists
         if "caching" not in self._config:
-            self._config["caching"] = {"enabled": False}
+            self._config["caching"] = {"enabled": True}
 
     def is_cache_enabled(self) -> bool:
         return self._config.get("caching", {}).get("enabled", False)

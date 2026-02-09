@@ -517,15 +517,25 @@ engineer_cwl_gen:
     Please explain your mapping logic (how you connected the ISA protocol nodes to the specific Github scripts) before generating the code.
 
     OUTPUT FORMAT:
-    Return ONLY the valid JSON object matching this exact schema:
+    Return ONLY the valid JSON object. The components key must be an array, allowing for any number of steps (1 to N) depending on the complexity of the ISA JSON.
     INFRASTRUCTURE_CODE:
-        {{
-          "Component1": {{ "filename1": "code" }},
-          "Component2": {{ "filename1": "code" }},
-          "jobfile": "code",
-          "workflow": "code",
-          "mapping_logic": "Your detailed explanation along with confidence estimates"
+    {{
+        "mapping_logic": "Detailed explanation of how ISA protocols were mapped to code, including confidence estimates.",
+        "components": [
+          {{
+            "step_name": "e.g., Preprocessing",
+            "files": {{
+              "wrapper.py": "...",
+              "Dockerfile": "...",
+              "tool.cwl": "..."
+            }}
+          }}
+        ],
+        "workflow": {{
+          "main_workflow.cwl": "...",
+          "job.yml": "..."
         }}
+    }}
 
 
 reviewer_critique:
