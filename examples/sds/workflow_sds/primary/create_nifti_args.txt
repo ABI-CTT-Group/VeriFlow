@@ -1,0 +1,1 @@
+--input_folder /app/dicom --output_folder /output

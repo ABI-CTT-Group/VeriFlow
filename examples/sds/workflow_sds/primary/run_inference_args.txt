@@ -1,0 +1,1 @@
+-i /app/nnUNet_raw -o /output -d 1 -c 3d_fullres -f 0 --disable_tta -device cpu --pre-trained-network /app/nnUNet_results

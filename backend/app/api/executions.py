@@ -12,6 +12,8 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Response
+from pydantic import BaseModel, Field
+import docker
 
 from app.models.execution import (
     ExecutionStatus,
@@ -724,3 +726,152 @@ steps:
       input_dir: segmentation/output_dir
     out: [output_dir]
 """
+
+
+# =============================================================================
+# V2 Execution Endpoint - Docker SDK Based Script Runner
+# =============================================================================
+
+class ScriptExecutionRequest(BaseModel):
+    """Request model for run_workflow_v2 endpoint."""
+    scripts: List[str] = Field(..., description="List of script names to execute in order")
+    scripts_root: str = Field(default="/app/scripts", description="Root folder containing scripts in the container")
+    arguments: Dict[str, List[str]] = Field(default_factory=dict, description="Arguments for each script, keyed by script name")
+
+
+class ScriptStepResult(BaseModel):
+    """Result for a single script execution step."""
+    script_name: str
+    exit_code: int
+    stdout: str
+    stderr: str
+    success: bool
+
+
+class ScriptExecutionResponse(BaseModel):
+    """Response model for run_workflow_v2 endpoint."""
+    execution_id: str
+    status: str  # "completed" or "failed"
+    steps: List[ScriptStepResult]
+    failed_at_step: Optional[int] = None  # Index of the failed step, if any
+
+
+@router.post("/executions_sandbox", response_model=ScriptExecutionResponse)
+async def run_workflow_sandbox(request: ScriptExecutionRequest):
+    """
+    Execute a list of scripts sequentially in the veriflow-sandbox container.
+    
+    This endpoint:
+    1. Accepts a list of script names and optional arguments
+    2. Runs each script in the veriflow-sandbox Docker container
+    3. Captures stdout, stderr, and exit_code for each step
+    4. Stops immediately on first failure
+    5. Returns a consolidated JSON report
+    
+    Scripts are located in:
+    - Host: ./backend/tools
+    - Container: /app/scripts (default, configurable via scripts_root)
+    
+    Outputs are stored in:
+    - Host: ./backend/outputs
+    - Container: /app/outputs
+    """
+    execution_id = f"exec_v2_{uuid.uuid4().hex[:12]}"
+    steps_results: List[ScriptStepResult] = []
+    
+    try:
+        # Initialize Docker client
+        client = docker.from_env()
+        
+        # Check if veriflow-sandbox container exists
+        try:
+            sandbox_container = client.containers.get("veriflow-sandbox")
+        except docker.errors.NotFound:
+            raise HTTPException(
+                status_code=503,
+                detail="veriflow-sandbox container is not running. Please start it first."
+            )
+        
+        # Execute scripts sequentially
+        for step_index, script_name in enumerate(request.scripts):
+            script_path = f"{request.scripts_root}/{script_name}"
+            
+            # Get arguments for this script
+            script_args = request.arguments.get(script_name, [])
+            
+            # Build the command
+            cmd = ["python", script_path] + script_args
+            
+            logger.info(f"[{execution_id}] Step {step_index + 1}: Executing {script_name} with args: {script_args}")
+            
+            try:
+                # Execute command in the container
+                exec_result = sandbox_container.exec_run(
+                    cmd=cmd,
+                    workdir="/app",
+                    environment={
+                        "PYTHONUNBUFFERED": "1",
+                        "OUTPUT_DIR": "/app/outputs"
+                    },
+                    demux=True  # Separate stdout and stderr
+                )
+                
+                exit_code = exec_result.exit_code
+                stdout_raw, stderr_raw = exec_result.output
+                
+                stdout = stdout_raw.decode("utf-8") if stdout_raw else ""
+                stderr = stderr_raw.decode("utf-8") if stderr_raw else ""
+                success = exit_code == 0
+                
+            except Exception as exec_error:
+                # Handle execution errors
+                exit_code = -1
+                stdout = ""
+                stderr = str(exec_error)
+                success = False
+            
+            # Create step result
+            step_result = ScriptStepResult(
+                script_name=script_name,
+                exit_code=exit_code,
+                stdout=stdout,
+                stderr=stderr,
+                success=success
+            )
+            steps_results.append(step_result)
+            
+            logger.info(f"[{execution_id}] Step {step_index + 1} ({script_name}): exit_code={exit_code}, success={success}")
+            
+            # Stop on first failure
+            if not success:
+                logger.warning(f"[{execution_id}] Workflow stopped at step {step_index + 1} due to failure")
+                return ScriptExecutionResponse(
+                    execution_id=execution_id,
+                    status="failed",
+                    steps=steps_results,
+                    failed_at_step=step_index
+                )
+        
+        # All steps completed successfully
+        logger.info(f"[{execution_id}] Workflow completed successfully with {len(steps_results)} steps")
+        return ScriptExecutionResponse(
+            execution_id=execution_id,
+            status="completed",
+            steps=steps_results,
+            failed_at_step=None
+        )
+        
+    except HTTPException:
+        raise
+    except docker.errors.APIError as e:
+        logger.error(f"[{execution_id}] Docker API error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Docker API error: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"[{execution_id}] Unexpected error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error during execution: {str(e)}"
+        )
