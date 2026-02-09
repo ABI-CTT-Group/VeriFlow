@@ -77,12 +77,9 @@ VeriFlow leverages **7 Gemini 3 features** through the `google-genai` SDK (`from
 | # | Feature | How It's Used | Agent(s) |
 |---|---------|---------------|----------|
 | 1 | **Pydantic Structured Output** | All agents use Pydantic `BaseModel` subclasses as `response_schema` parameter with `response_mime_type="application/json"` for type-safe, validated JSON responses (`AnalysisResult`, `WorkflowResult`, `ValidationResult`, `ErrorTranslationResult`) | All 3 |
-| 2 | **Thinking Level Control** | `ThinkingConfig(thinking_budget=N)` — HIGH (24,576 tokens) for complex scientific reasoning, MEDIUM (8,192) for validation, LOW (2,048) for error translation | All 3 |
-| 3 | **Grounding with Google Search** | `GoogleSearch()` tool verifies tool names, model architectures, and software references against the web during publication analysis | Scholar |
-| 4 | **Native PDF Upload** | `types.Part.from_bytes(data=file_data, mime_type="application/pdf")` for multimodal publication ingestion — the entire PDF is sent to Gemini for full-document analysis | Scholar |
-| 5 | **Thought Signature Preservation** | `_extract_thoughts()` captures reasoning chains from `response.candidates[].content.parts` where `part.thought == True`, preserving reasoning across multi-turn conversations for iterative CWL generation and validation-fix loops | Engineer, Reviewer |
-| 6 | **Agentic Vision** | Page image extraction via PyMuPDF for visual analysis of methodology diagrams, flowcharts, and figures | Scholar |
-| 7 | **Async Streaming** | `client.aio.models.generate_content_stream()` for real-time token-by-token streaming via WebSocket to the frontend console | All 3 |
+| 2 | **Native PDF Upload** | `types.Part.from_bytes(data=file_data, mime_type="application/pdf")` for multimodal publication ingestion — the entire PDF is sent to Gemini for full-document analysis | Scholar |
+| 3 | **Thought Signature Preservation** | `_extract_thoughts()` captures reasoning chains from `response.candidates[].content.parts` where `part.thought == True`, preserving reasoning across multi-turn conversations for iterative CWL generation and validation-fix loops | Engineer, Reviewer |
+| 4 | **Async Streaming** | `client.aio.models.generate_content_stream()` for real-time token-by-token streaming via WebSocket to the frontend console | All 3 |
 
 ### Agent Architecture
 
