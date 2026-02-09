@@ -408,6 +408,8 @@ engineer_cwl_gen:
     3.  **Repository Context:** {repo_context}
     4.  **Previous Errors:** {previous_errors}
 
+    If the **Repository Context** context is empty, use the **GitHub Repo** and its contents to guide you.
+
     Architectural Constraints (The "Gold Standard"):
     You must follow the strict architectural pattern used in the "MAMA-MIA" pipeline examples provided below. Specifically:
     1.  **Split Architecture:** Do not create one giant container. Isolate distinct logical steps (e.g., "Preprocessing/Conversion" vs "Heavy Inference/Analysis") into separate Docker containers to optimize build size and resource usage.
