@@ -25,10 +25,11 @@ app.add_middleware(
 )
 
 # Import Routers
-from app.api import publications, workflows, websockets
+from app.api import publications, workflows, websockets, mamamia_cache
 
 app.include_router(publications.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
+app.include_router(mamamia_cache.router, prefix="/api/v1")
 app.include_router(websockets.router) # WebSocket endpoint /ws/{client_id}
 
 class OrchestrationRequest(BaseModel):

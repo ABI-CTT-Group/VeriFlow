@@ -99,7 +99,11 @@ export const endpoints = {
 
     // Orchestrate Workflow
     orchestrateWorkflow: (pdfPath: string, repoPath: string, clientId?: string) =>
-        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, client_id: clientId })
+        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, client_id: clientId }),
+
+    // Cached MAMA-MIA Demo
+    mamaMiaCache: (clientId?: string) =>
+        api.get<OrchestrationResponse>('/mama-mia-cache', { params: { client_id: clientId } })
 }
 
 export interface OrchestrationResponse {

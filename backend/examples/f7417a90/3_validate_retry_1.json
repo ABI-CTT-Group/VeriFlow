@@ -1,0 +1,10 @@
+{
+  "inputs": {
+    "generated_code_keys": "Invalid Format"
+  },
+  "final_output": {
+    "errors": [
+      "Artifact generation failed or returned invalid format."
+    ]
+  }
+}

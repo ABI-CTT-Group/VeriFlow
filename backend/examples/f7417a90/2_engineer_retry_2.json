@@ -1,0 +1,11 @@
+{
+  "inputs": {
+    "isa_summary": "ISA JSON present",
+    "repo_path": "C:\\Users\\lgao142\\Desktop\\AI Agent 2026\\a-google-hackathon\\VeriFlow\\backend\\examples\\mama-mia"
+  },
+  "prompt_truncated": "You are a Principal DevOps Engineer. \nMap the Theoretical ISA Design to EXECUTABLE, SELF-CONTAINED CWL Code.\n\nCRITICAL REQUIREMENTS:\n1. **Self-Contained Scripts**: You MUST use `InitialWorkDirRequirem...",
+  "model_thoughts": [],
+  "final_output": {
+    "raw_parsed": ""
+  }
+}

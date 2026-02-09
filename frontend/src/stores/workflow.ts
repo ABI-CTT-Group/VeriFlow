@@ -164,7 +164,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     }
     async function loadExample(exampleName: string = 'mama-mia') {
         isLoading.value = true
-        loadingMessage.value = `Orchestrating ${exampleName.toUpperCase()} demo via Google Gemini 3...`
+        loadingMessage.value = `Orchestrating ${exampleName.toUpperCase()} demo...`
         error.value = null
 
         try {
@@ -178,13 +178,19 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
             // Use existing clientId
             const currentClientId = clientId.value!
+            let response;
 
-            // Use Orchestration API
-            const pdfPath = "/app/examples/mama-mia/1.pdf"
-            const repoPath = "/app/examples/mama-mia"
+            if (exampleName === 'mama-mia') {
+                response = await endpoints.mamaMiaCache(currentClientId)
+            } else {
+                // Use Orchestration API
+                const pdfPath = "/app/examples/mama-mia/1.pdf"
+                const repoPath = "/app/examples/mama-mia"
 
-            // Pass clientId to backend
-            const response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, currentClientId)
+                // Pass clientId to backend
+                response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, currentClientId)
+            }
+
             const data = response.data
             console.log("Orchestration Response: ", data);
 

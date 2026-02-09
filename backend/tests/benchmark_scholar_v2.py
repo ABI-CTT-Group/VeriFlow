@@ -4,8 +4,20 @@ import json
 import time
 import asyncio
 
-# Add app to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Helper to set up environment
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.abspath(os.path.join(current_dir, '..'))
+project_root = os.path.abspath(os.path.join(backend_dir, '..'))
+
+# 1. Set CWD to backend so config.yaml and prompts.yaml are found
+os.chdir(backend_dir)
+
+# 2. Add backend to sys.path
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+import dotenv
+dotenv.load_dotenv(os.path.join(project_root, '.env'))
 
 from app.agents.scholar import ScholarAgent
 
@@ -13,7 +25,9 @@ async def run_multimodal_benchmark():
     # 1. Setup V2 Agent
     agent = ScholarAgent()
     
-    pdf_path = r"tests\mamamiaworkflow.pdf"
+    # Construct path relative to this script to ensure it works from any CWD
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pdf_path = os.path.join(script_dir, "mamamiaworkflow.pdf")
     # pdf_path = r"tests\978-3-031-94562-5_34.pdf"
     
     if not os.path.exists(pdf_path):
@@ -32,7 +46,7 @@ async def run_multimodal_benchmark():
     agent.client.model_name = target_model
     
     # Ensure the correct prompt version is used
-    agent.prompt_version = "v2_multimodal"
+    agent.prompt_version = "v2_standard"
 
     start_time = time.time()
     

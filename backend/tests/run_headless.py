@@ -7,11 +7,14 @@ from pprint import pprint
 
 # Ensure backend directory is in path so imports work
 backend_path = Path(__file__).parent.parent
+project_root = backend_path.parent
 sys.path.append(str(backend_path))
 
 from app.graph.workflow import app_graph
 from app.state import AgentState
 
+import dotenv
+dotenv.load_dotenv(os.path.join(project_root, '.env'))
 async def main():
     print("--- VeriFlow Headless Runner ---")
     
@@ -20,6 +23,15 @@ async def main():
     base_dir = backend_path
     pdf_path = str(base_dir / "tests" / "mamamiaworkflow.pdf") 
     repo_path = str(base_dir / "examples" / "mama-mia")
+
+    # FIX: Reload prompts with absolute path to ensure they are found regardless of CWD
+    from app.services.prompt_manager import prompt_manager
+    prompts_path = base_dir / "prompts.yaml"
+    if prompts_path.exists():
+        print(f"Reloading prompts from: {prompts_path}")
+        prompt_manager.load_prompts(str(prompts_path))
+    else:
+        print(f"Warning: Prompts file not found at {prompts_path}")
 
     if not os.path.exists(pdf_path):
         print(f"Error: PDF not found at {pdf_path}")
