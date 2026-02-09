@@ -1,13 +1,17 @@
 """
 VeriFlow API - Workflows Router
 Handles workflow assembly, retrieval, saving (Design Mode), 
-AND execution restart/status (Execution Mode).
+AND execution restart/status/results (Execution Mode).
 """
 
 import uuid
+import json
+import logging
+import os
+from pathlib import Path
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 
 # --- Imports from Original File (Design Mode) ---
@@ -25,10 +29,12 @@ from app.models.workflow import (
     NodeStatus,
 )
 
-# --- Imports for New Functionality (Execution Mode) ---
+# --- Imports for Execution Mode ---
 from app.services.veriflow_service import veriflow_service
 from app.services.database_sqlite import database_service
 from app.services.websocket_manager import manager
+
+logger = logging.getLogger(__name__)
 
 # Stage 4: Import Engineer and Reviewer agents (Gemini 3 SDK)
 try:
@@ -52,16 +58,134 @@ router = APIRouter()
 # In-memory workflow storage (Design Mode)
 _workflows: dict[str, dict] = {}
 
-# --- New Models for Restart Logic ---
 class RestartRequest(BaseModel):
-    # Optional: Update user context or options on restart
     user_context: Optional[str] = None
-    
-    # Optional: Clear previous directives if just retrying
     clear_directives: bool = False
 
 # ==============================================================================
-# EXISTING ENDPOINTS (Design & Assembly)
+# EXECUTION RESULTS ENDPOINT (The fix for your frontend issue)
+# ==============================================================================
+
+@router.get("/veriflow/results/{run_id}")
+def get_veriflow_results(run_id: str):
+    """
+    Retrieve the complete results of a VeriFlow run.
+    Used by the Plan & Apply frontend to show generated artifacts.
+    """
+    logger.info(f"[/veriflow/results/{run_id}] Fetching results...")
+    
+    # 1. Fetch Session from DB
+    session = database_service.get_agent_session(run_id)
+    if not session:
+        logger.error(f"[/veriflow/results] Session NOT FOUND for {run_id}")
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found in database.")
+
+    results = {"run_id": run_id, "scholar": None, "engineer": None}
+    
+    # --- Helper to safely load JSON ---
+    def safe_load_json(path_str: Optional[str], label: str):
+        if not path_str:
+            logger.info(f"[{run_id}] No path in DB for {label}")
+            return None
+            
+        path_obj = Path(path_str)
+        if not path_obj.exists():
+            logger.warning(f"[{run_id}] File missing for {label} at {path_obj}")
+            return {"error": "File not found on disk", "path": str(path_obj)}
+            
+        try:
+            with open(path_obj, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            # FIX: Handle double-encoded JSON (if agent output was stringified twice)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError:
+                    pass # Keep as string if it's not valid JSON
+            
+            return data
+        except Exception as e:
+            logger.error(f"[{run_id}] Error loading {label}: {e}")
+            return {"error": f"Failed to load file: {e}"}
+
+    # 2. Load Scholar Output
+    results["scholar"] = safe_load_json(session.get("scholar_isa_json_path"), "scholar")
+
+    # 3. Load Engineer Output
+    results["engineer"] = safe_load_json(session.get("engineer_cwl_path"), "engineer")
+            
+    return results
+
+
+# ==============================================================================
+# RESTART & STATUS ENDPOINTS (Plan & Apply)
+# ==============================================================================
+
+@router.get("/workflows/{run_id}/status")
+async def get_workflow_status(run_id: str):
+    """
+    Get the current state of a workflow run (Execution Mode).
+    """
+    session = database_service.get_agent_session(run_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Run ID not found")
+        
+    state = database_service.get_full_state_mock(run_id)
+    
+    return {
+        "run_id": run_id,
+        "status": "completed" if session.get("workflow_complete") else "in_progress",
+        "current_errors": state.get("validation_errors", []),
+        "review_decision": state.get("review_decision"),
+        "generated_artifacts": list(state.get("generated_code", {}).keys()) if state.get("generated_code") else []
+    }
+
+@router.post("/workflows/{run_id}/restart")
+async def restart_workflow_execution(
+    run_id: str, 
+    start_node: str = Query(..., description="The agent node to restart from (e.g., 'engineer', 'scholar')"),
+    request: Optional[RestartRequest] = None,
+    background_tasks: BackgroundTasks = BackgroundTasks() 
+):
+    """
+    Explicitly restart a workflow execution from a specific agent node.
+    This supports the 'Plan & Apply' pattern.
+    """
+    # 1. Validate Run Exists
+    session = database_service.get_agent_session(run_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Run ID not found")
+
+    # 2. Update Context if provided
+    if request:
+        updates = {}
+        if request.user_context:
+            updates["user_context"] = request.user_context
+        
+        if request.clear_directives:
+            updates["agent_directives"] = {} # Clear chat history/instructions
+            
+        if updates:
+            database_service.create_or_update_agent_session(run_id, **updates)
+
+    # 3. Trigger Restart (Background Task)
+    background_tasks.add_task(
+        veriflow_service.restart_workflow,
+        run_id=run_id,
+        start_node=start_node,
+        stream_callback=manager.broadcast
+    )
+
+    return {
+        "status": "accepted", 
+        "message": f"Workflow restart initiated from '{start_node}'", 
+        "run_id": run_id
+    }
+
+
+# ==============================================================================
+# EXISTING ENDPOINTS (Design & Assembly - Preserved)
 # ==============================================================================
 
 @router.post("/workflows/assemble", response_model=AssembleResponse)
@@ -327,73 +451,4 @@ async def save_workflow(workflow_id: str, request: SaveWorkflowRequest):
         "workflow_id": workflow_id,
         "updated_at": _workflows[workflow_id]["updated_at"],
         "message": "Workflow saved successfully",
-    }
-
-
-# ==============================================================================
-# NEW ENDPOINTS (Execution & Restart)
-# ==============================================================================
-
-@router.get("/workflows/{run_id}/status")
-async def get_workflow_status(run_id: str):
-    """
-    Get the current state of a workflow run (Execution Mode).
-    Retrieved from the SQLite database.
-    """
-    session = database_service.get_agent_session(run_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Run ID not found")
-        
-    # Reconstruct a summary of the state
-    state = database_service.get_full_state_mock(run_id)
-    
-    return {
-        "run_id": run_id,
-        "status": "completed" if session.get("workflow_complete") else "in_progress",
-        "current_errors": state.get("validation_errors", []),
-        "review_decision": state.get("review_decision"),
-        "generated_artifacts": list(state.get("generated_code", {}).keys())
-    }
-
-
-@router.post("/workflows/{run_id}/restart")
-async def restart_workflow_execution(
-    run_id: str, 
-    start_node: str = Query(..., description="The agent node to restart from (e.g., 'engineer', 'scholar')"),
-    request: Optional[RestartRequest] = None,
-    background_tasks: BackgroundTasks = BackgroundTasks() 
-):
-    """
-    Explicitly restart a workflow execution from a specific agent node.
-    This supports the 'Plan & Apply' pattern.
-    """
-    # 1. Validate Run Exists
-    session = database_service.get_agent_session(run_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Run ID not found")
-
-    # 2. Update Context if provided
-    if request:
-        updates = {}
-        if request.user_context:
-            updates["user_context"] = request.user_context
-        
-        if request.clear_directives:
-            updates["agent_directives"] = {} # Clear chat history/instructions
-            
-        if updates:
-            database_service.create_or_update_agent_session(run_id, **updates)
-
-    # 3. Trigger Restart (Background Task)
-    background_tasks.add_task(
-        veriflow_service.restart_workflow,
-        run_id=run_id,
-        start_node=start_node,
-        stream_callback=manager.broadcast
-    )
-
-    return {
-        "status": "accepted", 
-        "message": f"Workflow restart initiated from '{start_node}'", 
-        "run_id": run_id
     }
