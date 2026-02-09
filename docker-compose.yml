@@ -228,7 +228,7 @@ services:
     stdin_open: true # Keep container running
     tty: true
     volumes:
-      - ./backend/tools:/app/scripts # Host scripts mapped to container
+      - ./backend/scripts:/app/scripts # Host scripts mapped to container
       - ./backend/outputs:/app/outputs # Output directory
     networks:
       - veriflow-network
