@@ -1,5 +1,7 @@
 import uvicorn
 import os
+import uuid
+import json
 import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,7 +49,7 @@ def read_root():
     return {"message": "VeriFlow Orchestrator is operational."}
 
 @app.post("/api/v1/orchestrate", response_model=OrchestrationResponse)
-async def orchestrate_workflow(request: OrchestrationRequest):
+async def orchestrate_workflow(request: OrchestrationRequest, background_tasks: BackgroundTasks):
     """
     Asynchronously invokes the VeriFlow LangGraph.
     Generates Docker/CWL/Airflow artifacts from PDF and Repo.
@@ -59,8 +61,12 @@ async def orchestrate_workflow(request: OrchestrationRequest):
     if not os.path.exists(request.repo_path):
         raise HTTPException(status_code=404, detail=f"Repo not found at {request.repo_path}")
 
-    # 2. Initialize State
+    # 2. Generate Run ID
+    run_id = str(uuid.uuid4())
+    
+    # 3. Initialize State
     initial_state: AgentState = {
+        "run_id": run_id, # Pass run_id to graph state
         "pdf_path": request.pdf_path,
         "repo_path": request.repo_path,
         "client_id": request.client_id, # Pass client_id to graph state
@@ -73,33 +79,59 @@ async def orchestrate_workflow(request: OrchestrationRequest):
         "review_feedback": None
     }
 
-    try:
-        logger.info(f"Starting workflow for {request.pdf_path}")
-        
-        # 3. Invoke Graph (Async)
-        # Using ainvoke directly awaits the result. 
-        # In a real heavy-load scenario, we would use BackgroundTasks and a DB 
-        # to store state, but for this specific instruction we await execution.
-        final_state = await app_graph.ainvoke(initial_state)
-        
-        # 4. Process Result
-        decision = final_state.get("review_decision", "unknown")
-        
-        return OrchestrationResponse(
-            status="completed",
-            message=f"Workflow finished with decision: {decision}",
-            result={
-                "isa_json": final_state.get("isa_json"),
-                "generated_code": final_state.get("generated_code"),
-                "review_decision": decision,
-                "review_feedback": final_state.get("review_feedback"),
-                "errors": final_state.get("validation_errors")
-            }
-        )
+    # 4. Start Background Task
+    background_tasks.add_task(run_orchestration_background, initial_state)
 
+    return OrchestrationResponse(
+        status="started",
+        message=f"Orchestration started in background with run_id: {run_id}",
+        result={"run_id": run_id}
+    )
+
+async def run_orchestration_background(initial_state: AgentState):
+    """
+    Executes the workflow graph in the background.
+    """
+    try:
+        logger.info(f"Starting background workflow for run_id: {initial_state.get('run_id')}")
+        await app_graph.ainvoke(initial_state)
+        logger.info(f"Background workflow completed for run_id: {initial_state.get('run_id')}")
     except Exception as e:
-        logger.error(f"Workflow execution failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Background workflow failed: {e}")
+
+@app.get("/api/v1/orchestrate/{run_id}/artifacts/{agent_name}")
+async def get_orchestration_artifact(run_id: str, agent_name: str):
+    """
+    Retrieves a specific artifact (log file) for a given run and agent.
+    Example: agent_name='scholar' -> returns content of logs/{run_id}/1_scholar.json
+    """
+    # Map agent name to filename pattern
+    filename_map = {
+        "scholar": "1_scholar.json",
+        "engineer": "2_engineer.json", # Note: engineer might have retries, handling simplest case first or latest?
+        # For engineer/validate nodes which have retries, we might need a more robust way or just grab the latest file matching pattern 
+        # But per user request "1_scholar.json", let's stick to that for now.
+    }
+    
+    target_filename = filename_map.get(agent_name)
+    if not target_filename:
+        # Fallback: try to find file starting with agent_name or containing it?
+        # For now, simplistic mapping as per "1_scholar.json" request
+        if agent_name == "scholar": target_filename = "1_scholar.json"
+        else: raise HTTPException(status_code=400, detail=f"Unknown agent artifact: {agent_name}")
+
+    log_dir = os.path.join("logs", run_id)
+    file_path = os.path.join(log_dir, target_filename)
+    
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read artifact: {e}")
+    
+    raise HTTPException(status_code=404, detail="Artifact not found (yet)")
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

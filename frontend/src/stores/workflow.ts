@@ -197,74 +197,65 @@ export const useWorkflowStore = defineStore('workflow', () => {
                 const repoPath = "/app/examples/mama-mia"
 
                 // Pass clientId to backend
+                // 1. Start Orchestration
                 response = await endpoints.orchestrateWorkflow(pdfPath, repoPath, currentClientId)
+                console.log("Orchestration Started:", response.data)
+
+                if (response.data.status === 'started' && (response.data.result as any)?.run_id) {
+                    const runId = (response.data.result as any).run_id
+
+                    // Log to Console
+                    const consoleStore = useConsoleStore()
+                    consoleStore.addSystemMessage(`Orchestration started (Run ID: ${runId}). Waiting for Scholar...`)
+
+                    // 2. Poll for Scholar Result
+                    const pollForArtifact = async (attempt = 1) => {
+                        if (attempt > 60) {
+                            throw new Error("Timeout waiting for Scholar results")
+                        }
+
+                        try {
+                            consoleStore.addSystemMessage(`Checking for Scholar results... (Attempt ${attempt})`)
+                            const artifactRes = await endpoints.getArtifact(runId, 'scholar')
+
+                            if (artifactRes.status === 200 && artifactRes.data) {
+                                consoleStore.addSystemMessage("Scholar results received.")
+
+                                // Process Result
+                                const scholarData = artifactRes.data
+                                const processedRes = {
+                                    status: 'completed',
+                                    result: {
+                                        isa_json: scholarData.final_output || scholarData.isa_json,
+                                        generated_code: {}
+                                    }
+                                }
+                                processOrchestrationResult(processedRes)
+                                return
+                            }
+                        } catch (e: any) {
+                            if (e.response && e.response.status === 404) {
+                                // Not ready yet, wait and retry
+                                await new Promise(resolve => setTimeout(resolve, 5000))
+                                await pollForArtifact(attempt + 1)
+                            } else {
+                                throw e
+                            }
+                        }
+                    }
+
+                    await pollForArtifact()
+                    return // polling handles the rest
+                } else {
+                    // Fallback check if it somehow completed immediately (unlikely with new logic but safe)
+                    if (response.data.status !== 'completed') {
+                        throw new Error("Failed to start orchestration")
+                    }
+                }
             }
 
             const data = response.data
-            console.log("Orchestration Response: ", data);
-
-            console.log("data.status: ", data.status);
-            console.log("data.result: ", data.result);
-            console.log(data.status === 'completed' && data.result)
-
-
-            if (data.status === 'completed' && data.result) {
-                // Generate a pseudo upload ID
-                uploadId.value = `orch_${Date.now()}`
-                uploadedPdfUrl.value = null
-                hasUploadedFiles.value = true
-
-                // Map ISA JSON to Hierarchy
-                // The orchestration result structure: { studyDesign: { ... } }
-                // We need to map this to our Investigation interface
-                const isa = data.result.isa_json
-                console.log("ISA: ", isa);
-                if (isa && isa.studyDesign) {
-                    const sd = isa.studyDesign
-                    const inv = sd.investigation || {}
-                    console.log("Investigation: ", inv);
-                    // Construct Hierarchy
-                    hierarchy.value = {
-                        identifier: inv.id || 'inv_orchestrated',
-                        title: inv.title || 'Orchestrated Investigation',
-                        description: inv.description || '',
-                        studies: [
-                            {
-                                identifier: sd.study?.id || 'study_orchestrated',
-                                title: sd.study?.title || 'Main Study',
-                                description: sd.study?.description || '',
-                                assays: (sd.assays || []).map((assay: any) => ({
-                                    identifier: assay.id,
-                                    filename: assay.name || 'Assay',
-                                    name: assay.name,
-                                    description: assay.name, // Mapping name to description for now or create new field
-                                    steps: assay.workflowSteps || [],
-                                    measurementType: { term: 'N/A' },
-                                    technologyType: { term: 'N/A' }
-                                }))
-                            }
-                        ]
-                    }
-                    console.log("Hierarchy: ", hierarchy.value);
-                    addLog({
-                        timestamp: new Date().toISOString(),
-                        level: 'INFO',
-                        message: `Orchestration complete. ISA extracted.`
-                    })
-                }
-
-                // Store Generated Code (Optional: could store in a new state variable)
-                if (data.result.generated_code) {
-                    addLog({
-                        timestamp: new Date().toISOString(),
-                        level: 'INFO',
-                        message: `Generated Artifacts: ${Object.keys(data.result.generated_code).join(', ')}`
-                    })
-                }
-
-            } else {
-                throw new Error(data.message || 'Orchestration failed')
-            }
+            processOrchestrationResult(data)
 
         } catch (err: any) {
             console.error('Orchestration failed:', err)
@@ -280,6 +271,73 @@ export const useWorkflowStore = defineStore('workflow', () => {
         } finally {
             isLoading.value = false
             loadingMessage.value = null
+        }
+    }
+
+    function processOrchestrationResult(data: any) {
+        console.log("Orchestration Response: ", data);
+
+        console.log("data.status: ", data.status);
+        console.log("data.result: ", data.result);
+        console.log(data.status === 'completed' && data.result)
+
+
+        if (data.status === 'completed' && data.result) {
+            // Generate a pseudo upload ID
+            uploadId.value = `orch_${Date.now()}`
+            uploadedPdfUrl.value = null
+            hasUploadedFiles.value = true
+
+            // Map ISA JSON to Hierarchy
+            // The orchestration result structure: { studyDesign: { ... } }
+            // We need to map this to our Investigation interface
+            const isa = data.result.isa_json
+            console.log("ISA: ", isa);
+            if (isa && isa.studyDesign) {
+                const sd = isa.studyDesign
+                const inv = sd.investigation || {}
+                console.log("Investigation: ", inv);
+                // Construct Hierarchy
+                hierarchy.value = {
+                    identifier: inv.id || 'inv_orchestrated',
+                    title: inv.title || 'Orchestrated Investigation',
+                    description: inv.description || '',
+                    studies: [
+                        {
+                            identifier: sd.study?.id || 'study_orchestrated',
+                            title: sd.study?.title || 'Main Study',
+                            description: sd.study?.description || '',
+                            assays: (sd.assays || []).map((assay: any) => ({
+                                identifier: assay.id,
+                                filename: assay.name || 'Assay',
+                                name: assay.name,
+                                description: assay.name, // Mapping name to description for now or create new field
+                                steps: assay.workflowSteps || [],
+                                measurementType: { term: 'N/A' },
+                                technologyType: { term: 'N/A' }
+                            }))
+                        }
+                    ]
+                }
+                console.log("Hierarchy: ", hierarchy.value);
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Orchestration complete. ISA extracted.`
+                })
+            }
+
+            // Store Generated Code (Optional: could store in a new state variable)
+            if (data.result.generated_code) {
+                addLog({
+                    timestamp: new Date().toISOString(),
+                    level: 'INFO',
+                    message: `Generated Artifacts: ${Object.keys(data.result.generated_code).join(', ')}`
+                })
+            }
+
+        } else {
+            throw new Error(data.message || 'Orchestration failed')
         }
     }
 
