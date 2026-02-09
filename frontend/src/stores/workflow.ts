@@ -554,6 +554,26 @@ export const useWorkflowStore = defineStore('workflow', () => {
             isWorkflowRunning.value = true
             addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Starting workflow execution...' })
 
+            // Find first tool node (sorted by X position)
+            const tools = nodes.value.filter(n => n.type === 'tool')
+            tools.sort((a, b) => a.position.x - b.position.x)
+
+            if (tools.length > 0) {
+                const firstTool = tools[0]
+                // 1. Set First Tool -> Running
+                updateNodeStatus(firstTool.id, { status: 'running', progress: 0 })
+
+                // 2. Find Input Measurements -> Completed
+                // Find edges where target is the first tool
+                const inputEdges = edges.value.filter(e => e.target === firstTool.id)
+                inputEdges.forEach(edge => {
+                    const sourceNode = nodes.value.find(n => n.id === edge.source)
+                    if (sourceNode && (sourceNode.type === 'measurement' || sourceNode.type === 'dataset')) {
+                        updateNodeStatus(sourceNode.id, { status: 'completed', progress: 100 })
+                    }
+                })
+            }
+
             // Mock execution start
             executionId.value = `exec_${Date.now()}`
 
