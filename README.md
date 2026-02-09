@@ -33,6 +33,7 @@ Built for the [Gemini 3 Hackathon](https://gemini3.devpost.com/).
 - [Project Structure](#project-structure)
 - [Testing](#testing)
 - [Documentation](#documentation)
+- [License](#license)
 
 ---
 
@@ -386,3 +387,7 @@ cd frontend && npx vitest run
 ## Documentation
 
 - [Technical Specification](SPEC.md) — Full implementation spec with API endpoints, data structures, and agent details
+
+## License
+
+VeriFlow is fully open source and distributed under the Apache License 2.0. See [LICENSE](https://github.com/ABI-CTT-Group/VeriFlow/blob/main/LICENSE) for more information.
