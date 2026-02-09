@@ -53,7 +53,7 @@ def _resolve_model_name(agent_name: str) -> str:
 
 def _get_prompt_version(agent_name: str) -> str:
     agent_conf = config.get_agent_config(agent_name)
-    return agent_conf.get("default_prompt_version", "v1_standard")
+    return agent_conf.get("default_prompt_version", "v2_standard")
 
 def _read_repo_context(repo_path: str) -> str:
     context = []
@@ -88,6 +88,30 @@ def _mock_validate_artifacts(artifacts: Dict[str, str]) -> List[str]:
         errors.append("CWL is missing or invalid (no cwlVersion declared).")
     return errors
 
+
+def get_repo_value(data):
+    """
+    Recursively finds the repo_url from isa_json
+    """
+    target_key="github"
+    if isinstance(data, dict):
+        if target_key in data:
+            return data[target_key]
+
+        for value in data.values():
+            result = get_repo_value(value)
+            if result is not None:
+                return result
+
+    elif isinstance(data, list):
+        for item in data:
+            result = get_repo_value(item)
+            if result is not None:
+                return result
+
+    return "Not found!"
+
+
 # --- Node Implementations ---
 
 async def scholar_node(state: AgentState) -> Dict[str, Any]:
@@ -111,7 +135,7 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
     
     if user_context:
-        full_prompt += f"\n\CRITICAL USER CONTEXT THAT SHOULD BE INCLUDED IN YOUR ANALYSIS AND EXTRACTION:\n{user_context}"
+        full_prompt += f"\n\\CRITICAL USER CONTEXT THAT SHOULD BE INCLUDED IN YOUR ANALYSIS AND EXTRACTION:\n{user_context}"
         
     if directive:
         full_prompt += f"\n\nIMPORTANT UPDATE - USER DIRECTIVE:\nThe user has reviewed previous outputs and provided this instruction:\n'{directive}'\nPlease adjust your analysis to strictly follow this directive."
@@ -164,13 +188,22 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     repo_context = state.get("repo_context")
     if not repo_context:
         repo_context = _read_repo_context(repo_path)
-    
+    ## Provide the ISA JSON and github URL
     base_prompt = prompt_manager.get_prompt("engineer_cwl_gen", version=prompt_version)
-    prompt = base_prompt.format(
-        isa_json=json.dumps(isa_json, indent=2),
-        repo_context=repo_context,
-        previous_errors=state.get("validation_errors", [])
-    )
+    if '**ISA JSON:**' not in base_prompt:
+        prompt = base_prompt.format(
+            isa_json=json.dumps(isa_json, indent=2),
+            repo_context=repo_context,
+            previous_errors=state.get("validation_errors", [])
+        )
+    else:
+        repo_url=get_repo_value(isa_json)
+        # Use safer method:
+        prompt = base_prompt.replace("{isa_json}", json.dumps(isa_json)) \
+                    .replace("{repo_url}", repo_url) \
+                    .replace("{repo_context}", repo_context) \
+                    .replace("{previous_errors}", str(state.get("validation_errors", [])))
+
     
     if directive:
         prompt += f"\n\nIMPORTANT USER DIRECTIVE:\nThe user has reviewed your previous work and requests the following changes:\n'{directive}'\nPlease regenerate the code strictly following this directive."
@@ -194,7 +227,7 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     return {
         "repo_context": repo_context,
         "generated_code": result,
-        "retry_count": current_retry_count + 1 # FIX: Use local variable
+        "retry_count": current_retry_count + 1 
     }
 
 

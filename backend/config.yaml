@@ -23,11 +23,11 @@ models:
 agents:
   scholar:
     default_model: "gemini-3-pro"
-    default_prompt_version: "v1_standard"
+    default_prompt_version: "v2_standard"
     thinking_level: "HIGH"
   engineer:
     default_model: "gemini-3-pro"
-    default_prompt_version: "v1_standard"
+    default_prompt_version: "v3_standard"
     thinking_level: "HIGH"
   reviewer:
     default_model: "gemini-3-flash"
