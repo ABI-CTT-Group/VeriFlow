@@ -141,7 +141,7 @@ function handleClose() {
       <div class="flex-1 flex overflow-hidden">
         
         <!-- Left Panel: Hybrid PDF Viewer -->
-        <div class="w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col relative group">
+        <div data-tour="modal-pdf-preview" class="w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col relative group">
           
           <!-- Case A: Custom Web Viewer (VuePdfEmbed) - For iOS/Touch/Fallback -->
           <template v-if="useCustomViewer">
@@ -211,6 +211,7 @@ function handleClose() {
                   Additional Context
                 </label>
                 <textarea
+                  data-tour="modal-context-input"
                   v-model="additionalInfo"
                   :disabled="isDemoMode"
                   rows="12"
@@ -237,6 +238,7 @@ function handleClose() {
               Skip
             </button>
             <button
+              data-tour="modal-continue-button"
               @click="handleSubmit"
               class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200 transition-all active:scale-95"
             >

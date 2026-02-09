@@ -304,7 +304,7 @@ function removeFile(index: number) {
 </script>
 
 <template>
-  <div class="h-full flex flex-col border-b border-slate-200 bg-white">
+  <div class="h-full flex flex-col border-b border-slate-200 bg-white" data-tour="upload-panel">
     <div class="flex-shrink-0 flex items-center">
       <!-- Collapse left panel button -->
       <button
@@ -344,6 +344,7 @@ function removeFile(index: number) {
 
       <!-- Drop zone -->
       <div
+        data-tour="pdf-upload-zone"
         :class="[
           'border-2 border-dashed rounded-lg p-6 text-center transition-colors',
           isDragging ? 'border-blue-500 bg-blue-50' : 'border-slate-300'
@@ -369,6 +370,7 @@ function removeFile(index: number) {
 
       <!-- Load Demo Button -->
       <button
+        data-tour="load-demo"
         @click="handleLoadDemo"
         :disabled="props.isLoading"
         :class="[

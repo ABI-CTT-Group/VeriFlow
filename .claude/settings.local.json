@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn add:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(node -e:*)"
+    ]
+  }
+}

@@ -360,6 +360,7 @@ onMounted(() => {
           <div v-show="expandedCategories.has(section.id)" class="pb-2">
             <div v-for="item in section.items" :key="item.id">
               <div
+                :data-tour="section.id === 'output-measurements' ? 'output-measurements-card' : undefined"
                 class="mx-3 mb-2 border border-slate-200 rounded-lg overflow-hidden transition-all cursor-pointer"
                 :class="[
                   activeTab === 'active' && expandedItem === item.id ? '' : 'bg-white hover:shadow-sm hover:border-blue-300'

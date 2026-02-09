@@ -26,12 +26,12 @@ interface SelectedItem {
 interface WorkflowStep {
   id: string
   description: string
-  tool: {
+  tool?: {
           id: string,
           name: string
         }
-  input: Array<{ name: string, type: string }>
-  output: Array<{ name: string, type: string }>
+  input?: Array<{ name: string, type: string }>
+  output?: Array<{ name: string, type: string }>
 }
 
 withDefaults(defineProps<Props>(), {
@@ -61,7 +61,7 @@ const assays = computed(() => study.value?.assays || [])
 // For now, we display the store values directly or fallback
 
 const paperTitle = computed({
-  get: () => hierarchy.value?.paper?.title || 'No Paper Title',
+  get: () => hierarchy.value?.paper?.title || 'A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations',
   set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.title = val }
 })
 const paperAuthors = computed({
@@ -114,6 +114,18 @@ watch(() => selectedItem.value, (newItem) => {
         }))
     }
 })
+
+function getStepName(step: WorkflowStep) {
+  return step.tool ? step.tool.name : step.description
+}
+
+function setStepName(step: WorkflowStep, value: string) {
+  if (step.tool) {
+    step.tool.name = value
+  } else {
+    step.description = value
+  }
+}
 
 // --- Interaction Handlers ---
 
@@ -176,7 +188,7 @@ function handleSourceClick() {
 </script>
 
 <template>
-  <div class="flex-1 border-b border-slate-200 bg-white flex flex-col overflow-hidden h-full">
+  <div class="flex-1 border-b border-slate-200 bg-white flex flex-col overflow-hidden h-full" data-tour="study-design">
     <!-- Header -->
     <div
       class="w-full flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white"
@@ -236,6 +248,7 @@ function handleSourceClick() {
               <div class="ml-6 space-y-1">
                 <!-- Investigation -->
                 <div
+                  data-tour="investigation-field"
                   :class="[
                     'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
                     selectedItem?.id === investigation?.identifier ? selectedItemClass : hoverClass
@@ -249,6 +262,7 @@ function handleSourceClick() {
                 <div class="ml-6 space-y-1">
                   <!-- Study -->
                   <div
+                    data-tour="study-field"
                     :class="[
                       'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
                       selectedItem?.id === study?.identifier ? selectedItemClass : hoverClass
@@ -264,6 +278,7 @@ function handleSourceClick() {
                     <div
                       v-for="assay in assays"
                       :key="assay.identifier"
+                      data-tour="assay-field"
                       :class="[
                         'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
                         selectedItem?.id === assay.identifier ? selectedItemClass : hoverClass
@@ -509,7 +524,8 @@ function handleSourceClick() {
                     <span class="text-xs text-slate-500 mt-2 w-6">{{ index + 1 }}.</span>
                     <input
                       type="text"
-                      v-model="step.tool.name"
+                      :value="getStepName(step)"
+                      @input="setStepName(step, ($event.target as HTMLInputElement).value)"
                       class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
@@ -539,6 +555,7 @@ function handleSourceClick() {
       <!-- Assemble Button -->
       <div v-if="selectedAssay && hasUploadedFiles" class="border-t border-slate-200 p-3 flex-shrink-0 bg-white">
         <button
+          data-tour="assemble-button"
           class="w-full px-4 py-2 text-sm rounded transition-colors bg-blue-600 text-white hover:bg-blue-700"
           @click="emit('assembleClick')"
         >
