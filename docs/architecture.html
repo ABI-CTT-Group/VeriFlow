@@ -87,6 +87,15 @@
             font-size: 12px;
             font-weight: 600;
         }
+        .langgraph-badge {
+            background: #7C4DFF;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -95,12 +104,16 @@
             <h1>VeriFlow &mdash; Architecture Diagram</h1>
             <p>Autonomous Research Reliability Engineer &bull; Gemini 3 Hackathon</p>
         </div>
-        <span class="gemini-badge">7 Gemini 3 Features</span>
+        <div>
+            <span class="gemini-badge">7 Gemini 3 Features</span>
+            <span class="langgraph-badge">LangGraph Orchestration</span>
+        </div>
     </header>
 
     <div class="legend">
         <div class="legend-item"><div class="legend-color" style="background:#4285F4"></div> Gemini 3 Models</div>
         <div class="legend-item"><div class="legend-color" style="background:#E8F0FE;border:1px solid #4285F4"></div> Gemini 3 Features</div>
+        <div class="legend-item"><div class="legend-color" style="background:#7C4DFF"></div> LangGraph Nodes</div>
         <div class="legend-item"><div class="legend-color" style="background:#34A853"></div> AI Agents &amp; SDK Client</div>
         <div class="legend-item"><div class="legend-color" style="background:#FBBC04"></div> Frontend Components</div>
         <div class="legend-item"><div class="legend-color" style="background:#EA4335"></div> Backend Services</div>
@@ -120,15 +133,14 @@ graph TB
         App["App.vue &mdash; 4-Panel Layout"]
 
         subgraph LeftPanel["Left Panel"]
-            Upload["UploadModule.vue<br/>PDF Upload + Demo"]
+            Upload["UploadModule.vue<br/>PDF Upload + MAMA-MIA Demo"]
             StudyDesign["StudyDesignModule.vue<br/>ISA Hierarchy + Confidence Scores"]
         end
 
         subgraph CenterPanel["Center Panel"]
-            Workflow["WorkflowAssemblerModule.vue<br/>Vue Flow Graph Canvas"]
-            GraphNode["GraphNode.vue<br/>Custom Node Types"]
+            WorkflowUI["WorkflowAssemblerModule.vue<br/>Vue Flow Graph Canvas"]
+            GraphNode["GraphNode.vue &bull; Custom Nodes"]
             Catalogue["DataObjectCatalogue.vue"]
-            Viewer["ViewerPanel.vue"]
         end
 
         subgraph RightPanel["Right Panel"]
@@ -136,48 +148,57 @@ graph TB
         end
 
         subgraph BottomPanel["Bottom Panel"]
-            Console["ConsoleModule.vue<br/>Real-time Agent Logs"]
+            ConsoleUI["ConsoleModule.vue<br/>Real-time Agent Streaming"]
+            SmartRender["SmartMessageRenderer.vue<br/>JSON / Markdown / Code"]
         end
 
-        Store["Pinia Store (workflow.ts)"]
+        Store["Pinia Stores (workflow.ts + console.ts)"]
         ApiService["API Service (axios)"]
+        WS_FE["WebSocket Service (websocket.ts)"]
     end
 
     subgraph Backend["FastAPI Backend (Port 8000)"]
         direction TB
         FastAPI["FastAPI App (main.py)"]
 
-        subgraph APIRouters["REST API &mdash; 5 Routers"]
+        subgraph APIRouters["REST API &mdash; 5 Routers + WebSocket"]
             PubAPI["publications"]
             WfAPI["workflows"]
-            ExecAPI["executions"]
-            CatAPI["catalogue"]
-            SetAPI["settings"]
+            CacheAPI["mamamia_cache"]
+            ChatAPI["chat (Plan &amp; Apply)"]
+            WSAPI["websockets /ws/{client_id}"]
         end
 
-        WS["WebSocket /ws/logs"]
+        subgraph LangGraphSG["LangGraph StateGraph (Self-Healing Loop)"]
+            direction LR
+            ScholarN["scholar_node<br/>PDF &rarr; ISA-JSON"]
+            EngineerN["engineer_node<br/>ISA &rarr; CWL + Docker"]
+            ValidateN["validate_node<br/>Artifact Checks"]
+            ReviewerN["reviewer_node<br/>Scientific Critique"]
 
-        subgraph Agents["Gemini 3 AI Agent System"]
+            ScholarN -->|"isa_json"| EngineerN
+            EngineerN -->|"generated_code"| ValidateN
+            ValidateN -->|"errors + retry &lt; 3"| EngineerN
+            ValidateN -->|"success / max retries"| ReviewerN
+        end
+
+        subgraph Agents["Gemini 3 AI Agents"]
             Scholar["ScholarAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
             Engineer["EngineerAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
             Reviewer["ReviewerAgent<br/>gemini-3-flash-preview<br/>Thinking: MEDIUM (8192)"]
         end
 
-        GeminiClient["GeminiClient<br/>google-genai SDK Wrapper"]
+        GeminiClient["GeminiClient<br/>google-genai SDK<br/>json_repair + async streaming"]
 
         subgraph CoreServices["Core Services"]
+            VFS["VeriFlowService"]
+            WSM["WebSocketManager"]
+            DBS["SQLiteDB"]
             CWLParser["CWLParser"]
             DAGGen["DAGGenerator"]
             DockerBuild["DockerBuilder"]
             ExecEngine["ExecutionEngine"]
             SDSExport["SDSExporter"]
-            PromptMgr["PromptManager"]
-        end
-
-        subgraph DataServices["Data Services"]
-            DBService["DatabaseService (asyncpg)"]
-            MinIOSvc["MinIOService (S3)"]
-            AirflowClient["AirflowClient (httpx)"]
         end
     end
 
@@ -193,13 +214,15 @@ graph TB
             F4["4. Native PDF Upload"]
             F5["5. Thought Signature Preservation"]
             F6["6. Agentic Vision"]
-            F7["7. Agentic Function Calling"]
+            F7["7. Async Streaming"]
         end
     end
 
     subgraph DataLayer["Data Layer"]
-        Postgres[("PostgreSQL 15 (5432)")]
-        MinIO[("MinIO S3 (9000/9001)<br/>4 Buckets")]
+        SQLite[("SQLite &mdash; Sessions")]
+        Postgres[("PostgreSQL 15 &mdash; Airflow")]
+        MinIO[("MinIO S3 &mdash; 4 Buckets")]
+        Logs[("File System &mdash; Agent Logs")]
     end
 
     subgraph Execution["Workflow Execution"]
@@ -207,38 +230,38 @@ graph TB
         AirflowSched["Airflow Scheduler"]
         DIND["Docker-in-Docker"]
         CWLRunner["CWL Runner (cwltool)"]
+        Sandbox["VeriFlow Sandbox"]
     end
 
     User -->|Browser| Frontend
     App --> LeftPanel & CenterPanel & RightPanel & BottomPanel
-    Store --> ApiService
+    Store --> ApiService & WS_FE
     ApiService -->|"REST /api/v1"| FastAPI
-    Console -.->|"WebSocket"| WS
+    WS_FE <-->|"WebSocket"| WSAPI
 
-    FastAPI --> APIRouters & WS
-    PubAPI --> Scholar
-    WfAPI --> Engineer & Reviewer
-    ExecAPI --> ExecEngine & SDSExport
+    FastAPI --> APIRouters
+    VFS --> LangGraphSG
+    ChatAPI --> GeminiClient & VFS
+    WfAPI --> VFS
 
-    Scholar --> GeminiClient
-    Engineer --> GeminiClient
-    Reviewer --> GeminiClient
-
+    ScholarN & EngineerN & ReviewerN --> GeminiClient
+    Scholar & Engineer & Reviewer --> GeminiClient
     GeminiClient -->|"google-genai SDK"| GemPro & GemFlash
 
     Scholar -.->|Uses| F1 & F2 & F3 & F4 & F6
     Engineer -.->|Uses| F1 & F2 & F5 & F7
     Reviewer -.->|Uses| F1 & F2 & F5
 
-    ExecEngine --> CWLParser & DAGGen & DockerBuild & AirflowClient
-    DBService --> Postgres
-    MinIOSvc --> MinIO
+    DBS --> SQLite
+    ExecEngine --> CWLParser & DAGGen & DockerBuild
+    LangGraphSG -->|"Log outputs"| Logs
 
-    AirflowClient -->|REST| AirflowAPI
+    ExecEngine -->|REST| AirflowAPI
     AirflowAPI --> AirflowSched
     AirflowSched -->|DockerOperator| DIND
     DIND --> CWLRunner
     CWLRunner --> MinIO
+    AirflowAPI --> Postgres
 
     classDef gemini fill:#4285F4,stroke:#1a73e8,color:#fff,stroke-width:2px
     classDef geminiFeature fill:#E8F0FE,stroke:#4285F4,color:#1a73e8,stroke-width:1px
@@ -247,14 +270,16 @@ graph TB
     classDef service fill:#EA4335,stroke:#c5221f,color:#fff,stroke-width:2px
     classDef storage fill:#9AA0A6,stroke:#5f6368,color:#fff,stroke-width:2px
     classDef execution fill:#FF6D01,stroke:#e85d00,color:#fff,stroke-width:2px
+    classDef langgraph fill:#7C4DFF,stroke:#651FFF,color:#fff,stroke-width:2px
 
     class GemPro,GemFlash gemini
     class F1,F2,F3,F4,F5,F6,F7 geminiFeature
     class Scholar,Engineer,Reviewer,GeminiClient agent
-    class App,Upload,StudyDesign,Workflow,DatasetNav,Console,Store,ApiService,GraphNode,Catalogue,Viewer frontend
-    class CWLParser,DAGGen,DockerBuild,ExecEngine,SDSExport,PromptMgr,DBService,MinIOSvc,AirflowClient service
-    class Postgres,MinIO storage
-    class AirflowAPI,AirflowSched,DIND,CWLRunner execution
+    class ScholarN,EngineerN,ValidateN,ReviewerN langgraph
+    class App,Upload,StudyDesign,WorkflowUI,DatasetNav,ConsoleUI,Store,ApiService,WS_FE,GraphNode,Catalogue,SmartRender frontend
+    class CWLParser,DAGGen,DockerBuild,ExecEngine,SDSExport,VFS,WSM,DBS service
+    class SQLite,Postgres,MinIO,Logs storage
+    class AirflowAPI,AirflowSched,DIND,CWLRunner,Sandbox execution
         </pre>
     </div>
 
