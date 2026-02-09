@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pin cwltool to the specified version or higher
 RUN pip install --no-cache-dir "cwltool>=3.1.20231114134824" cwlref-runner
 
+RUN mkdir /workflows
+RUN mkdir /input_data
+
 WORKDIR /workflows
 
 # Provide the entrypoint for the runner

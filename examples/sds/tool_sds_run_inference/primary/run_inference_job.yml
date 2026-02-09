@@ -3,11 +3,11 @@
 
 input_images:
   class: Directory
-  path: /data
+  path: /input_data
 
 pre_trained_network:
   class: Directory
-  path: /data/nnUNet_results
+  path: /input_data/nnUNet_results
 
 # Optional - using defaults:
 # dataset_name: "new_dataset"
