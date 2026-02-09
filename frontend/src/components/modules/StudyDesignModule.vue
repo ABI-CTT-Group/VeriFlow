@@ -26,6 +26,12 @@ interface SelectedItem {
 interface WorkflowStep {
   id: string
   description: string
+  tool: {
+          id: string,
+          name: string
+        }
+  input: Array<{ name: string, type: string }>
+  output: Array<{ name: string, type: string }>
 }
 
 withDefaults(defineProps<Props>(), {
@@ -136,7 +142,13 @@ function handleNodeClick(id: string, type: SelectedItem['type'], name: string, d
 function addStep() {
   workflowSteps.value.push({
     id: `step-${Date.now()}`,
-    description: 'New workflow step'
+    description: 'New workflow step',
+    tool: {
+      id: 'tool-1',
+      name: 'Example Tool'
+    },
+    input: [],
+    output: []
   })
 }
 
@@ -497,7 +509,7 @@ function handleSourceClick() {
                     <span class="text-xs text-slate-500 mt-2 w-6">{{ index + 1 }}.</span>
                     <input
                       type="text"
-                      v-model="step.description"
+                      v-model="step.tool.name"
                       class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
