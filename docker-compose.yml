@@ -11,7 +11,7 @@ services:
     volumes:
       - ./examples:/opt/airflow/cwl
       - ./cwl/workflows:/workflows
-      - ./cwl/data:/data
+      - ./cwl/input_data:/input_data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     networks:
@@ -211,7 +211,7 @@ services:
       - HOME=/tmp
     volumes:
       - ./cwl/workflows:/workflows
-      - ./cwl/data:/data
+      - ./cwl/input_data:/input_data
       - ./cwl/output:/output
       - cwl-tmp:/tmp
     working_dir: /workflows
