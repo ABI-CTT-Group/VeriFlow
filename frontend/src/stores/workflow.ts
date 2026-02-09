@@ -215,7 +215,9 @@ export const useWorkflowStore = defineStore('workflow', () => {
                         }
 
                         try {
-                            consoleStore.addSystemMessage(`Checking for Scholar results... (Attempt ${attempt})`)
+                            if (attempt <= 2) {
+                                consoleStore.addSystemMessage(`Checking for Scholar results... (Attempt ${attempt})`)
+                            }
                             const artifactRes = await endpoints.getArtifact(runId, 'scholar')
 
                             if (artifactRes.status === 200 && artifactRes.data) {

@@ -1,12 +1,13 @@
 {
   "inputs": {
     "generated_code_keys": [
-      "tcia_data_retriever.cwl",
-      "nnunet_segmentation.cwl",
-      "manual_annotation_tool.cwl",
-      "model_training.cwl",
-      "workflow.cwl",
-      "Dockerfile"
+      "Dockerfile",
+      "step1_dicom_convert.cwl",
+      "step2_standardize.cwl",
+      "step3_inference.cwl",
+      "step4_correction.cwl",
+      "step5_metrics.cwl",
+      "workflow.cwl"
     ]
   },
   "final_output": {
