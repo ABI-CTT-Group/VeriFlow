@@ -10,11 +10,11 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 
-# --- Imports from Original File (Design Mode) ---
+# --- Imports for Design/Assembly Mode ---
 from app.models.workflow import (
     NodeType,
     Position,
@@ -29,7 +29,7 @@ from app.models.workflow import (
     NodeStatus,
 )
 
-# --- Imports for Execution Mode ---
+# --- Imports for Execution/Restart Mode ---
 from app.services.veriflow_service import veriflow_service
 from app.services.database_sqlite import database_service
 from app.services.websocket_manager import manager
@@ -63,7 +63,7 @@ class RestartRequest(BaseModel):
     clear_directives: bool = False
 
 # ==============================================================================
-# EXECUTION RESULTS ENDPOINT (The fix for your frontend issue)
+# EXECUTION RESULTS ENDPOINT
 # ==============================================================================
 
 @router.get("/veriflow/results/{run_id}")
@@ -185,7 +185,7 @@ async def restart_workflow_execution(
 
 
 # ==============================================================================
-# EXISTING ENDPOINTS (Design & Assembly - Preserved)
+# DESIGN MODE ENDPOINTS (Original Functionality)
 # ==============================================================================
 
 @router.post("/workflows/assemble", response_model=AssembleResponse)
@@ -275,7 +275,7 @@ async def assemble_workflow(request: AssembleRequest):
                 )
                 
             except Exception as e:
-                # Fall through to mock data
+                # Fall through to mock data if agent fails
                 pass
     
     # Fallback: Generate mock workflow graph based on MAMA-MIA example

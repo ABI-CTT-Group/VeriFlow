@@ -40,11 +40,13 @@
         .msg-header { font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; font-weight: bold; }
         
         /* Artifact Viewer */
-        .artifact-viewer { background: var(--code-bg); color: #a5b4fc; padding: 15px; border-radius: 4px; overflow: auto; font-family: monospace; font-size: 0.85rem; flex: 1; white-space: pre-wrap; }
-        .artifact-section { margin-bottom: 20px; border-bottom: 1px dashed #334155; padding-bottom: 20px; }
-        .artifact-title { color: var(--success); font-weight: bold; margin-bottom: 10px; display: block; }
-        .file-block { background: #1e293b; padding: 10px; border-radius: 4px; margin-top: 5px; }
-        .file-name { color: #e2e8f0; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #334155; display:block;}
+        .artifact-viewer { background: var(--code-bg); color: #a5b4fc; padding: 15px; border-radius: 4px; overflow: auto; font-family: monospace; font-size: 0.85rem; flex: 1; }
+        .artifact-section { margin-bottom: 25px; border-bottom: 1px dashed #334155; padding-bottom: 15px; }
+        .artifact-title { color: var(--success); font-weight: bold; margin-bottom: 10px; display: block; border-left: 3px solid var(--success); padding-left: 8px; font-size: 1rem; }
+        
+        .file-block { background: #1e293b; border-radius: 4px; margin-top: 10px; border: 1px solid #334155; overflow: hidden; }
+        .file-name { background: #334155; color: #fff; padding: 5px 10px; font-weight: bold; font-size: 0.8rem; border-bottom: 1px solid #475569; display:block;}
+        .file-content { padding: 10px; margin: 0; white-space: pre-wrap; overflow-x: auto; color: #e2e8f0; font-family: 'Consolas', monospace; }
 
         /* Tabs */
         .tabs { display: flex; gap: 10px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
@@ -125,7 +127,7 @@
                 <div id="artifactsContent" class="artifact-viewer">
                     Waiting for Engineer output...
                 </div>
-                <button class="secondary" onclick="fetchResults()" style="margin-top:10px;">Refresh Artifacts</button>
+                <button class="secondary" onclick="fetchResults()" style="margin-top:10px;">Force Refresh Artifacts</button>
             </div>
 
             <div id="view-restart" style="display:none; flex-direction:column; gap:15px;">
@@ -200,7 +202,9 @@
                 if (msg.data?.run_id) {
                     currentRunId = msg.data.run_id;
                     if(type === 'engineer_complete' || type === 'workflow_complete') {
-                        fetchResults(); // Auto-fetch
+                        // AUTO FETCH AND SHOW
+                        appendLog('System', 'Engineer complete. Fetching artifacts...');
+                        fetchResults(); 
                     }
                 }
             } else if (type === 'error') {
@@ -250,30 +254,37 @@
 
         async function fetchResults() {
             if (!currentRunId) return;
-            appendLog('System', 'Fetching generated artifacts...');
             
             try {
                 const res = await fetch(`${API_BASE}/veriflow/results/${currentRunId}`);
-                if(!res.ok) throw new Error("Failed to fetch results");
+                if(!res.ok) throw new Error("Failed to fetch results: " + res.status);
                 
                 const data = await res.json();
+                console.log("Raw Artifact Data:", data); // Debugging
+                
                 const container = document.getElementById('artifactsContent');
                 
-                // Format the output specifically for v3_standard structure
+                // Check if engineer data exists and has no error
                 if (data.engineer && !data.engineer.error) {
                     let displayHtml = "";
                     const eng = data.engineer;
 
                     // 1. Mapping Logic
                     if (eng.mapping_logic) {
-                        displayHtml += `<div class="artifact-section"><span class="artifact-title">Mapping Logic</span>${eng.mapping_logic}</div>`;
+                        displayHtml += `<div class="artifact-section">
+                            <span class="artifact-title">Mapping Logic</span>
+                            <div style="white-space: pre-wrap; color: #cbd5e1;">${escapeHtml(eng.mapping_logic)}</div>
+                        </div>`;
                     }
 
                     // 2. Workflow Files
                     if (eng.workflow) {
                         displayHtml += `<div class="artifact-section"><span class="artifact-title">Workflow Definition</span>`;
                         for (const [filename, content] of Object.entries(eng.workflow)) {
-                            displayHtml += `<div class="file-block"><span class="file-name">${filename}</span>${escapeHtml(content)}</div>`;
+                            displayHtml += `<div class="file-block">
+                                <span class="file-name">${filename}</span>
+                                <pre class="file-content">${escapeHtml(content)}</pre>
+                            </div>`;
                         }
                         displayHtml += `</div>`;
                     }
@@ -282,11 +293,14 @@
                     if (eng.components && Array.isArray(eng.components)) {
                         displayHtml += `<div class="artifact-section"><span class="artifact-title">Workflow Components</span>`;
                         eng.components.forEach(comp => {
-                            displayHtml += `<div style="margin-left:10px; margin-bottom:15px;">`;
-                            displayHtml += `<div style="color:#38bdf8; font-weight:bold;">Step: ${comp.step_name}</div>`;
+                            displayHtml += `<div style="margin-left:10px; margin-bottom:20px;">`;
+                            displayHtml += `<div style="color:#38bdf8; font-weight:bold; margin-bottom:5px;">Step: ${comp.step_name}</div>`;
                             if (comp.files) {
                                 for (const [filename, content] of Object.entries(comp.files)) {
-                                    displayHtml += `<div class="file-block"><span class="file-name">${filename}</span>${escapeHtml(content)}</div>`;
+                                    displayHtml += `<div class="file-block">
+                                        <span class="file-name">${filename}</span>
+                                        <pre class="file-content">${escapeHtml(content)}</pre>
+                                    </div>`;
                                 }
                             }
                             displayHtml += `</div>`;
@@ -294,17 +308,26 @@
                         displayHtml += `</div>`;
                     }
                     
-                    // Fallback if structure is unknown
-                    if(!displayHtml) displayHtml = JSON.stringify(eng, null, 2);
+                    // Fallback
+                    if(!displayHtml) {
+                         displayHtml = `<div class="artifact-section"><span class="artifact-title">Raw Output</span><pre class="file-content">${escapeHtml(JSON.stringify(eng, null, 2))}</pre></div>`;
+                    }
                     
                     container.innerHTML = displayHtml;
+                    appendLog('System', 'Artifacts rendered successfully.');
                     
+                    // AUTO-SWITCH TAB
+                    switchTab('artifacts');
+                    
+                } else if (data.engineer && data.engineer.error) {
+                     container.innerHTML = `<div style="color:red">Error loading artifacts: ${data.engineer.error}</div>`;
                 } else {
                     container.innerText = "No engineer artifacts found yet.";
                 }
                 
             } catch(e) {
                 console.error(e);
+                appendLog('Error', 'Fetch failed: ' + e.message, true);
             }
         }
 
@@ -365,7 +388,14 @@
 
         // --- Helpers ---
         function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            if (text === null || text === undefined) return "";
+            if (typeof text !== 'string') text = JSON.stringify(text, null, 2);
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
         function appendLog(source, text, isError = false) {
@@ -381,7 +411,7 @@
             const history = document.getElementById('chatHistory');
             const div = document.createElement('div');
             div.className = `msg ${type}`;
-            div.innerHTML = `<div class="msg-header">${name}</div>${text.replace(/\n/g, '<br>')}`;
+            div.innerHTML = `<div class="msg-header">${name}</div>${escapeHtml(text).replace(/\n/g, '<br>')}`;
             history.appendChild(div);
             history.scrollTop = history.scrollHeight;
         }
