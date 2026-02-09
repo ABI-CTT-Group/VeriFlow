@@ -39,7 +39,7 @@ Built for the [Gemini 3 Hackathon](https://gemini3.devpost.com/).
 
 ## About
 
-VeriFlow is an end-to-end platform that tackles the **research reproducibility crisis** by autonomously converting scientific publications into executable computational workflows. Given a PDF of a research paper, VeriFlow uses three specialized Gemini 3 AI agents to extract the methodology, generate standards-compliant CWL v1.3 workflows with Docker containers, validate them, and execute them via Apache Airflow 3 — producing fully traceable, SPARC SDS-compliant results.
+VeriFlow is an end-to-end platform that tackles the **research reproducibility crisis** by autonomously converting scientific publications into executable computational workflows. Given a PDF of a research paper, VeriFlow uses a **LangGraph-orchestrated pipeline** of three specialized Gemini 3 AI agents to extract the methodology, generate standards-compliant CWL v1.3 workflows with Docker containers, validate them through a self-healing retry loop, and review the output for scientific correctness — all with real-time WebSocket streaming to an interactive Vue 3 frontend.
 
 **Note**: This project was built for the [Gemini 3 Hackathon](https://gemini3.devpost.com/).
 
@@ -60,12 +60,12 @@ Scientific research faces a **reproducibility crisis**: studies report that 70%+
 
 VeriFlow bridges the gap between scientific publications and executable workflows through an autonomous, AI-driven pipeline:
 
-1. **Upload** a scientific publication (PDF)
+1. **Upload** a scientific publication (PDF) with optional user context
 2. **Scholar Agent** (Gemini 3 Pro) extracts the full methodology as a structured ISA-JSON hierarchy using native PDF upload, grounding with Google Search, and agentic vision for diagram analysis
-3. **User selects** the specific assay/experiment to reproduce
-4. **Engineer Agent** (Gemini 3 Pro) generates a complete CWL v1.3 workflow with Dockerfiles, tool definitions, and a visual graph using agentic function calling with think-act-observe loops
-5. **Reviewer Agent** (Gemini 3 Flash) validates the workflow through combined local + semantic validation, with auto-fix capabilities using multi-turn thought signature preservation
-6. **Airflow 3** executes the validated workflow via Docker-in-Docker with real-time progress monitoring
+3. **Engineer Agent** (Gemini 3 Pro) generates a complete CWL v1.3 workflow with Dockerfiles, tool definitions, and infrastructure code using the extracted ISA-JSON and repository context
+4. **Validate Node** checks generated artifacts for structural correctness (Dockerfile has FROM, CWL has cwlVersion) — if errors are found, the self-healing loop retries the Engineer up to 3 times with error context
+5. **Reviewer Agent** (Gemini 3 Flash) critiques the final output for scientific correctness, comparing the ISA extraction against the generated code
+6. **Plan & Apply** — Users can chat with any agent, refine directives, and restart the workflow from any node
 7. **Export** results as a SPARC SDS-compliant ZIP with full provenance tracking
 
 ---
@@ -76,39 +76,44 @@ VeriFlow leverages **7 Gemini 3 features** through the `google-genai` SDK (`from
 
 | # | Feature | How It's Used | Agent(s) |
 |---|---------|---------------|----------|
-| 1 | **Pydantic Structured Output** | All agents use Pydantic `BaseModel` subclasses as `response_schema` parameter for type-safe, validated JSON responses (`AnalysisResult`, `WorkflowResult`, `ValidationResult`, `ErrorTranslationResult`) | All 3 |
+| 1 | **Pydantic Structured Output** | All agents use Pydantic `BaseModel` subclasses as `response_schema` parameter with `response_mime_type="application/json"` for type-safe, validated JSON responses (`AnalysisResult`, `WorkflowResult`, `ValidationResult`, `ErrorTranslationResult`) | All 3 |
 | 2 | **Thinking Level Control** | `ThinkingConfig(thinking_budget=N)` — HIGH (24,576 tokens) for complex scientific reasoning, MEDIUM (8,192) for validation, LOW (2,048) for error translation | All 3 |
 | 3 | **Grounding with Google Search** | `GoogleSearch()` tool verifies tool names, model architectures, and software references against the web during publication analysis | Scholar |
-| 4 | **Native PDF Upload** | `client.files.upload()` for multimodal publication ingestion — the entire PDF is sent to Gemini for full-document analysis | Scholar |
-| 5 | **Thought Signature Preservation** | `types.Part(thought=True, text=sig)` preserves reasoning chains across multi-turn conversations for iterative CWL generation and validation-fix loops | Engineer, Reviewer |
+| 4 | **Native PDF Upload** | `types.Part.from_bytes(data=file_data, mime_type="application/pdf")` for multimodal publication ingestion — the entire PDF is sent to Gemini for full-document analysis | Scholar |
+| 5 | **Thought Signature Preservation** | `_extract_thoughts()` captures reasoning chains from `response.candidates[].content.parts` where `part.thought == True`, preserving reasoning across multi-turn conversations for iterative CWL generation and validation-fix loops | Engineer, Reviewer |
 | 6 | **Agentic Vision** | Page image extraction via PyMuPDF for visual analysis of methodology diagrams, flowcharts, and figures | Scholar |
-| 7 | **Agentic Function Calling** | Think-Act-Observe loops for iterative CWL workflow generation with local validation feedback (max 3 iterations) | Engineer |
+| 7 | **Async Streaming** | `client.aio.models.generate_content_stream()` for real-time token-by-token streaming via WebSocket to the frontend console | All 3 |
 
 ### Agent Architecture
 
 | Agent | Model | Thinking Budget | Responsibilities |
 |-------|-------|-----------------|------------------|
 | **ScholarAgent** | `gemini-3-pro-preview` | HIGH (24,576) | PDF analysis, ISA-JSON extraction, confidence scoring, tool/model identification |
-| **EngineerAgent** | `gemini-3-pro-preview` | HIGH (24,576) | CWL v1.3 workflow generation, Dockerfile creation, Vue Flow graph layout |
-| **ReviewerAgent** | `gemini-3-flash-preview` | MEDIUM (8,192) | CWL syntax validation, type compatibility checking, auto-fix, error translation |
+| **EngineerAgent** | `gemini-3-pro-preview` | HIGH (24,576) | CWL v1.3 workflow generation, Dockerfile creation, infrastructure code |
+| **ReviewerAgent** | `gemini-3-flash-preview` | MEDIUM (8,192) | ISA vs code critique, scientific correctness validation, approval/rejection decision |
 
 ### GeminiClient — Central SDK Wrapper
 
-All Gemini 3 interactions go through a single `GeminiClient` class with three methods:
+All Gemini 3 interactions go through a single `GeminiClient` class:
 
 ```python
 from google import genai
 from google.genai import types
 
 class GeminiClient:
-    def analyze_file(self, file_path, prompt, response_schema, thinking_level, enable_grounding):
-        """Native PDF upload + structured output + thinking + grounding + local caching"""
+    model_name = "gemini-3.0-flash"  # Default fallback
 
-    def generate_text(self, prompt, response_schema, thinking_level):
-        """Text-only structured generation with thinking control"""
+    async def analyze_file(self, file_path, prompt, model, stream_callback):
+        """Native PDF upload via Part.from_bytes + JSON response + async streaming"""
 
-    def generate_with_history(self, messages, response_schema, thinking_level):
-        """Multi-turn with thought signature preservation via types.Part(thought=True)"""
+    async def generate_content(self, prompt, model, response_schema, stream_callback):
+        """Text-only structured generation with optional streaming"""
+
+    def _extract_thoughts(self, response) -> List[str]:
+        """Chain-of-thought extraction from response candidates"""
+
+    def _robust_parse_json(self, text) -> Dict:
+        """json_repair-based parsing for Markdown backticks and malformed JSON"""
 ```
 
 ---
@@ -123,18 +128,31 @@ graph TB
         SD[StudyDesignModule — ISA Hierarchy Viewer]
         UP[UploadModule — PDF Upload + Demo]
         DS[DatasetNavigationModule — Results & Export]
-        CS[ConsoleModule — Real-time Logs]
+        CS[ConsoleModule — Real-time Agent Streaming]
+        SMR[SmartMessageRenderer — JSON/Markdown/Code]
     end
 
     subgraph Backend["FastAPI Backend :8000"]
-        API[REST API — 5 Routers]
+        API[REST API — 5 Routers + WebSocket]
+        subgraph LG["LangGraph StateGraph"]
+            SN["scholar_node"]
+            EN["engineer_node"]
+            VN["validate_node"]
+            RN["reviewer_node"]
+            SN --> EN --> VN
+            VN -->|"errors + retry < 3"| EN
+            VN -->|"success or max retries"| RN
+        end
         subgraph Agents["Gemini 3 AI Agents"]
             SA["ScholarAgent\ngemini-3-pro-preview\nThinking: HIGH 24576"]
             EA["EngineerAgent\ngemini-3-pro-preview\nThinking: HIGH 24576"]
             RA["ReviewerAgent\ngemini-3-flash-preview\nThinking: MEDIUM 8192"]
         end
-        GC["GeminiClient\ngoogle-genai SDK"]
+        GC["GeminiClient\ngoogle-genai SDK\njson_repair + async streaming"]
         subgraph Services["Core Services"]
+            VFS[VeriFlowService — Workflow Orchestrator]
+            WSM[WebSocketManager — Real-time Streaming]
+            DBS[SQLiteDB — Session Storage]
             CWP[CWLParser]
             DAG[DAGGenerator]
             DB[DockerBuilder]
@@ -144,8 +162,10 @@ graph TB
     end
 
     subgraph Storage["Data Layer"]
-        PG[(PostgreSQL 15)]
-        MN[(MinIO S3)]
+        SQ[(SQLite — Sessions)]
+        PG[(PostgreSQL 15 — Airflow)]
+        MN[(MinIO S3 — 4 Buckets)]
+        LF[(File System — Logs)]
     end
 
     subgraph Execution["Workflow Execution"]
@@ -158,61 +178,72 @@ graph TB
         G3["Google Gemini 3\nPro + Flash"]
     end
 
-    Frontend -->|REST /api/v1| API
-    API --> SA & EA & RA
+    Frontend <-->|"REST + WebSocket"| API
+    API --> LG
+    LG --> GC
     SA & EA & RA --> GC
-    GC -->|google-genai SDK| G3
+    GC -->|"google-genai SDK"| G3
     API --> Services
+    VFS --> LG
+    WSM -->|"WebSocket /ws/client_id"| Frontend
     EE --> CWP & DAG & DB
     EE -->|Trigger DAG| AF
     AF -->|DockerOperator| DIND
     DIND --> CWL
-    API --> PG & MN
+    VFS --> DBS --> SQ
+    API --> MN
     EE --> MN
+    AF --> PG
+    LG --> LF
 ```
 
-### Docker Compose — 9 Services
+### Docker Compose — 10 Services
 
 | Service | Port | Purpose |
 |---------|------|---------|
 | `backend` | 8000 | FastAPI backend (Python 3.11) |
 | `frontend` | 3000 | Vue 3 SPA via Nginx |
-| `postgres` | 5432 | PostgreSQL 15 database |
+| `postgres` | 5432 | PostgreSQL 15 (Airflow database) |
 | `minio` | 9000/9001 | S3-compatible object storage (4 buckets) |
 | `minio-init` | — | Ephemeral bucket initialization |
 | `airflow-apiserver` | 8080 | Airflow 3.0.6 REST API server |
 | `airflow-scheduler` | — | Airflow task scheduler (LocalExecutor) |
 | `dind` | — | Docker-in-Docker for CWL execution |
 | `cwl` | — | CWL runner (cwltool) |
+| `veriflow-sandbox` | — | Sandbox for script execution (PyTorch + nnU-Net) |
 
 ---
 
 ## Key Features
 
+### LangGraph-Orchestrated Multi-Agent Pipeline
+A `StateGraph` with 4 nodes (Scholar, Engineer, Validate, Reviewer) orchestrates the full PDF-to-workflow pipeline. Conditional edges enable a self-healing retry loop where validation failures automatically route back to the Engineer with error context, up to 3 iterations.
+
 ### Autonomous PDF-to-Workflow Pipeline
-Upload a scientific paper and VeriFlow autonomously extracts the methodology, generates executable workflows, validates them, and prepares them for execution — no manual intervention required.
+Upload a scientific paper and VeriFlow autonomously extracts the methodology, generates executable workflows, validates them through a self-healing loop, and reviews them for scientific correctness — no manual intervention required.
 
 ### ISA-JSON Study Design Extraction
-The Scholar Agent extracts structured investigation hierarchies following the ISA (Investigation-Study-Assay) standard, with per-field confidence scores and source page references.
+The Scholar Agent extracts structured investigation hierarchies following the ISA (Investigation-Study-Assay) standard, with per-field confidence scores and source page references using Gemini 3's native PDF upload.
 
 ### CWL v1.3 Workflow Generation
 The Engineer Agent produces standards-compliant Common Workflow Language workflows with:
-- Step-by-step `CommandLineTool` definitions
+- Step-by-step `CommandLineTool` definitions with `InitialWorkDirRequirement` embedded scripts
 - Auto-generated Dockerfiles for each tool
 - Data format adapters between incompatible step types
-- Visual workflow graph for the Vue Flow canvas
+- Repository context analysis (reads repo files up to 50KB for informed generation)
 
-### Iterative Validation with Auto-Fix
-The Reviewer Agent combines:
-- **Local validation**: cwltool syntax checking, type compatibility analysis, dependency resolution
-- **Semantic validation**: Gemini-powered analysis of scientific correctness
-- **Auto-fix loop**: Up to 3 iterations of validate-fix-regenerate using thought signature preservation
+### Self-Healing Validation Loop
+The Validate node checks generated artifacts and the LangGraph conditional edges route:
+- **Back to Engineer** (retry with error context) if validation fails and `retry_count < 3`
+- **Forward to Reviewer** (final critique) if validation passes or max retries reached
 
-### Real-time Workflow Execution
-Execute validated workflows through Apache Airflow 3.0.6 with:
-- Docker-in-Docker containerized execution via cwltool
-- Real-time WebSocket log streaming
-- Per-node progress tracking with status visualization
+### Plan & Apply — Interactive Agent Consultation
+Users can chat with any agent about their output, formulate specific directives, and restart the workflow from any node with those directives applied:
+- `POST /api/v1/chat/{run_id}/{agent_name}` — Discuss agent output
+- `POST /api/v1/chat/{run_id}/{agent_name}/apply` — Apply directive and restart
+
+### Real-time WebSocket Streaming
+All agent output is streamed token-by-token via WebSocket to the frontend console using Gemini 3's `generate_content_stream()` API, with the `SmartMessageRenderer` component providing intelligent rendering of JSON, Markdown, Dockerfiles, and CWL code blocks.
 
 ### SPARC SDS-Compliant Export
 Export results as a standards-compliant ZIP containing:
@@ -226,51 +257,65 @@ Vue 3 frontend with:
 - **Left**: PDF upload + ISA hierarchy viewer with confidence scores
 - **Center**: Interactive Vue Flow workflow graph with custom nodes
 - **Right**: Results visualization and SDS export
-- **Bottom**: Real-time console with agent log streaming
+- **Bottom**: Real-time console with agent streaming via SmartMessageRenderer
 
 ---
 
 ## Data Flow Pipeline
 
 ```
-Scientific Publication (PDF)
+Scientific Publication (PDF) + User Context + Repository Path
         |
         v
-  [Upload to MinIO + Temp File]
+  [POST /api/v1/orchestrate]
         |
         v
-  ScholarAgent (Gemini 3 Pro)
-  - Native PDF Upload
-  - Grounding with Google Search
-  - Pydantic Structured Output (AnalysisResult)
-  - Thinking: HIGH (24,576)
+  VeriFlowService.run_workflow()
         |
         v
-  ISA-JSON Hierarchy + Confidence Scores
+  +=== LangGraph StateGraph ================================+
+  |                                                          |
+  |  ScholarAgent (Gemini 3 Pro)                             |
+  |  - Native PDF Upload (Part.from_bytes)                   |
+  |  - Grounding with Google Search                          |
+  |  - Pydantic Structured Output (AnalysisResult)           |
+  |  - Thinking: HIGH (24,576) + Async Streaming             |
+  |        |                                                 |
+  |        v                                                 |
+  |  ISA-JSON Hierarchy + Confidence Scores                  |
+  |        |                                                 |
+  |        v                                                 |
+  |  EngineerAgent (Gemini 3 Pro)                            |
+  |  - Pydantic Structured Output (WorkflowResult)           |
+  |  - Repository Context (up to 50KB of source files)       |
+  |  - Previous validation_errors injected into prompt       |
+  |  - Thinking: HIGH (24,576) + Async Streaming             |
+  |        |                                                 |
+  |        v                                                 |
+  |  CWL Workflow + Dockerfiles + Infrastructure Code        |
+  |        |                                                 |
+  |        v                                                 |
+  |  Validate Node (System)                                  |
+  |  - Dockerfile has FROM instruction?                      |
+  |  - CWL has cwlVersion declaration?                       |
+  |        |                                                 |
+  |    Valid? --No + retry<3--> Back to Engineer              |
+  |        |                                                 |
+  |       Yes (or max retries)                               |
+  |        |                                                 |
+  |        v                                                 |
+  |  ReviewerAgent (Gemini 3 Flash)                          |
+  |  - ISA vs Generated Code critique                        |
+  |  - Thought Signature Preservation                        |
+  |  - Thinking: MEDIUM (8,192) + Async Streaming            |
+  |  - Decision: approved / rejected                         |
+  |                                                          |
+  +=========================================================+
         |
-        v
-  [User Selects Assay]
+        v (WebSocket streaming throughout)
+  Vue 3 Frontend — Real-time Console + ISA Viewer + Graph
         |
-        v
-  EngineerAgent (Gemini 3 Pro)
-  - Pydantic Structured Output (WorkflowResult)
-  - Agentic Function Calling (validate-fix loops)
-  - Thinking: HIGH (24,576)
-        |
-        v
-  CWL Workflow + Dockerfiles + Vue Flow Graph
-        |
-        v
-  ReviewerAgent (Gemini 3 Flash)
-  - Pydantic Structured Output (ValidationResult)
-  - Thought Signature Preservation
-  - Thinking: MEDIUM (8,192)
-        |
-    Valid? --No--> Auto-Fix Loop (max 3 iterations)
-        |
-       Yes
-        |
-        v
+        v (optional)
   ExecutionEngine --> CWLParser --> DAGGenerator
         |
         v
@@ -287,10 +332,12 @@ Scientific Publication (PDF)
 | Layer | Technology |
 |-------|------------|
 | **AI** | Gemini 3 (`google-genai` SDK) — `gemini-3-pro-preview`, `gemini-3-flash-preview` |
-| **Backend** | Python 3.11, FastAPI, Pydantic, uvicorn |
-| **Frontend** | Vue 3.5, Vue Flow 1.41, Pinia, Tailwind CSS 4, TypeScript, Vite 6 |
+| **Orchestration** | LangGraph (`StateGraph` with conditional edges, self-healing retry loop) |
+| **Backend** | Python 3.11, FastAPI, Pydantic, uvicorn, json-repair |
+| **Frontend** | Vue 3.5, Vue Flow 1.41, Pinia, Tailwind CSS 4, TypeScript, Vite 6, markdown-it |
+| **Real-time** | WebSocket (FastAPI native), SmartMessageRenderer |
 | **Execution** | Apache Airflow 3.0.6 (LocalExecutor), CWL v1.3, Docker-in-Docker, cwltool |
-| **Storage** | PostgreSQL 15, MinIO (S3-compatible, 4 buckets) |
+| **Storage** | SQLite (sessions), PostgreSQL 15 (Airflow), MinIO (S3-compatible, 4 buckets) |
 | **Standards** | ISA-JSON, SPARC SDS, CWL v1.3, W3C PROV |
 
 ---
@@ -345,24 +392,31 @@ npm run dev
 VeriFlow/
 +-- backend/                     # Python FastAPI backend
 |   +-- app/
-|   |   +-- agents/              # ScholarAgent, EngineerAgent, ReviewerAgent
-|   |   +-- api/                 # 5 REST API routers
+|   |   +-- agents/              # ScholarAgent, EngineerAgent, ReviewerAgent (class-based)
+|   |   +-- api/                 # 5 REST API routers + WebSocket endpoint
+|   |   +-- graph/               # LangGraph StateGraph + node implementations
+|   |   |   +-- workflow.py      # StateGraph definition with conditional edges
+|   |   |   +-- nodes.py         # scholar_node, engineer_node, validate_node, reviewer_node
 |   |   +-- models/              # Pydantic schemas (Gemini structured output)
-|   |   +-- services/            # GeminiClient, CWLParser, DAGGenerator, etc.
+|   |   +-- services/            # GeminiClient, VeriFlowService, WebSocketManager, SQLiteDB
+|   |   +-- state.py             # AgentState TypedDict (LangGraph shared state)
 |   |   +-- main.py              # FastAPI entry point
 |   +-- config.yaml              # Agent model & thinking level configuration
 |   +-- prompts.yaml             # Versioned prompt templates per agent
-|   +-- tests/                   # 163 pytest tests (unit + integration)
+|   +-- examples/                # Pre-computed agent outputs for MAMA-MIA demo
+|   +-- tests/                   # pytest tests (unit + integration)
 +-- frontend/                    # Vue 3 + TypeScript + Tailwind CSS 4
 |   +-- src/
-|   |   +-- components/          # 17 Vue components
-|   |   +-- stores/              # Pinia workflow store
-|   |   +-- services/            # API client (axios)
+|   |   +-- components/          # Vue components including SmartMessageRenderer
+|   |   +-- stores/              # Pinia workflow + console stores
+|   |   +-- services/            # API client (axios) + WebSocket service
 |   |   +-- utils/               # dagre layout utilities
 +-- airflow/                     # Custom Airflow 3.0.6 image + DAGs
 +-- cwl/                         # CWL runner service (cwltool)
-+-- docs/                        # Architecture diagrams (Mermaid, draw.io)
-+-- docker-compose.yml           # 9-service orchestration
++-- sandbox/                     # Sandbox Docker environment (PyTorch + nnU-Net)
++-- docs/                        # Architecture diagrams (Mermaid, draw.io, about, testing)
++-- docker-compose.yml           # 10-service orchestration (development)
++-- docker-compose.prod.yml      # Production configuration (GHCR images)
 +-- .env.example                 # Environment variable template
 +-- SPEC.md                      # Technical specification
 ```
@@ -372,7 +426,7 @@ VeriFlow/
 ## Testing
 
 ```bash
-# Backend unit tests (163 tests)
+# Backend unit tests
 cd backend && python -m pytest tests/ -v
 
 # Backend tests in Docker

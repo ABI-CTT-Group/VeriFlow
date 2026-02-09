@@ -7,12 +7,10 @@ graph TB
     %% ===== FRONTEND LAYER =====
     subgraph Frontend["Vue 3 Frontend (Port 3000)"]
         direction TB
-        App["App.vue<br/>4-Panel Layout"]
-        Landing["LandingPageOverlay.vue"]
-        Config["ConfigurationPanel.vue"]
+        App["App.vue<br/>4-Panel Responsive Layout"]
 
         subgraph LeftPanel["Left Panel"]
-            Upload["UploadModule.vue<br/>PDF Upload + Demo"]
+            Upload["UploadModule.vue<br/>PDF Upload + MAMA-MIA Demo"]
             StudyDesign["StudyDesignModule.vue<br/>ISA Hierarchy + Confidence Scores"]
             AdditionalInfo["AdditionalInfoModal.vue"]
         end
@@ -22,60 +20,83 @@ graph TB
             GraphNode["GraphNode.vue<br/>Custom Node Types"]
             ConnLine["ConnectionLine.vue<br/>Custom Edges"]
             Catalogue["DataObjectCatalogue.vue<br/>Tools / Models / Data"]
-            Viewer["ViewerPanel.vue<br/>PDF Viewer"]
+            ViewerPanel["ViewerPanel.vue<br/>PDF Viewer"]
         end
 
         subgraph RightPanel["Right Panel"]
-            DatasetNav["DatasetNavigationModule.vue<br/>Results & SDS Export"]
+            DatasetNav["DatasetNavigationModule.vue<br/>Results &amp; SDS Export"]
             FileTree["FileTreeNode.vue"]
         end
 
         subgraph BottomPanel["Bottom Panel"]
-            Console["ConsoleModule.vue<br/>Real-time Agent Logs"]
+            Console["ConsoleModule.vue<br/>Real-time Agent Streaming"]
             ConsoleInput["ConsoleInput.vue"]
+            SmartRender["SmartMessageRenderer.vue<br/>JSON / Markdown / Code"]
         end
 
-        Store["Pinia Store<br/>(workflow.ts)"]
-        ApiService["API Service<br/>(axios)"]
-        DagreLayout["dagre Layout Engine<br/>(LR auto-layout)"]
+        Store["Pinia Stores<br/>(workflow.ts + console.ts)"]
+        ApiService["API Service (axios)"]
+        WS_FE["WebSocket Service<br/>(websocket.ts)"]
+        DagreLayout["dagre Layout Engine (LR)"]
     end
 
     %% ===== BACKEND LAYER =====
     subgraph Backend["FastAPI Backend (Port 8000)"]
         direction TB
-        FastAPI["FastAPI App<br/>(main.py)"]
+        FastAPI["FastAPI App (main.py)"]
 
-        subgraph APIRouters["REST API Routers"]
-            PubAPI["publications<br/>POST /upload<br/>POST /load-example<br/>GET /study-design"]
-            WfAPI["workflows<br/>POST /assemble<br/>GET /:id"]
-            ExecAPI["executions<br/>POST /<br/>GET /:id<br/>GET /:id/export"]
-            CatAPI["catalogue<br/>GET /catalogue<br/>PUT /:id"]
-            SetAPI["settings<br/>POST /gemini-key"]
+        subgraph APIRouters["REST API &mdash; 5 Routers"]
+            PubAPI["publications<br/>PDF upload, study design"]
+            WfAPI["workflows<br/>assemble, restart, status"]
+            CacheAPI["mamamia_cache<br/>Pre-cached demo data"]
+            ChatAPI["chat<br/>Plan &amp; Apply consultation"]
+            WSAPI["websockets<br/>/ws/{client_id}"]
         end
 
-        WS["WebSocket<br/>/ws/logs"]
+        subgraph LangGraphSG["LangGraph StateGraph"]
+            direction LR
+            ScholarN["scholar_node<br/>PDF → ISA-JSON"]
+            EngineerN["engineer_node<br/>ISA → CWL + Docker"]
+            ValidateN["validate_node<br/>Artifact Checks"]
+            ReviewerN["reviewer_node<br/>Scientific Critique"]
 
-        subgraph Agents["Gemini 3 AI Agent System"]
-            Scholar["ScholarAgent<br/>PDF Analysis<br/>ISA-JSON Extraction<br/>Confidence Scoring"]
-            Engineer["EngineerAgent<br/>CWL v1.3 Generation<br/>Dockerfile Creation<br/>Vue Flow Graph"]
-            Reviewer["ReviewerAgent<br/>CWL Validation<br/>Auto-Fix Loop<br/>Error Translation"]
+            ScholarN -->|"isa_json"| EngineerN
+            EngineerN -->|"generated_code"| ValidateN
+            ValidateN -->|"errors + retry &lt; 3"| EngineerN
+            ValidateN -->|"success / max retries"| ReviewerN
         end
 
-        GeminiClient["GeminiClient<br/>(gemini_client.py)<br/>google-genai SDK Wrapper"]
+        subgraph AgentState["AgentState (TypedDict)"]
+            STATE["run_id, pdf_path, repo_path<br/>user_context, isa_json<br/>generated_code, validation_errors<br/>retry_count, review_decision<br/>agent_directives, client_id"]
+        end
+
+        subgraph Agents["Gemini 3 AI Agents (Class-Based)"]
+            Scholar["ScholarAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
+            Engineer["EngineerAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
+            Reviewer["ReviewerAgent<br/>gemini-3-flash-preview<br/>Thinking: MEDIUM (8192)"]
+        end
+
+        GeminiClient["GeminiClient<br/>google-genai SDK Wrapper<br/>json_repair + async streaming"]
 
         subgraph CoreServices["Core Services"]
+            VFS["VeriFlowService<br/>run_workflow() / restart_workflow()"]
+            WSM["WebSocketManager<br/>client_id → WebSocket mapping"]
+            DBS["SQLiteDB<br/>db/veriflow.db"]
             PromptMgr["PromptManager<br/>(prompts.yaml)"]
-            CWLParser["CWLParser<br/>CWL v1.3 YAML Parsing<br/>Dependency Resolution<br/>Topological Sort"]
-            DAGGen["DAGGenerator<br/>CWL → Airflow DAG<br/>Python Code Generation"]
-            DockerBuild["DockerBuilder<br/>Dockerfile Generation<br/>Image Management"]
-            ExecEngine["ExecutionEngine<br/>Workflow Orchestration<br/>Status Monitoring"]
-            SDSExport["SDSExporter<br/>SPARC SDS ZIP<br/>Provenance Tracking"]
+            AppCfg["AppConfig<br/>(config.yaml)"]
+        end
+
+        subgraph ExecutionServices["Execution Services"]
+            CWLParser["CWLParser<br/>CWL v1.3 YAML"]
+            DAGGen["DAGGenerator<br/>CWL → Airflow DAG"]
+            DockerBuild["DockerBuilder<br/>Dockerfile Generation"]
+            ExecEngine["ExecutionEngine<br/>Workflow Orchestration"]
+            SDSExport["SDSExporter<br/>SPARC SDS ZIP"]
         end
 
         subgraph DataServices["Data Services"]
-            DBService["DatabaseService<br/>(asyncpg)"]
-            MinIOSvc["MinIOService<br/>(S3 Client)"]
-            AirflowClient["AirflowClient<br/>(httpx REST)"]
+            MinIOSvc["MinIOService (S3 Client)"]
+            AirflowClient["AirflowClient (httpx REST)"]
         end
     end
 
@@ -85,30 +106,32 @@ graph TB
         GemPro["gemini-3-pro-preview<br/>Complex Reasoning"]
         GemFlash["gemini-3-flash-preview<br/>Fast Validation"]
 
-        subgraph GeminiFeatures["Gemini 3 Features Used"]
+        subgraph GeminiFeatures["7 Gemini 3 Features"]
             F1["1. Pydantic Structured Output<br/>response_schema parameter"]
             F2["2. Thinking Level Control<br/>ThinkingConfig(thinking_budget)"]
             F3["3. Grounding with Google Search<br/>GoogleSearch() tool"]
-            F4["4. Native PDF Upload<br/>client.files.upload()"]
-            F5["5. Thought Signature Preservation<br/>types.Part(thought=True)"]
+            F4["4. Native PDF Upload<br/>Part.from_bytes(mime_type=pdf)"]
+            F5["5. Thought Signature Preservation<br/>_extract_thoughts()"]
             F6["6. Agentic Vision<br/>Page Image Extraction"]
-            F7["7. Agentic Function Calling<br/>Think-Act-Observe Loops"]
+            F7["7. Async Streaming<br/>generate_content_stream()"]
         end
     end
 
     %% ===== DATA LAYER =====
     subgraph DataLayer["Data Layer"]
-        Postgres[("PostgreSQL 15<br/>(Port 5432)<br/>Sessions + Executions<br/>+ Conversation History")]
-        MinIO[("MinIO S3<br/>(Ports 9000/9001)<br/>4 Buckets:<br/>measurements | workflow<br/>workflow-tool | process")]
-        MinIOInit["minio-init<br/>Bucket Bootstrap"]
+        SQLite[("SQLite<br/>db/veriflow.db<br/>agent_sessions")]
+        Postgres[("PostgreSQL 15 (5432)<br/>Airflow Metadata")]
+        MinIO[("MinIO S3 (9000/9001)<br/>4 Buckets:<br/>measurements | workflow<br/>workflow-tool | process")]
+        Logs[("File System<br/>logs/{run_id}/<br/>Agent Output JSON")]
     end
 
     %% ===== EXECUTION LAYER =====
     subgraph Execution["Workflow Execution Layer"]
-        AirflowAPI["Airflow 3.0.6 API Server<br/>(Port 8080)"]
-        AirflowSched["Airflow Scheduler<br/>(LocalExecutor)"]
-        DIND["Docker-in-Docker<br/>(dind)"]
-        CWLRunner["CWL Runner<br/>(cwltool)"]
+        AirflowAPI["Airflow 3.0.6 API Server (8080)"]
+        AirflowSched["Airflow Scheduler (LocalExecutor)"]
+        DIND["Docker-in-Docker (dind)"]
+        CWLRunner["CWL Runner (cwltool)"]
+        Sandbox["VeriFlow Sandbox<br/>(PyTorch + nnU-Net)"]
     end
 
     %% ===== CONNECTIONS: User → Frontend =====
@@ -122,33 +145,30 @@ graph TB
     Workflow --> DagreLayout
     Workflow --> GraphNode & ConnLine
     DatasetNav --> Store
-    Console --> Store
-    Store --> ApiService
+    Console --> Store & SmartRender
+    Store --> ApiService & WS_FE
 
     %% ===== CONNECTIONS: Frontend → Backend =====
     ApiService -->|"REST /api/v1"| FastAPI
-    Console -.->|"WebSocket /ws/logs"| WS
+    WS_FE <-->|"WebSocket /ws/{client_id}"| WSAPI
 
     %% ===== CONNECTIONS: Backend Internal =====
     FastAPI --> APIRouters
-    FastAPI --> WS
     PubAPI --> Scholar
-    WfAPI --> Engineer
-    WfAPI --> Reviewer
-    ExecAPI --> ExecEngine
+    WfAPI --> VFS
+    CacheAPI --> WSM
+    ChatAPI --> GeminiClient & VFS
 
-    Scholar --> GeminiClient
-    Engineer --> GeminiClient
-    Reviewer --> GeminiClient
-    Scholar --> PromptMgr
-    Engineer --> PromptMgr
-    Reviewer --> PromptMgr
+    VFS --> LangGraphSG
+    LangGraphSG --> AgentState
 
-    ExecEngine --> CWLParser
-    ExecEngine --> DAGGen
-    ExecEngine --> DockerBuild
-    ExecEngine --> AirflowClient
-    ExecAPI --> SDSExport
+    ScholarN & EngineerN & ReviewerN --> GeminiClient
+    Scholar & Engineer & Reviewer --> GeminiClient
+    Scholar & Engineer & Reviewer --> PromptMgr
+
+    ExecEngine --> CWLParser & DAGGen & DockerBuild & AirflowClient
+
+    WSM -->|"send_message / broadcast"| WSAPI
 
     %% ===== CONNECTIONS: Backend → Gemini 3 API =====
     GeminiClient -->|"google-genai SDK"| GemPro
@@ -160,9 +180,9 @@ graph TB
     Reviewer -.->|"Uses"| F1 & F2 & F5
 
     %% ===== CONNECTIONS: Backend → Data Layer =====
-    DBService --> Postgres
+    DBS --> SQLite
     MinIOSvc --> MinIO
-    MinIOInit --> MinIO
+    LangGraphSG -->|"Log agent outputs"| Logs
 
     %% ===== CONNECTIONS: Backend → Execution =====
     AirflowClient -->|"REST API"| AirflowAPI
@@ -170,6 +190,7 @@ graph TB
     AirflowSched -->|"DockerOperator"| DIND
     DIND --> CWLRunner
     DAGGen -->|"Write DAG .py"| AirflowSched
+    AirflowAPI --> Postgres
 
     %% ===== CONNECTIONS: Execution → Storage =====
     CWLRunner -->|"Read Input Data"| MinIO
@@ -183,11 +204,13 @@ graph TB
     classDef service fill:#EA4335,stroke:#c5221f,color:#fff,stroke-width:2px
     classDef storage fill:#9AA0A6,stroke:#5f6368,color:#fff,stroke-width:2px
     classDef execution fill:#FF6D01,stroke:#e85d00,color:#fff,stroke-width:2px
+    classDef langgraph fill:#7C4DFF,stroke:#651FFF,color:#fff,stroke-width:2px
 
     class GemPro,GemFlash gemini
     class F1,F2,F3,F4,F5,F6,F7 geminiFeature
     class Scholar,Engineer,Reviewer,GeminiClient agent
-    class App,Upload,StudyDesign,Workflow,DatasetNav,Console,Store,ApiService,Landing,Config,GraphNode,ConnLine,Catalogue,Viewer,AdditionalInfo,FileTree,ConsoleInput,DagreLayout frontend
-    class CWLParser,DAGGen,DockerBuild,ExecEngine,SDSExport,PromptMgr,DBService,MinIOSvc,AirflowClient service
-    class Postgres,MinIO,MinIOInit storage
-    class AirflowAPI,AirflowSched,DIND,CWLRunner execution
+    class ScholarN,EngineerN,ValidateN,ReviewerN langgraph
+    class App,Upload,StudyDesign,Workflow,DatasetNav,Console,Store,ApiService,WS_FE,GraphNode,ConnLine,Catalogue,ViewerPanel,AdditionalInfo,FileTree,ConsoleInput,SmartRender,DagreLayout frontend
+    class CWLParser,DAGGen,DockerBuild,ExecEngine,SDSExport,PromptMgr,AppCfg,VFS,WSM,DBS,MinIOSvc,AirflowClient service
+    class SQLite,Postgres,MinIO,Logs storage
+    class AirflowAPI,AirflowSched,DIND,CWLRunner,Sandbox execution
