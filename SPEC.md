@@ -774,7 +774,7 @@ Buckets are auto-created by the `minio-init` service on startup.
 
 ### 10.1 Backend Tests (pytest)
 
-**163 tests** across 19 test files:
+**163 tests** across 17 test files:
 
 | Category | Files | Tests |
 |----------|-------|-------|
@@ -892,43 +892,51 @@ services:
 ## Appendix B: Database Schema
 
 ```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE agent_sessions (
-    session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     upload_id VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Scholar agent state
     scholar_extraction_complete BOOLEAN DEFAULT FALSE,
-    isa_json_path VARCHAR(500),
-    confidence_scores_path VARCHAR(500),
-    context_used TEXT,
-    workflow_id VARCHAR(255),
-    cwl_path VARCHAR(500),
-    tools_generated JSONB DEFAULT '[]',
-    adapters_generated JSONB DEFAULT '[]',
-    validations_passed BOOLEAN DEFAULT FALSE,
-    validation_errors JSONB DEFAULT '[]',
-    suggestions JSONB DEFAULT '[]'
+    scholar_isa_json_path TEXT,
+    scholar_confidence_scores_path TEXT,
+    scholar_context_used TEXT,
+    -- Engineer agent state
+    engineer_workflow_id VARCHAR(255),
+    engineer_cwl_path TEXT,
+    engineer_tools_generated JSONB DEFAULT '[]'::jsonb,
+    engineer_adapters_generated JSONB DEFAULT '[]'::jsonb,
+    -- Reviewer agent state
+    reviewer_validations_passed BOOLEAN DEFAULT FALSE,
+    reviewer_validation_errors JSONB DEFAULT '[]'::jsonb,
+    reviewer_suggestions JSONB DEFAULT '[]'::jsonb
 );
 
 CREATE TABLE conversation_history (
     id SERIAL PRIMARY KEY,
-    session_id UUID REFERENCES agent_sessions(session_id),
-    agent VARCHAR(20) NOT NULL,
-    role VARCHAR(20) NOT NULL,
+    session_id UUID REFERENCES agent_sessions(session_id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
     content TEXT NOT NULL,
-    timestamp TIMESTAMP DEFAULT NOW()
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    agent VARCHAR(50) NOT NULL CHECK (agent IN ('scholar', 'engineer', 'reviewer'))
 );
 
 CREATE TABLE executions (
-    execution_id VARCHAR(255) PRIMARY KEY,
+    execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     workflow_id VARCHAR(255) NOT NULL,
-    session_id UUID REFERENCES agent_sessions(session_id),
     dag_id VARCHAR(255),
-    status VARCHAR(50) DEFAULT 'pending',
-    config JSONB,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    results_path VARCHAR(500)
+    status VARCHAR(50) DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'success', 'partial_failure', 'failed')),
+    overall_progress INTEGER DEFAULT 0,
+    config JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    node_statuses JSONB DEFAULT '{}'::jsonb,
+    logs JSONB DEFAULT '[]'::jsonb
 );
 ```
 

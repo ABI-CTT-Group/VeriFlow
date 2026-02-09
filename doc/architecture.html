@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriFlow Architecture Diagram</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #202124;
+        }
+        header {
+            background: #1a73e8;
+            color: white;
+            padding: 20px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 16px 32px;
+            background: white;
+            border-bottom: 1px solid #dadce0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        .diagram-container {
+            padding: 24px;
+            overflow: auto;
+            min-height: calc(100vh - 140px);
+            display: flex;
+            justify-content: center;
+        }
+        .mermaid {
+            max-width: 100%;
+        }
+        .controls {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            gap: 8px;
+        }
+        .controls button {
+            background: white;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .controls button:hover {
+            background: #f1f3f4;
+        }
+        .gemini-badge {
+            background: #4285F4;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>VeriFlow &mdash; Architecture Diagram</h1>
+            <p>Autonomous Research Reliability Engineer &bull; Gemini 3 Hackathon</p>
+        </div>
+        <span class="gemini-badge">7 Gemini 3 Features</span>
+    </header>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background:#4285F4"></div> Gemini 3 Models</div>
+        <div class="legend-item"><div class="legend-color" style="background:#E8F0FE;border:1px solid #4285F4"></div> Gemini 3 Features</div>
+        <div class="legend-item"><div class="legend-color" style="background:#34A853"></div> AI Agents &amp; SDK Client</div>
+        <div class="legend-item"><div class="legend-color" style="background:#FBBC04"></div> Frontend Components</div>
+        <div class="legend-item"><div class="legend-color" style="background:#EA4335"></div> Backend Services</div>
+        <div class="legend-item"><div class="legend-color" style="background:#9AA0A6"></div> Storage Layer</div>
+        <div class="legend-item"><div class="legend-color" style="background:#FF6D01"></div> Execution Engine</div>
+    </div>
+
+    <div class="diagram-container">
+        <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4285F4', 'primaryTextColor': '#fff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#5f6368', 'secondaryColor': '#34A853', 'tertiaryColor': '#FBBC04'}}}%%
+
+graph TB
+    User["fa:fa-user Researcher / User"]
+
+    subgraph Frontend["Vue 3 Frontend (Port 3000)"]
+        direction TB
+        App["App.vue &mdash; 4-Panel Layout"]
+
+        subgraph LeftPanel["Left Panel"]
+            Upload["UploadModule.vue<br/>PDF Upload + Demo"]
+            StudyDesign["StudyDesignModule.vue<br/>ISA Hierarchy + Confidence Scores"]
+        end
+
+        subgraph CenterPanel["Center Panel"]
+            Workflow["WorkflowAssemblerModule.vue<br/>Vue Flow Graph Canvas"]
+            GraphNode["GraphNode.vue<br/>Custom Node Types"]
+            Catalogue["DataObjectCatalogue.vue"]
+            Viewer["ViewerPanel.vue"]
+        end
+
+        subgraph RightPanel["Right Panel"]
+            DatasetNav["DatasetNavigationModule.vue<br/>Results &amp; SDS Export"]
+        end
+
+        subgraph BottomPanel["Bottom Panel"]
+            Console["ConsoleModule.vue<br/>Real-time Agent Logs"]
+        end
+
+        Store["Pinia Store (workflow.ts)"]
+        ApiService["API Service (axios)"]
+    end
+
+    subgraph Backend["FastAPI Backend (Port 8000)"]
+        direction TB
+        FastAPI["FastAPI App (main.py)"]
+
+        subgraph APIRouters["REST API &mdash; 5 Routers"]
+            PubAPI["publications"]
+            WfAPI["workflows"]
+            ExecAPI["executions"]
+            CatAPI["catalogue"]
+            SetAPI["settings"]
+        end
+
+        WS["WebSocket /ws/logs"]
+
+        subgraph Agents["Gemini 3 AI Agent System"]
+            Scholar["ScholarAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
+            Engineer["EngineerAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
+            Reviewer["ReviewerAgent<br/>gemini-3-flash-preview<br/>Thinking: MEDIUM (8192)"]
+        end
+
+        GeminiClient["GeminiClient<br/>google-genai SDK Wrapper"]
+
+        subgraph CoreServices["Core Services"]
+            CWLParser["CWLParser"]
+            DAGGen["DAGGenerator"]
+            DockerBuild["DockerBuilder"]
+            ExecEngine["ExecutionEngine"]
+            SDSExport["SDSExporter"]
+            PromptMgr["PromptManager"]
+        end
+
+        subgraph DataServices["Data Services"]
+            DBService["DatabaseService (asyncpg)"]
+            MinIOSvc["MinIOService (S3)"]
+            AirflowClient["AirflowClient (httpx)"]
+        end
+    end
+
+    subgraph GeminiAPI["Gemini 3 API (External)"]
+        direction TB
+        GemPro["gemini-3-pro-preview"]
+        GemFlash["gemini-3-flash-preview"]
+
+        subgraph GeminiFeatures["7 Gemini 3 Features"]
+            F1["1. Pydantic Structured Output"]
+            F2["2. Thinking Level Control"]
+            F3["3. Grounding with Google Search"]
+            F4["4. Native PDF Upload"]
+            F5["5. Thought Signature Preservation"]
+            F6["6. Agentic Vision"]
+            F7["7. Agentic Function Calling"]
+        end
+    end
+
+    subgraph DataLayer["Data Layer"]
+        Postgres[("PostgreSQL 15 (5432)")]
+        MinIO[("MinIO S3 (9000/9001)<br/>4 Buckets")]
+    end
+
+    subgraph Execution["Workflow Execution"]
+        AirflowAPI["Airflow 3.0.6 API (8080)"]
+        AirflowSched["Airflow Scheduler"]
+        DIND["Docker-in-Docker"]
+        CWLRunner["CWL Runner (cwltool)"]
+    end
+
+    User -->|Browser| Frontend
+    App --> LeftPanel & CenterPanel & RightPanel & BottomPanel
+    Store --> ApiService
+    ApiService -->|"REST /api/v1"| FastAPI
+    Console -.->|"WebSocket"| WS
+
+    FastAPI --> APIRouters & WS
+    PubAPI --> Scholar
+    WfAPI --> Engineer & Reviewer
+    ExecAPI --> ExecEngine & SDSExport
+
+    Scholar --> GeminiClient
+    Engineer --> GeminiClient
+    Reviewer --> GeminiClient
+
+    GeminiClient -->|"google-genai SDK"| GemPro & GemFlash
+
+    Scholar -.->|Uses| F1 & F2 & F3 & F4 & F6
+    Engineer -.->|Uses| F1 & F2 & F5 & F7
+    Reviewer -.->|Uses| F1 & F2 & F5
+
+    ExecEngine --> CWLParser & DAGGen & DockerBuild & AirflowClient
+    DBService --> Postgres
+    MinIOSvc --> MinIO
+
+    AirflowClient -->|REST| AirflowAPI
+    AirflowAPI --> AirflowSched
+    AirflowSched -->|DockerOperator| DIND
+    DIND --> CWLRunner
+    CWLRunner --> MinIO
+
+    classDef gemini fill:#4285F4,stroke:#1a73e8,color:#fff,stroke-width:2px
+    classDef geminiFeature fill:#E8F0FE,stroke:#4285F4,color:#1a73e8,stroke-width:1px
+    classDef agent fill:#34A853,stroke:#1e8e3e,color:#fff,stroke-width:2px
+    classDef frontend fill:#FBBC04,stroke:#e8a200,color:#000,stroke-width:2px
+    classDef service fill:#EA4335,stroke:#c5221f,color:#fff,stroke-width:2px
+    classDef storage fill:#9AA0A6,stroke:#5f6368,color:#fff,stroke-width:2px
+    classDef execution fill:#FF6D01,stroke:#e85d00,color:#fff,stroke-width:2px
+
+    class GemPro,GemFlash gemini
+    class F1,F2,F3,F4,F5,F6,F7 geminiFeature
+    class Scholar,Engineer,Reviewer,GeminiClient agent
+    class App,Upload,StudyDesign,Workflow,DatasetNav,Console,Store,ApiService,GraphNode,Catalogue,Viewer frontend
+    class CWLParser,DAGGen,DockerBuild,ExecEngine,SDSExport,PromptMgr,DBService,MinIOSvc,AirflowClient service
+    class Postgres,MinIO storage
+    class AirflowAPI,AirflowSched,DIND,CWLRunner execution
+        </pre>
+    </div>
+
+    <div class="controls">
+        <button onclick="document.querySelector('.diagram-container').style.zoom = (parseFloat(document.querySelector('.diagram-container').style.zoom || 1) + 0.1)">Zoom +</button>
+        <button onclick="document.querySelector('.diagram-container').style.zoom = (parseFloat(document.querySelector('.diagram-container').style.zoom || 1) - 0.1)">Zoom -</button>
+        <button onclick="document.querySelector('.diagram-container').style.zoom = 1">Reset</button>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#4285F4',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#1a73e8',
+                lineColor: '#5f6368',
+                secondaryColor: '#34A853',
+                tertiaryColor: '#FBBC04'
+            },
+            flowchart: {
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            securityLevel: 'loose'
+        });
+    </script>
+</body>
+</html>
