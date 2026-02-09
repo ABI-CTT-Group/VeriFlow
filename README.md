@@ -72,7 +72,7 @@ VeriFlow bridges the gap between scientific publications and executable workflow
 
 ## Gemini 3 Integration
 
-VeriFlow leverages **7 Gemini 3 features** through the `google-genai` SDK (`from google import genai`):
+VeriFlow leverages **4 Gemini 3 features** through the `google-genai` SDK (`from google import genai`):
 
 | # | Feature | How It's Used | Agent(s) |
 |---|---------|---------------|----------|
