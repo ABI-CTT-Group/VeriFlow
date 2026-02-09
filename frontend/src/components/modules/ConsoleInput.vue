@@ -8,10 +8,9 @@ import { useWorkflowStore } from '../../stores/workflow'
 const consoleStore = useConsoleStore()
 const workflowStore = useWorkflowStore()
 const { input } = storeToRefs(consoleStore)
-const selectedAgent = ref<string>('system')
+const selectedAgent = ref<string>('scholar')
 
 const agents = [
-  { value: 'system', label: 'System' },
   { value: 'scholar', label: 'Scholar' },
   { value: 'engineer', label: 'Engineer' },
   { value: 'reviewer', label: 'Reviewer' }
@@ -28,6 +27,19 @@ function handleSend() {
     workflowStore.toggleConsole()
   }
 }
+
+// function handleApply() {
+//   if (!input.value.trim()) return
+
+//   if (confirm(`Are you sure you want to apply this directive to ${selectedAgent.value} and restart the workflow?`)) {
+//     consoleStore.sendApplyDirective(input.value, selectedAgent.value)
+//     input.value = ''
+    
+//     if (workflowStore.isConsoleCollapsed) {
+//       workflowStore.toggleConsole()
+//     }
+//   }
+// }
 
 // Auto-expand console when user starts typing
 watch(input, (newVal) => {
@@ -56,6 +68,13 @@ watch(input, (newVal) => {
         placeholder="Chat with VeriFlow agents..."
         class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
+      <!-- <button
+        @click="handleApply"
+        class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors whitespace-nowrap flex items-center gap-1"
+        title="Apply directive and restart workflow from this agent"
+      >
+        <span class="text-xs font-bold">Apply</span>
+      </button> -->
       <button
         @click="handleSend"
         class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"

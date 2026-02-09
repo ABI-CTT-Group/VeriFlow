@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { wsService } from '../services/websocket'
+import { endpoints } from '../services/api'
+import { useWorkflowStore } from './workflow'
 
 export interface Message {
     id: string
@@ -31,8 +32,16 @@ export const useConsoleStore = defineStore('console', () => {
         })
     }
 
-    function sendMessage(content: string, agent?: string) {
+    async function sendMessage(content: string, agent?: string) {
         if (!content.trim()) return
+
+        const workflowStore = useWorkflowStore()
+        const runId = workflowStore.currentRunId
+
+        if (!runId) {
+            addSystemMessage("Error: No active workflow run found. Please start a workflow first.")
+            return
+        }
 
         // 1. Add to local store (optimistic UI)
         addMessage({
@@ -42,12 +51,42 @@ export const useConsoleStore = defineStore('console', () => {
             timestamp: new Date()
         })
 
-        // 2. Send to backend
-        wsService.send({
-            type: 'user_message',
-            content,
-            agent: agent || 'system'
-        })
+        // 2. Send via HTTP
+        try {
+            // Add a temporary "thinking" message or just wait
+            const response = await endpoints.chatWithAgent(runId, agent || 'scholar', content)
+
+            // Add Agent Reply
+            addMessage({
+                type: 'agent',
+                agent: (agent || 'scholar') as any,
+                content: response.data.reply,
+                timestamp: new Date()
+            })
+
+        } catch (error: any) {
+            console.error("Chat error:", error)
+            addSystemMessage(`Error sending message: ${error.message || 'Unknown error'}`)
+        }
+    }
+
+    async function sendApplyDirective(directive: string, agent: string) {
+        const workflowStore = useWorkflowStore()
+        const runId = workflowStore.currentRunId
+
+        if (!runId) {
+            addSystemMessage("Error: No active workflow run found.")
+            return
+        }
+
+        try {
+            addSystemMessage(`Applying directive to ${agent} and restarting...`)
+            const response = await endpoints.applyAndRestart(runId, agent, directive)
+            addSystemMessage(response.data.message)
+        } catch (error: any) {
+            console.error("Apply error:", error)
+            addSystemMessage(`Error applying directive: ${error.message || 'Unknown error'}`)
+        }
     }
 
     // Handle streaming chunks from agents
@@ -96,7 +135,8 @@ export const useConsoleStore = defineStore('console', () => {
         addMessage,
         sendMessage,
         appendAgentMessage,
-        addSystemMessage
+        addSystemMessage,
+        sendApplyDirective
     }
 
 

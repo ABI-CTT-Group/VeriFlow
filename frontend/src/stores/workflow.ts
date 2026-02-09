@@ -108,6 +108,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const isLoading = ref(false)
     const loadingMessage = ref<string | null>(null)
     const error = ref<string | null>(null)
+    const currentRunId = ref<string | null>(null)
 
     // Computed
     const graph = computed(() => ({
@@ -191,6 +192,9 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
             if (exampleName === 'mama-mia') {
                 response = await endpoints.mamaMiaCache(currentClientId)
+                if ((response.data.result as any)?.run_id) {
+                    currentRunId.value = (response.data.result as any).run_id
+                }
             } else {
                 // Use Orchestration API
                 const pdfPath = "/app/examples/mama-mia/1.pdf"
@@ -203,6 +207,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
                 if (response.data.status === 'started' && (response.data.result as any)?.run_id) {
                     const runId = (response.data.result as any).run_id
+                    currentRunId.value = runId
 
                     // Log to Console
                     const consoleStore = useConsoleStore()
@@ -689,6 +694,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         isWorkflowRunning.value = false
         nodeStatuses.value = {}
         logs.value = []
+        currentRunId.value = null
         if (pollingInterval.value) clearInterval(pollingInterval.value)
     }
 
@@ -744,5 +750,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
         clearError,
         clientId,
         initWebSocket,
+        currentRunId
     }
 })

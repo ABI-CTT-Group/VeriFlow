@@ -118,7 +118,16 @@ export const endpoints = {
 
     // Artifact Retrieval (Polling)
     getArtifact: (runId: string, agentName: string) =>
-        api.get(`/orchestrate/${runId}/artifacts/${agentName}`)
+        api.get(`/orchestrate/${runId}/artifacts/${agentName}`),
+
+    // Chat Validation (Plan & Apply)
+    chatWithAgent: (runId: string, agentName: string, message: string) =>
+        api.post<{ reply: string }>(`/chat/${runId}/${agentName}`, {
+            messages: [{ role: 'user', content: message }]
+        }),
+
+    applyAndRestart: (runId: string, agentName: string, directive: string) =>
+        api.post(`/chat/${runId}/${agentName}/apply`, { directive })
 }
 
 export interface OrchestrationResponse {

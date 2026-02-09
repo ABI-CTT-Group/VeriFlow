@@ -202,6 +202,7 @@ async function handleModalSubmit(info: string) {
           
           if (response.data.status === 'started' && (response.data.result as any)?.run_id) {
               const runId = (response.data.result as any).run_id
+              store.currentRunId = runId // Fix: Update store with runId
               
               const consoleStore = useConsoleStore()
               consoleStore.addSystemMessage(`Orchestration started (Run ID: ${runId}). Waiting for Scholar...`)
