@@ -1,9 +1,10 @@
 # VeriFlow Technical Specification
 
-**Version**: 1.0.0  
-**Status**: MVP Specification  
-**Last Updated**: 2026-01-29  
+**Version**: 2.0.0
+**Status**: Implementation Specification
+**Last Updated**: 2026-02-09
 **Target**: Engineers and AI Agents
+**Hackathon**: [Gemini 3 Hackathon](https://gemini3.devpost.com/)
 
 ---
 
@@ -13,12 +14,13 @@
 2. [Architecture](#2-architecture)
 3. [Data Structures](#3-data-structures)
 4. [Agent System](#4-agent-system)
-5. [API Specification](#5-api-specification)
-6. [Frontend Specification](#6-frontend-specification)
-7. [Execution Engine](#7-execution-engine)
-8. [Storage System](#8-storage-system)
-9. [MVP Constraints](#9-mvp-constraints)
-10. [Error Handling](#10-error-handling)
+5. [Gemini 3 Integration](#5-gemini-3-integration)
+6. [API Specification](#6-api-specification)
+7. [Frontend Specification](#7-frontend-specification)
+8. [Execution Engine](#8-execution-engine)
+9. [Storage System](#9-storage-system)
+10. [Testing](#10-testing)
+11. [Error Handling](#11-error-handling)
 
 ---
 
@@ -28,16 +30,16 @@
 
 VeriFlow is an autonomous Research Reliability Engineer that:
 1. Ingests scientific publications (PDF)
-2. Extracts methodological logic using AI agents
-3. Creates verifiable, executable research workflows
-4. Executes workflows via Apache Airflow
+2. Extracts methodological logic using AI agents powered by Gemini 3
+3. Creates verifiable, executable research workflows (CWL v1.3)
+4. Executes workflows via Apache Airflow 3
 
 ### 1.2 Core Standards
 
 | Standard | Usage |
 |----------|-------|
 | **CWL v1.3** | Internal workflow description format |
-| **ISA-JSON** | Study design serialization (Investigation → Study → Assay) |
+| **ISA-JSON** | Study design serialization (Investigation -> Study -> Assay) |
 | **SPARC SDS** | Dataset structure for all data objects |
 | **Apache Airflow 3** | Workflow execution engine |
 
@@ -45,13 +47,15 @@ VeriFlow is an autonomous Research Reliability Engineer that:
 
 | Component | Technology |
 |-----------|------------|
-| Frontend | Vue 3 + Vue Flow + TypeScript |
-| Backend | Python FastAPI |
-| AI Engine | Gemini API (Direct calls) |
+| Frontend | Vue 3 + Vue Flow + TypeScript + Tailwind CSS 4 |
+| Backend | Python 3.11 + FastAPI |
+| AI Engine | Gemini 3 via `google-genai` SDK |
+| State Management | Pinia |
 | Storage | MinIO (S3-compatible) |
-| Execution | Apache Airflow 3 (local) |
-| Database | PostgreSQL |
-| Real-time | WebSocket |
+| Execution | Apache Airflow 3.0.6 (LocalExecutor) |
+| CWL Runner | cwltool via Docker-in-Docker |
+| Database | PostgreSQL 15 |
+| Containerization | Docker Compose (9 services) |
 
 ---
 
@@ -60,101 +64,141 @@ VeriFlow is an autonomous Research Reliability Engineer that:
 ### 2.1 High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        VeriFlow System                          │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐    ┌─────────────────┐    ┌────────────────┐  │
-│  │  Vue 3 UI   │◄──►│  FastAPI Backend │◄──►│  Gemini API    │  │
-│  │  (Vue Flow) │    │                 │    │  (3 Agents)    │  │
-│  └──────┬──────┘    └────────┬────────┘    └────────────────┘  │
-│         │                    │                                  │
-│         │ WebSocket          │ REST API                         │
-│         ▼                    ▼                                  │
-│  ┌─────────────┐    ┌─────────────────┐                        │
-│  │   Console   │    │   PostgreSQL    │                        │
-│  │   Logs      │    │   (Sessions)    │                        │
-│  └─────────────┘    └─────────────────┘                        │
-│                              │                                  │
-│         ┌────────────────────┼────────────────────┐            │
-│         ▼                    ▼                    ▼            │
-│  ┌─────────────┐    ┌─────────────────┐    ┌────────────┐      │
-│  │    MinIO    │    │  Airflow 3      │    │  Docker    │      │
-│  │  (4 buckets)│◄──►│  (Local DAGs)   │◄──►│  Executor  │      │
-│  └─────────────┘    └─────────────────┘    └────────────┘      │
-└─────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+|                        VeriFlow System                              |
++--------------------------------------------------------------------+
+|  +--------------+    +------------------+    +-----------------+   |
+|  |  Vue 3 UI    |<-->|  FastAPI Backend  |<-->|  Gemini 3 API   |   |
+|  |  (Vue Flow)  |    |  (5 API routers) |    |  (3 Agents)     |   |
+|  +------+-------+    +--------+---------+    +-----------------+   |
+|         |                     |                                     |
+|         | REST API            | Services Layer                      |
+|         v                     v                                     |
+|  +--------------+    +------------------+                           |
+|  |   Console    |    |   PostgreSQL 15  |                           |
+|  |   Logs       |    |   (Sessions)     |                           |
+|  +--------------+    +------------------+                           |
+|                               |                                     |
+|         +---------------------+---------------------+              |
+|         v                     v                     v              |
+|  +--------------+    +------------------+    +-------------+       |
+|  |    MinIO     |    |  Airflow 3.0.6   |    |  Docker-in  |       |
+|  |  (4 buckets) |<-->|  (API + Sched)   |<-->|  -Docker    |       |
+|  +--------------+    +------------------+    +-------------+       |
+|                                                     |              |
+|                                              +------+------+      |
+|                                              | CWL Runner  |      |
+|                                              | (cwltool)   |      |
+|                                              +-------------+      |
++--------------------------------------------------------------------+
 ```
 
-### 2.2 Request Flow
+### 2.2 Docker Compose Services
+
+| Service | Image | Port | Purpose |
+|---------|-------|------|---------|
+| `backend` | python:3.11-slim | 8000 | FastAPI backend with hot-reload |
+| `frontend` | node:20 / nginx | 3000 | Vue 3 SPA served via nginx |
+| `postgres` | postgres:15 | 5432 | Primary database |
+| `minio` | minio/minio | 9000, 9001 | S3-compatible object storage |
+| `minio-init` | minio/mc | - | Bucket initialization |
+| `airflow-apiserver` | custom | 8080 | Airflow 3.0.6 API server |
+| `airflow-scheduler` | custom | - | Airflow task scheduler |
+| `dind` | docker:dind | - | Docker-in-Docker for CWL execution |
+| `cwl` | custom | - | CWL runner (cwltool) |
+
+### 2.3 Request Flow
 
 ```
 User uploads PDF
-       │
-       ▼
-┌──────────────────┐
-│ POST /publications/upload │
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│  Scholar Agent   │ ──► Extracts ISA hierarchy
-│  (Gemini API)    │ ──► Generates confidence scores
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│ User selects     │
-│ Assay            │
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│  Engineer Agent  │ ──► Generates CWL workflow
-│  (Gemini API)    │ ──► Creates Dockerfiles
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│  Reviewer Agent  │ ──► Validates CWL syntax
-│  (Gemini API)    │ ──► Checks data formats
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│ CWL → Airflow    │ ──► Converts to DAG
-│ Conversion       │
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│ Airflow Executor │ ──► Runs Docker containers
-└──────────┬───────┘
-           ▼
-┌──────────────────┐
-│ Results stored   │ ──► MinIO `process` bucket
-│ in SDS format    │
-└──────────────────┘
+       |
+       v
++------------------------+
+| POST /publications/upload |
++-----------+------------+
+            v
++------------------------+
+|  Scholar Agent         | --> Extracts ISA hierarchy (Gemini 3)
+|  (PDF upload +         | --> Generates confidence scores
+|   structured output +  | --> Grounding with Google Search
+|   thinking: HIGH)      |
++-----------+------------+
+            v
++------------------------+
+| User selects Assay     |
++-----------+------------+
+            v
++------------------------+
+|  Engineer Agent        | --> Generates CWL workflow (Gemini 3)
+|  (structured output +  | --> Creates Vue Flow graph
+|   thinking: HIGH +     | --> Iterative think-act-observe
+|   thought signatures)  |
++-----------+------------+
+            v
++------------------------+
+|  Reviewer Agent        | --> Validates CWL syntax (Gemini 3)
+|  (structured output +  | --> Checks data formats
+|   thinking: MEDIUM +   | --> Translates errors
+|   multi-turn)          |
++-----------+------------+
+            v
++------------------------+
+| CWL -> Airflow DAG     | --> Converts to DAG
++-----------+------------+
+            v
++------------------------+
+| Airflow 3 Executor     | --> Runs via Docker-in-Docker
++-----------+------------+
+            v
++------------------------+
+| Results stored in SDS  | --> MinIO `process` bucket
++------------------------+
 ```
 
 ---
 
 ## 3. Data Structures
 
-### 3.1 SDS Manifest Schema
+### 3.1 Pydantic Schemas (Gemini 3 Structured Output)
 
-Physical format: `manifest.xlsx`. Logical schema per row:
+All agent responses use Pydantic models as `response_schema` for Gemini 3's structured output feature, ensuring type-safe, validated JSON responses.
 
-```typescript
-interface SDSManifestRow {
-  // Required fields
-  filename: string;      // Relative path from dataset root (e.g., "primary/sub-01/data.nii.gz")
-  timestamp: string;     // ISO 8601 datetime, auto-generated
-  description: string;   // File description, defaults to "Data file"
-  
-  // Optional fields
-  "file type"?: string;  // Broad category: "text", "image", "data"
-  
-  // Computed field (auto-detected by sds-converter)
-  "additional type"?: string;  // IANA MIME type (e.g., "application/x-nifti")
-}
+```python
+# Scholar Agent Schema
+class AnalysisResult(BaseModel):
+    thought_process: str          # Step-by-step reasoning trace
+    investigation: Investigation  # ISA hierarchy
+    confidence_scores: List[Metric]
+    identified_tools: List[Tool]
+    identified_models: List[str]
+    identified_measurements: List[str]
+
+# Engineer Agent Schema
+class WorkflowResult(BaseModel):
+    thought_process: str
+    workflow_cwl: str             # CWL v1.3 YAML
+    tool_cwls: Dict[str, str]
+    dockerfiles: Dict[str, str]
+    adapters: List[Adapter]
+    nodes: List[GraphNode]        # Vue Flow graph nodes
+    edges: List[GraphEdge]        # Vue Flow graph edges
+
+# Reviewer Agent Schema
+class ValidationResult(BaseModel):
+    thought_process: str
+    passed: bool
+    issues: List[ValidationIssue]
+    summary: str
+
+# Error Translation Schema
+class ErrorTranslationResult(BaseModel):
+    thought_process: str
+    translations: List[TranslatedError]
 ```
 
 ### 3.2 ISA-JSON Schema
 
-Standard ISA-JSON format. See: https://isa-specs.readthedocs.io/en/latest/isajson.html
+Standard ISA-JSON format (Investigation -> Study -> Assay):
 
 ```typescript
 interface Investigation {
@@ -172,20 +216,18 @@ interface Study {
 }
 
 interface Assay {
+  identifier?: string;
   filename: string;
-  measurementType: OntologyAnnotation;
-  technologyType: OntologyAnnotation;
+  measurementType: { term: string };
+  technologyType: { term: string };
 }
 ```
 
 ### 3.3 Confidence Scores
 
-> **IMPORTANT**: Confidence scores are SEPARATE from ISA-JSON (cannot modify standard).
-
-Store in a dedicated file within the same SDS:
+Stored separately from ISA-JSON (cannot modify the standard):
 
 ```typescript
-// File: confidence_scores.json (stored alongside ISA-JSON)
 interface ConfidenceScores {
   upload_id: string;
   generated_at: string;  // ISO 8601
@@ -199,21 +241,9 @@ interface ConfidenceScores {
 }
 ```
 
-Example:
-```json
-{
-  "upload_id": "pub_123",
-  "generated_at": "2026-01-29T10:00:00Z",
-  "scores": {
-    "inv-title": { "value": 95, "source_page": 1, "source_text": "Automated Tumor Detection..." },
-    "study-subjects": { "value": 88, "source_page": 3, "source_text": "384 patients..." }
-  }
-}
-```
-
 ### 3.4 CWL Workflow Schema
 
-Target: **CWL v1.3**. Use all four process types as appropriate:
+Target: **CWL v1.3**:
 
 ```yaml
 cwlVersion: v1.3
@@ -235,18 +265,15 @@ steps:
     in:
       input_dir: input_measurements
     out: [output_dir]
-  
+
   segmentation:
     run: tools/unet-segmentation.cwl
     in:
       input_dir: preprocessing/output_dir
-      model_weights: model_weights
     out: [output_dir]
 ```
 
 ### 3.5 Vue Flow Graph Schema
-
-Frontend graph representation (converted from CWL):
 
 ```typescript
 interface WorkflowGraph {
@@ -255,14 +282,13 @@ interface WorkflowGraph {
 }
 
 interface VueFlowNode {
-  id: string;                    // Unique identifier
+  id: string;
   type: "measurement" | "tool" | "model";
-  position: { x: number; y: number };  // Auto-layout generated
+  position: { x: number; y: number };  // Auto-layout via dagre
   data: {
     label: string;
     status?: "pending" | "running" | "completed" | "error";
-    confidence?: number;         // 0-100
-    source_id?: string;          // Reference to PDF citation
+    confidence?: number;
     inputs?: PortDefinition[];
     outputs?: PortDefinition[];
   };
@@ -270,60 +296,10 @@ interface VueFlowNode {
 
 interface VueFlowEdge {
   id: string;
-  source: string;      // Source node ID
-  target: string;      // Target node ID
+  source: string;
+  target: string;
   sourceHandle?: string;
   targetHandle?: string;
-}
-
-interface PortDefinition {
-  id: string;
-  label: string;
-  type: string;        // MIME type or CWL type
-}
-```
-
-### 3.6 Session State Schema
-
-Persisted in PostgreSQL:
-
-```typescript
-interface AgentSession {
-  session_id: string;           // UUID
-  upload_id: string;            // Links to publication
-  created_at: string;
-  updated_at: string;
-  
-  // Agent-specific state
-  scholar_state: {
-    extraction_complete: boolean;
-    isa_json_path: string;      // MinIO path
-    confidence_scores_path: string;
-    context_used: string;       // Context file content
-  };
-  
-  engineer_state: {
-    workflow_id: string;
-    cwl_path: string;           // MinIO path
-    tools_generated: string[];
-    adapters_generated: string[];
-  };
-  
-  reviewer_state: {
-    validations_passed: boolean;
-    validation_errors: string[];
-    suggestions: string[];
-  };
-  
-  // Conversation history for Gemini
-  conversation_history: Message[];
-}
-
-interface Message {
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: string;
-  agent: "scholar" | "engineer" | "reviewer";
 }
 ```
 
@@ -333,228 +309,223 @@ interface Message {
 
 ### 4.1 Agent Overview
 
-| Agent | Primary Stage | Responsibilities |
-|-------|---------------|------------------|
-| **Scholar** | Stage 1 | PDF parsing, ISA extraction, metadata population |
-| **Engineer** | Stage 2 | CWL generation, Dockerfile creation, adapter logic |
-| **Reviewer** | All Stages | Validation, error translation, user communication |
+| Agent | Model | Thinking Level | Responsibilities |
+|-------|-------|----------------|------------------|
+| **Scholar** | gemini-3-pro-preview | HIGH (24576) | PDF parsing, ISA extraction, confidence scoring |
+| **Engineer** | gemini-3-pro-preview | HIGH (24576) | CWL generation, Dockerfiles, graph layout |
+| **Reviewer** | gemini-3-flash-preview | MEDIUM (8192) | Validation, error translation, auto-fix |
 
-### 4.2 Agent Invocation
+### 4.2 Agent Configuration
 
-```typescript
-// Direct Gemini API calls with session state
-interface AgentInvocation {
-  agent: "scholar" | "engineer" | "reviewer";
-  session_id: string;
-  input: {
-    type: "pdf_upload" | "assay_selection" | "validation_request" | "error_analysis";
-    payload: any;
-  };
-}
+Agents are configured via `config.yaml` with model aliases and thinking levels:
 
-// Example: Scholar invocation
-const scholarResponse = await gemini.generate({
-  model: "gemini-3-pro",
-  systemInstruction: SCHOLAR_SYSTEM_PROMPT,
-  history: session.conversation_history,
-  contents: [
-    { role: "user", parts: [{ text: "Analyze this PDF and extract ISA structure..." }] }
-  ]
-});
+```yaml
+models:
+  gemini-3-pro:
+    api_model_name: "gemini-3-pro-preview"
+    temperature: 1.0
+    top_p: 0.95
+    max_output_tokens: 8192
+
+  gemini-3-flash:
+    api_model_name: "gemini-3-flash-preview"
+    temperature: 1.0
+    top_p: 0.95
+    max_output_tokens: 8192
+
+agents:
+  scholar:
+    default_model: "gemini-3-pro"
+    thinking_level: "HIGH"
+  engineer:
+    default_model: "gemini-3-pro"
+    thinking_level: "HIGH"
+  reviewer:
+    default_model: "gemini-3-flash"
+    thinking_level: "MEDIUM"
 ```
 
-### 4.3 Scholar Agent Specification
+Prompts are managed via `prompts.yaml` with versioned templates per agent.
 
-**System Prompt Requirements:**
-```
-You are the Scholar Agent for VeriFlow. Your role is to:
+### 4.3 Scholar Agent
 
-1. Parse scientific publications (PDF text, figures, diagrams)
-2. Extract the ISA hierarchy:
-   - Investigation: Overall research context
-   - Study: Experimental design
-   - Assay: Specific measurement process
-3. Identify data objects:
-   - Measurements (input data)
-   - Tools (processing software)
-   - Models (pre-trained weights)
-4. Generate confidence scores (0-100%) for each extracted property
-5. Output in ISA-JSON format
+**Capabilities:**
+- Native PDF upload for multimodal analysis
+- Pydantic structured output (`AnalysisResult` schema)
+- Grounding with Google Search for tool/model verification
+- Thinking level: HIGH for deep scientific reasoning
+- Agentic Vision mode (page image extraction via PyMuPDF)
 
-When a Context File is provided, use it to supplement ambiguous information.
-```
+**Methods:**
+- `analyze_publication()` - Full PDF analysis with structured output + grounding
+- `analyze_with_vision()` - Enhanced analysis using page images for diagram extraction
 
-**Input:**
-```typescript
-interface ScholarInput {
-  pdf_url: string;           // MinIO presigned URL
-  context_file?: string;     // Optional supplemental notes
-}
-```
+### 4.4 Engineer Agent
 
-**Output:**
-```typescript
-interface ScholarOutput {
-  isa_json: Investigation;   // ISA-JSON structure
-  confidence_scores: ConfidenceScores;
-  identified_tools: ToolReference[];
-  identified_models: ModelReference[];
-  identified_measurements: MeasurementReference[];
-}
-```
+**Capabilities:**
+- Pydantic structured output (`WorkflowResult` schema)
+- Thinking level: HIGH for complex CWL generation
+- Iterative think-act-observe via `generate_workflow_agentic()`
+- Thought signature preservation across multi-turn iterations
 
-### 4.4 Engineer Agent Specification
+**Methods:**
+- `generate_workflow()` - Single-shot CWL generation
+- `generate_workflow_agentic()` - Iterative generation with validation loop (max 3 iterations)
+- `_quick_validate_cwl()` - Local CWL syntax validation
 
-**System Prompt Requirements:**
-```
-You are the Engineer Agent for VeriFlow. Your role is to:
+### 4.5 Reviewer Agent
 
-1. Generate CWL v1.3 workflow definitions from extracted methodology
-2. Create Dockerfiles for each tool
-3. Infer dependencies from:
-   - requirements.txt (if available)
-   - import statements in code
-   - Code timestamps for version inference
-4. Generate adapters for type mismatches:
-   - Check additional_type (MIME type) compatibility
-   - Insert conversion tools (e.g., DICOM → NIfTI)
-5. Map SDS inputs/outputs to CWL ports
+**Capabilities:**
+- Pydantic structured output (`ValidationResult`, `ErrorTranslationResult`)
+- Thinking level: MEDIUM for validation, LOW for error translation
+- Multi-turn validation with thought signature preservation
+- CWL syntax validation (cwltool or fallback)
+- Type compatibility checking
+- Dependency resolution
 
-Use CommandLineTool for executable tools, Workflow for orchestration.
-```
-
-**Input:**
-```typescript
-interface EngineerInput {
-  assay_id: string;
-  isa_json: Investigation;
-  tool_references: ToolReference[];
-  model_references: ModelReference[];
-}
-```
-
-**Output:**
-```typescript
-interface EngineerOutput {
-  workflow_cwl: string;      // CWL v1.3 YAML
-  tool_cwls: { [tool_id: string]: string };
-  dockerfiles: { [tool_id: string]: string };
-  adapters: AdapterDefinition[];
-}
-```
-
-### 4.5 Reviewer Agent Specification
-
-**System Prompt Requirements:**
-```
-You are the Reviewer Agent for VeriFlow. Your role is to:
-
-1. Validate CWL syntax and semantics
-2. Validate Airflow DAG structure
-3. Check data format compatibility:
-   - Verify additional_type matches between connected nodes
-   - Ensure input data exists and is accessible
-4. Check dependencies are resolvable
-5. Translate technical errors to user-friendly advice
-6. Communicate with user when issues arise
-
-All validations must pass before execution. If validation fails:
-- Attempt automatic fix/adapter generation
-- Ask user for clarification if needed
-- Allow user to abort if unresolvable
-```
-
-**Validation Checks:**
-```typescript
-interface ValidationResult {
-  passed: boolean;
-  checks: {
-    cwl_syntax: { passed: boolean; errors: string[] };
-    dag_syntax: { passed: boolean; errors: string[] };
-    data_format: { passed: boolean; mismatches: TypeMismatch[] };
-    dependencies: { passed: boolean; missing: string[] };
-  };
-  auto_fixes_applied: string[];
-  user_action_required: string[];
-}
-
-interface TypeMismatch {
-  source_node: string;
-  source_type: string;  // e.g., "application/dicom"
-  target_node: string;
-  target_type: string;  // e.g., "application/x-nifti"
-  suggested_adapter: string;
-}
-```
+**Methods:**
+- `validate_workflow()` - Combined local + semantic validation
+- `validate_and_fix()` - Iterative validation with thought signatures
+- `suggest_fixes()` - Auto-fix suggestions for validation issues
+- `_translate_errors()` - Technical to user-friendly error translation
 
 ---
 
-## 5. API Specification
+## 5. Gemini 3 Integration
 
-### 5.1 Base Configuration
+### 5.1 SDK
+
+VeriFlow uses the `google-genai` Python SDK (not the legacy `google-generativeai` package) for all Gemini 3 interactions.
+
+```python
+from google import genai
+from google.genai import types
+```
+
+### 5.2 Gemini 3 Features Used
+
+| Feature | How Used |
+|---------|----------|
+| **Pydantic Structured Output** | All agents use Pydantic `BaseModel` subclasses as `response_schema` for type-safe JSON responses |
+| **Thinking Level Control** | `ThinkingConfig(thinking_budget=N, include_thoughts=True)` - HIGH (24576), MEDIUM (8192), LOW (2048) |
+| **Grounding with Google Search** | Scholar Agent verifies tool names and model references against the web |
+| **Native PDF Upload** | Multimodal file analysis via `client.files.upload()` for publication ingestion |
+| **Thought Signature Preservation** | Multi-turn reasoning via `types.Part(thought=True, text=sig)` for iterative workflows |
+| **Agentic Vision** | Page image extraction with PyMuPDF for visual analysis of methodology diagrams |
+| **Agentic Function Calling** | Think-Act-Observe loops for iterative CWL generation with validation feedback |
+
+### 5.3 GeminiClient
+
+Central client (`app/services/gemini_client.py`) with three methods:
+
+```python
+class GeminiClient:
+    model_name = "gemini-3-flash-preview"
+
+    def analyze_file(self, file_path, prompt, ..., response_schema, thinking_level, enable_grounding):
+        """Native PDF upload + structured output + thinking + grounding + caching"""
+
+    def generate_text(self, prompt, ..., response_schema, thinking_level, enable_grounding):
+        """Text-only structured generation for Engineer and Reviewer"""
+
+    def generate_with_history(self, messages, ..., response_schema, thinking_level):
+        """Multi-turn with thought signature preservation"""
+```
+
+### 5.4 Thought Signature Preservation
+
+For multi-turn agent loops (Engineer agentic generation, Reviewer validate-and-fix), thought signatures are extracted from model responses and re-injected in subsequent turns:
+
+```python
+# Extract from response
+for part in response.candidates[0].content.parts:
+    if hasattr(part, "thought") and part.thought:
+        thought_signatures.append(part.text)
+
+# Re-inject in next turn
+parts = [types.Part(thought=True, text=sig) for sig in thought_sigs]
+parts.append(types.Part(text=content))
+contents.append(types.Content(role="model", parts=parts))
+```
+
+### 5.5 Local Caching
+
+`GeminiClient.analyze_file()` supports local file-based caching keyed on `model_name + file_hash + prompt_hash` to avoid redundant API calls during development.
+
+---
+
+## 6. API Specification
+
+### 6.1 Base Configuration
 
 ```
 Base URL: /api/v1
 Content-Type: application/json
-Authentication: JWT Bearer Token (for Airflow integration)
+Docs: /docs (Swagger UI), /redoc (ReDoc)
+Health: /health
 ```
 
-### 5.2 Publication Endpoints
+### 6.2 API Routers
+
+| Router | Prefix | Purpose |
+|--------|--------|---------|
+| `publications` | `/api/v1` | PDF upload, study design, examples |
+| `workflows` | `/api/v1` | Workflow assembly, save, retrieve |
+| `executions` | `/api/v1` | Execution management, status, results |
+| `catalogue` | `/api/v1` | Data object catalogue |
+| `settings` | `/api/v1` | Application settings |
+
+### 6.3 Key Endpoints
 
 #### Upload Publication
 ```http
-POST /publications/upload
+POST /api/v1/publications/upload
 Content-Type: multipart/form-data
 
 Request:
   file: <PDF binary>
-  context_file?: <text file>  # Optional supplemental notes
+  context_file?: <text file>
 
 Response: 200 OK
 {
   "upload_id": "pub_abc123",
-  "filename": "mama-mia-paper.pdf",
-  "status": "processing",
-  "message": "Scholar Agent analyzing...",
-  "session_id": "sess_xyz789"
+  "filename": "paper.pdf",
+  "status": "processing"
+}
+```
+
+#### Load Pre-configured Example
+```http
+POST /api/v1/publications/load-example
+{
+  "example_name": "mama-mia"
+}
+
+Response: 200 OK
+{
+  "upload_id": "example_mama-mia_...",
+  "filename": "mama-mia",
+  "status": "completed",
+  "message": "Pre-loaded example"
 }
 ```
 
 #### Get Study Design
 ```http
-GET /study-design/{upload_id}
+GET /api/v1/study-design/{upload_id}
 
 Response: 200 OK
 {
   "upload_id": "pub_abc123",
   "status": "completed",
-  "hierarchy": {
-    "investigation": {
-      "identifier": "inv_1",
-      "title": "Breast Cancer Segmentation",
-      "properties": [
-        {
-          "id": "inv-title",
-          "value": "Breast Cancer Segmentation",
-          "source_id": "citation_1",
-          "confidence": 95
-        }
-      ],
-      "studies": [...]
-    }
-  },
+  "hierarchy": { "investigation": {...} },
   "confidence_scores": {...}
 }
 ```
 
-### 5.3 Workflow Endpoints
-
 #### Assemble Workflow
 ```http
-POST /workflows/assemble
-Content-Type: application/json
-
-Request:
+POST /api/v1/workflows/assemble
 {
   "assay_id": "assay_1",
   "upload_id": "pub_abc123"
@@ -563,829 +534,414 @@ Request:
 Response: 200 OK
 {
   "workflow_id": "wf_789",
-  "cwl_path": "workflow/wf_789/workflow.cwl",
-  "graph": {
-    "nodes": [
-      {
-        "id": "input-1",
-        "type": "measurement",
-        "position": { "x": 50, "y": 100 },
-        "data": {
-          "label": "DCE-MRI Scans",
-          "inputs": [],
-          "outputs": [{ "id": "out-1", "label": "DICOM", "type": "application/dicom" }]
-        }
-      },
-      {
-        "id": "tool-1",
-        "type": "tool",
-        "position": { "x": 300, "y": 100 },
-        "data": {
-          "label": "DICOM to NIfTI",
-          "inputs": [{ "id": "in-1", "label": "Input", "type": "application/dicom" }],
-          "outputs": [{ "id": "out-1", "label": "Output", "type": "application/x-nifti" }]
-        }
-      }
-    ],
-    "edges": [
-      { "id": "e1", "source": "input-1", "target": "tool-1", "sourceHandle": "out-1", "targetHandle": "in-1" }
-    ]
-  },
-  "validation": {
-    "passed": true,
-    "checks": {...}
-  }
+  "graph": { "nodes": [...], "edges": [...] }
 }
 ```
-
-#### Save Workflow
-```http
-PUT /workflows/{workflow_id}
-Content-Type: application/json
-
-Request:
-{
-  "graph": {
-    "nodes": [...],
-    "edges": [...]
-  }
-}
-
-Response: 200 OK
-{
-  "workflow_id": "wf_789",
-  "updated_at": "2026-01-29T12:00:00Z"
-}
-```
-
-### 5.4 Execution Endpoints
 
 #### Run Workflow
 ```http
-POST /executions
-Content-Type: application/json
-
-Request:
+POST /api/v1/executions
 {
-  "workflow_id": "wf_789",
-  "config": {
-    "subjects": [1]  // Subject limit, default 1 for MVP
-  }
+  "workflow_id": "wf_789"
 }
 
 Response: 202 Accepted
 {
   "execution_id": "exec_456",
-  "status": "queued",
-  "dag_id": "veriflow_wf_789_exec_456"
+  "status": "queued"
 }
 ```
 
 #### Get Execution Status
 ```http
-GET /executions/{execution_id}
+GET /api/v1/executions/{execution_id}
 
 Response: 200 OK
 {
   "execution_id": "exec_456",
   "status": "running",
   "overall_progress": 45,
-  "nodes": {
-    "tool-1": {
-      "execution_sub_id": "sub_001",
-      "status": "completed",
-      "progress": 100
-    },
-    "tool-2": {
-      "execution_sub_id": "sub_002",
-      "status": "running",
-      "progress": 45
-    }
-  },
-  "logs": [
-    {
-      "timestamp": "2026-01-29T12:05:00Z",
-      "level": "INFO",
-      "message": "Starting segmentation step...",
-      "node_id": "tool-2"
-    }
-  ]
+  "nodes": {...}
 }
 ```
 
-#### Get Results
+#### Export Results (SDS ZIP)
 ```http
-GET /executions/{execution_id}/results?node_id=tool-2
+GET /api/v1/executions/{execution_id}/export
 
-Response: 200 OK
+Response: 200 OK (application/zip)
+```
+
+#### Real-time Logs (WebSocket)
+```
+WebSocket /ws/logs
+
+Messages (JSON):
 {
-  "execution_id": "exec_456",
-  "files": [
-    {
-      "path": "derivative/sub-001/tumor_mask.nii.gz",
-      "node_id": "tool-2",
-      "size": 1048576,
-      "download_url": "https://minio.local/process/exec_456/..."  // Presigned URL
-    }
-  ]
-}
-```
-
-### 5.5 WebSocket Specification
-
-#### Endpoint
-```
-ws://localhost:8000/ws/logs?execution_id={execution_id}
-```
-
-#### Message Types
-
-```typescript
-// Server → Client messages
-type WebSocketMessage = 
-  | AgentStatusMessage
-  | NodeStatusMessage
-  | LogEntryMessage
-  | ExecutionCompleteMessage;
-
-interface AgentStatusMessage {
-  type: "agent_status";
-  timestamp: string;
-  agent: "scholar" | "engineer" | "reviewer";
-  status: "idle" | "thinking" | "processing" | "complete" | "error";
-  message?: string;
-}
-
-interface NodeStatusMessage {
-  type: "node_status";
-  timestamp: string;
-  execution_id: string;
-  execution_sub_id: string;
-  node_id: string;
-  status: "pending" | "running" | "completed" | "error";
-  progress: number;  // 0-100
-}
-
-interface LogEntryMessage {
-  type: "log";
-  timestamp: string;
-  level: "DEBUG" | "INFO" | "WARNING" | "ERROR";
-  message: string;
-  node_id?: string;
-  agent?: string;
-}
-
-interface ExecutionCompleteMessage {
-  type: "execution_complete";
-  timestamp: string;
-  execution_id: string;
-  status: "success" | "partial_failure" | "failed";
-  results_url: string;
+  "timestamp": "2026-02-09T12:00:00Z",
+  "level": "INFO",
+  "message": "Node preprocessing completed",
+  "node_id": "step_1",
+  "agent": "engineer"
 }
 ```
 
 ---
 
-## 6. Frontend Specification
+## 7. Frontend Specification
 
-### 6.1 Technology Stack
+### 7.1 Technology Stack
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| Vue | 3.x | UI Framework |
-| Vue Flow | latest | Workflow graph visualization |
-| Pinia | latest | State management |
-| TypeScript | 5.x | Type safety |
-| Tailwind CSS | 4.x | Styling |
+| Vue | 3.5+ | UI Framework |
+| Vue Flow | 1.41+ | Workflow graph visualization |
+| Pinia | 2.2+ | State management |
+| TypeScript | 5.6+ | Type safety |
+| Tailwind CSS | 4.0+ | Styling |
+| Vite | 6.0+ | Build tool |
+| dagre | 0.8.5 | Graph auto-layout |
+| lucide-vue-next | 0.468+ | Icons |
+| axios | 1.13+ | HTTP client |
 
-### 6.2 Component Hierarchy
+### 7.2 Component Hierarchy
 
 ```
 App.vue
-├── LeftPanel/
-│   ├── UploadModule.vue
-│   └── StudyDesignModule.vue
-├── CenterPanel/
-│   ├── WorkflowCanvas.vue (Vue Flow)
-│   ├── DataObjectCatalogue.vue
-│   └── ViewerPanel.vue
-├── RightPanel/
-│   └── DatasetNavigationModule.vue
-└── BottomPanel/
-    └── ConsoleModule.vue
++-- LandingPageOverlay.vue
++-- Header (inline)
+|   +-- ConfigurationPanel.vue
++-- LeftPanel/
+|   +-- ResizablePanel.vue
+|       +-- UploadModule.vue
+|   +-- ResizablePanel.vue (conditional)
+|       +-- StudyDesignModule.vue
+|           +-- AdditionalInfoModal.vue
++-- CenterPanel/
+|   +-- WorkflowAssemblerModule.vue
+|       +-- GraphNode.vue (custom Vue Flow node)
+|       +-- ConnectionLine.vue (custom Vue Flow edge)
+|       +-- DataObjectCatalogue.vue
+|       +-- ViewerPanel.vue
++-- RightPanel/
+|   +-- CollapsibleHorizontalPanel.vue
+|       +-- DatasetNavigationModule.vue
+|           +-- FileTreeNode.vue
++-- BottomPanel/
+    +-- ConsoleModule.vue
+    +-- ConsoleInput.vue
 ```
 
-### 6.3 State Management (Pinia)
+### 7.3 State Management (Pinia)
+
+Single store at `stores/workflow.ts`:
 
 ```typescript
-// stores/workflow.ts
-interface WorkflowState {
-  // Upload state
-  uploadId: string | null;
-  uploadedPdfUrl: string | null;
-  hasUploadedFiles: boolean;
-  
-  // Study design state
-  hierarchy: Investigation | null;
-  confidenceScores: ConfidenceScores | null;
-  selectedAssay: string | null;
-  
-  // Workflow state
-  workflowId: string | null;
-  graph: WorkflowGraph;
-  isAssembled: boolean;
-  selectedNode: string | null;
-  selectedDatasetId: string | null;
-  
-  // Execution state
-  executionId: string | null;
-  isWorkflowRunning: boolean;
-  nodeStatuses: Record<string, NodeStatus>;
-  logs: LogEntry[];
-  
-  // UI state
-  isLeftPanelCollapsed: boolean;
-  isRightPanelCollapsed: boolean;
-  isConsoleCollapsed: boolean;
-  consoleHeight: number;
-  viewerPdfUrl: string | null;
-  isViewerVisible: boolean;
-}
+// Upload state
+uploadId, uploadedPdfUrl, hasUploadedFiles
+
+// Study design state
+hierarchy, confidenceScores, selectedAssay
+
+// Workflow state
+workflowId, nodes, edges, isAssembled, selectedNode, selectedDatasetId
+
+// Execution state
+executionId, isWorkflowRunning, nodeStatuses, logs
+
+// UI state
+isLeftPanelCollapsed, isRightPanelCollapsed, isConsoleCollapsed
+consoleHeight, viewerPdfUrl, isViewerVisible
+
+// Loading state
+isLoading, loadingMessage, error
 ```
 
-### 6.4 Vue Flow Integration
+**Key Actions:**
+- `uploadPublication()` - Upload PDF and trigger study design fetch
+- `loadExample()` - Load pre-configured MAMA-MIA demo
+- `fetchStudyDesignFromApi()` - Fetch ISA hierarchy from backend
+- `assembleWorkflow()` - Request workflow assembly from AI agents
+- `runWorkflow()` - Start workflow execution
+- `exportResults()` - Download SDS ZIP export
+
+### 7.4 Layout
+
+Four-panel responsive layout:
+- **Left Panel**: Upload + Study Design (resizable, collapsible)
+- **Center Panel**: Workflow graph canvas (Vue Flow) with data catalogue and viewer
+- **Right Panel**: Results visualization and export (collapsible)
+- **Bottom Panel**: Console with resizable height and agent log streaming
+
+### 7.5 Vue Flow Integration
+
+Auto-layout using dagre (left-to-right):
 
 ```typescript
-// components/WorkflowCanvas.vue
-import { VueFlow, useVueFlow } from '@vue-flow/core';
-import { Background, Controls, MiniMap } from '@vue-flow/additional-components';
-
-// Custom node components
-const nodeTypes = {
-  measurement: MeasurementNode,
-  tool: ToolNode,
-  model: ModelNode,
-};
-
-// Auto-layout using dagre
 import dagre from 'dagre';
 
-function autoLayout(nodes: Node[], edges: Edge[]): Node[] {
+function getLayoutedElements(nodes, edges, direction = 'LR') {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 150 });
-  
-  nodes.forEach(node => {
-    g.setNode(node.id, { width: 200, height: 100 });
-  });
-  
-  edges.forEach(edge => {
-    g.setEdge(edge.source, edge.target);
-  });
-  
-  dagre.layout(g);
-  
-  return nodes.map(node => ({
-    ...node,
-    position: {
-      x: g.node(node.id).x - 100,
-      y: g.node(node.id).y - 50,
-    },
-  }));
+  g.setGraph({ rankdir: direction, nodesep: 50, ranksep: 150 });
+  // ... layout calculation
 }
 ```
 
-### 6.5 Visual Design
-
-```css
-/* Node colors */
---measurement-color: #2563eb;  /* Blue */
---tool-color: #9333ea;         /* Purple */
---model-color: #16a34a;        /* Green */
-
-/* Status colors */
---status-pending: #94a3b8;     /* Gray */
---status-running: #2563eb;     /* Blue */
---status-completed: #16a34a;   /* Green */
---status-error: #dc2626;       /* Red */
-```
+Custom node types: `measurement`, `tool`, `model` with status-based styling.
 
 ---
 
-## 7. Execution Engine
+## 8. Execution Engine
 
-### 7.1 Airflow Configuration
+### 8.1 Airflow 3 Configuration
 
-```python
-# airflow.cfg relevant settings
-[core]
-executor = LocalExecutor
-dags_folder = /opt/airflow/dags
+VeriFlow uses Apache Airflow 3.0.6 with:
+- **Executor**: LocalExecutor
+- **Auth**: FabAuthManager + basic_auth
+- **API**: REST API with session + basic_auth backends
+- **CWL execution**: Via Docker-in-Docker (dind service)
 
-[api]
-auth_backends = airflow.api.auth.backend.session
+### 8.2 Services
 
-[webserver]
-expose_config = False
-```
+| Service | Role |
+|---------|------|
+| `CWLParser` | Parse CWL v1.3 YAML into structured workflow/tool models |
+| `DAGGenerator` | Convert CWL workflows to Airflow DAG Python files |
+| `DockerBuilder` | Generate Dockerfiles from CWL tool requirements |
+| `ExecutionEngine` | Orchestrate workflow execution lifecycle |
+| `AirflowClient` | HTTP client for Airflow 3 REST API |
+| `SDSExporter` | Export execution results as SPARC SDS ZIP |
 
-### 7.2 CWL to Airflow Conversion
+### 8.3 CWL Parser
 
-```python
-def cwl_to_airflow_dag(cwl_workflow: dict, execution_id: str) -> DAG:
-    """
-    Convert CWL v1.3 workflow to Airflow DAG.
-    
-    Mapping:
-    - CWL Workflow → Airflow DAG
-    - CWL CommandLineTool → DockerOperator
-    - CWL inputs → Airflow Variables / XCom
-    - CWL scatter → Dynamic Task Mapping
-    """
-    dag_id = f"veriflow_{execution_id}"
-    
-    with DAG(
-        dag_id=dag_id,
-        start_date=datetime.now(),
-        catchup=False,
-        tags=["veriflow"],
-    ) as dag:
-        
-        for step_id, step in cwl_workflow["steps"].items():
-            tool_cwl = load_cwl(step["run"])
-            
-            task = DockerOperator(
-                task_id=step_id,
-                image=get_docker_image(tool_cwl),
-                command=build_command(tool_cwl, step["in"]),
-                mounts=[
-                    Mount(source=MINIO_MOUNT, target="/data", type="bind")
-                ],
-                environment={
-                    "INPUT_PATH": resolve_input_path(step["in"]),
-                    "OUTPUT_PATH": f"/data/output/{execution_id}/{step_id}",
-                },
-            )
-        
-        # Set dependencies based on CWL step connections
-        for step_id, step in cwl_workflow["steps"].items():
-            for input_ref in step["in"].values():
-                if "/" in str(input_ref):  # References another step
-                    source_step = input_ref.split("/")[0]
-                    dag.get_task(source_step) >> dag.get_task(step_id)
-    
-    return dag
-```
+Parses CWL v1.3 workflows and tools:
+- Validates `cwlVersion` and `class`
+- Extracts inputs/outputs (dict and list formats)
+- Resolves step dependencies
+- Topological sort for execution order
+- Docker requirement extraction
 
-### 7.3 Airflow Authentication
+### 8.4 DAG Generator
 
-```python
-# JWT-based authentication for Airflow API
-import requests
+Converts parsed CWL to Airflow DAGs:
+- Maps CWL `CommandLineTool` -> `DockerOperator`
+- Generates dependency chains
+- Creates Python DAG files in the dags directory
 
-class AirflowClient:
-    def __init__(self, base_url: str = "http://localhost:8080"):
-        self.base_url = base_url
-        self.token = self._get_jwt_token()
-    
-    def _get_jwt_token(self) -> str:
-        response = requests.post(
-            f"{self.base_url}/api/v1/security/login",
-            json={"username": "veriflow", "password": AIRFLOW_PASSWORD}
-        )
-        return response.json()["access_token"]
-    
-    def trigger_dag(self, dag_id: str, conf: dict) -> str:
-        response = requests.post(
-            f"{self.base_url}/api/v1/dags/{dag_id}/dagRuns",
-            headers={"Authorization": f"Bearer {self.token}"},
-            json={"conf": conf}
-        )
-        return response.json()["dag_run_id"]
-    
-    def get_dag_run_status(self, dag_id: str, dag_run_id: str) -> dict:
-        response = requests.get(
-            f"{self.base_url}/api/v1/dags/{dag_id}/dagRuns/{dag_run_id}",
-            headers={"Authorization": f"Bearer {self.token}"}
-        )
-        return response.json()
-```
+### 8.5 SDS Export
 
-### 7.4 Status Polling
-
-Default polling interval: **5 seconds** (Airflow default for task state refresh).
-
-```python
-async def poll_execution_status(execution_id: str, websocket: WebSocket):
-    """Stream execution status updates via WebSocket."""
-    airflow = AirflowClient()
-    dag_id = f"veriflow_{execution_id}"
-    
-    while True:
-        status = airflow.get_dag_run_status(dag_id, execution_id)
-        
-        if status["state"] in ["success", "failed"]:
-            await websocket.send_json({
-                "type": "execution_complete",
-                "execution_id": execution_id,
-                "status": status["state"]
-            })
-            break
-        
-        # Send node-level updates
-        for task in status["task_instances"]:
-            await websocket.send_json({
-                "type": "node_status",
-                "execution_id": execution_id,
-                "node_id": task["task_id"],
-                "status": task["state"],
-                "progress": calculate_progress(task)
-            })
-        
-        await asyncio.sleep(5)  # 5-second polling interval
-```
+Exports execution results as SPARC SDS compliant ZIP:
+- `dataset_description.json`
+- `manifest.xlsx` / `manifest.csv`
+- Provenance tracking with derivation links
+- Output files organized by execution step
 
 ---
 
-## 8. Storage System
+## 9. Storage System
 
-### 8.1 MinIO Bucket Structure
+### 9.1 MinIO Bucket Structure
 
 ```
 MinIO
-├── measurements/           # Primary measurement datasets (SDS)
-│   ├── mama-mia/
-│   │   ├── primary/
-│   │   │   └── DCE-MRI/
-│   │   │       └── sub-001/
-│   │   │           └── T1w.nii.gz
-│   │   ├── manifest.xlsx
-│   │   └── dataset_description.json
-│   └── biv-me/
-│       └── ...
-│
-├── workflow/               # Workflow definitions (SDS)
-│   ├── wf_789/
-│   │   ├── primary/
-│   │   │   └── workflow.cwl
-│   │   ├── manifest.xlsx
-│   │   └── dataset_description.json
-│   └── ...
-│
-├── workflow-tool/          # Tool definitions (SDS)
-│   ├── dicom-to-nifti/
-│   │   ├── code/
-│   │   │   └── convert.py
-│   │   ├── Dockerfile
-│   │   ├── tool.cwl
-│   │   └── manifest.xlsx
-│   └── unet-segmentation/
-│       └── ...
-│
-└── process/                # Execution outputs (Derived SDS)
-    └── exec_456/
-        ├── derivative/
-        │   └── segmentation/
-        │       └── sub-001/
-        │           └── tumor_mask.nii.gz
-        ├── manifest.xlsx
-        └── provenance.json  # Links to source datasets
++-- measurements/         # Primary measurement datasets (SDS)
+|   +-- mama-mia/
+|       +-- primary/
+|       +-- manifest.xlsx
+|       +-- dataset_description.json
++-- workflow/             # Workflow definitions (SDS)
+|   +-- wf_789/
+|       +-- primary/
+|           +-- workflow.cwl
++-- workflow-tool/        # Tool definitions (SDS)
+|   +-- dicom-to-nifti/
+|       +-- code/
+|       +-- Dockerfile
+|       +-- tool.cwl
++-- process/              # Execution outputs (Derived SDS)
+    +-- exec_456/
+        +-- derivative/
+        +-- manifest.xlsx
+        +-- provenance.json
 ```
 
-### 8.2 Presigned URL Generation
-
-```python
-from minio import Minio
-from datetime import timedelta
-
-minio_client = Minio(
-    "localhost:9000",
-    access_key="veriflow",
-    secret_key=MINIO_SECRET,
-    secure=False
-)
-
-def get_presigned_download_url(bucket: str, object_name: str, expires: int = 3600) -> str:
-    """Generate presigned URL for file download."""
-    return minio_client.presigned_get_object(
-        bucket,
-        object_name,
-        expires=timedelta(seconds=expires)
-    )
-
-def get_presigned_upload_url(bucket: str, object_name: str) -> str:
-    """Generate presigned URL for file upload."""
-    return minio_client.presigned_put_object(
-        bucket,
-        object_name,
-        expires=timedelta(hours=1)
-    )
-```
-
-### 8.3 SDS Export Format
-
-Export as ZIP preserving SDS structure:
-
-```
-export_pub_123.zip
-├── investigation_sds/
-│   ├── dataset_description.json
-│   ├── manifest.xlsx
-│   └── primary/
-│       └── investigation.json  # ISA-JSON
-│
-├── study_sds/
-│   └── ...
-│
-├── measurements_sds/
-│   └── ...  # Only if populated at export time
-│
-├── workflow_sds/
-│   └── ...  # Only if workflow assembled
-│
-└── process_sds/
-    └── ...  # Only if workflow executed
-```
+Buckets are auto-created by the `minio-init` service on startup.
 
 ---
 
-## 9. MVP Constraints
+## 10. Testing
 
-### 9.1 Scope Boundaries
+### 10.1 Backend Tests (pytest)
 
-| Feature | MVP Status | Notes |
-|---------|------------|-------|
-| MAMA-MIA workflow | ✅ Required | Primary demo case |
-| Biv-me workflow | ⭐ Stretch | Secondary example |
-| Subject limit | 1 | Default for MVP |
-| Save/Resume workflow | ❌ Not in MVP | Export only |
-| Load saved state | ❌ Not in MVP | |
-| Custom PDF upload | ✅ Supported | |
-| Pre-loaded examples | ✅ Required | PDF + Context file |
+**163 tests** across 17 test files:
 
-### 9.2 Pre-loaded Example Configuration
+| Category | Files | Tests |
+|----------|-------|-------|
+| Agent tests | `test_scholar.py`, `test_engineer.py`, `test_reviewer.py` | ~30 |
+| Service tests | `test_gemini_client.py`, `test_cwl_parser.py`, `test_dag_generator.py`, `test_docker_builder.py`, `test_sds_exporter.py`, `test_execution_engine.py`, `test_airflow_client.py`, `test_minio_service.py`, `test_config.py`, `test_prompt_manager.py` | ~100 |
+| API tests | `test_api_health.py`, `test_api_publications.py`, `test_api_workflows.py`, `test_api_executions.py` | ~20 |
+| Fixtures | `conftest.py` | - |
 
-```typescript
-interface PreloadedExample {
-  id: string;
-  name: string;
-  pdf_url: string;           // MinIO presigned URL
-  context_file_url: string;  // Supplemental notes for Scholar
-  ground_truth?: {           // For validation
-    isa_json: string;
-    workflow_cwl: string;
-    expected_outputs: string[];
-  };
-}
+**Run:**
+```bash
+# Local
+cd backend && python -m pytest tests/ -v
 
-const PRELOADED_EXAMPLES: PreloadedExample[] = [
-  {
-    id: "mama-mia",
-    name: "MAMA-MIA: Breast Cancer Segmentation",
-    pdf_url: "measurements/mama-mia/docs/paper.pdf",
-    context_file_url: "measurements/mama-mia/docs/context.txt",
-    ground_truth: {
-      // Used for benchmarking, not displayed
-      isa_json: "measurements/mama-mia/ground_truth/investigation.json",
-      workflow_cwl: "workflow/mama-mia-gt/workflow.cwl",
-      expected_outputs: ["tumor_mask.nii.gz"]
-    }
-  }
-];
+# Docker
+docker compose run --rm backend pytest tests/ -v
 ```
 
-### 9.3 Context File Format
+### 10.2 Frontend Tests (Vitest)
 
+**6 tests** across 2 test files:
+- `stores/__tests__/workflow.spec.ts` - Pinia store tests
+- `components/modules/__tests__/UploadModule.spec.ts` - Component tests
+
+**Run:**
+```bash
+cd frontend && npx vitest run
 ```
-# MAMA-MIA Context File
-# Supplemental information for Scholar Agent
 
-## Dataset Information
-- Name: MAMA-MIA (Multi-center Annotated Mammary MRI for AI)
-- Total Subjects: 1506 patients
-- Modality: DCE-MRI (Dynamic Contrast-Enhanced)
+### 10.3 Test Guidelines
 
-## Methodology Details
-- Segmentation Model: nnU-Net
-- Input Format: NIfTI (converted from DICOM)
-- Output: Binary tumor segmentation mask
-
-## Repository Information
-- Code Repository: https://github.com/example/mama-mia
-- Model Weights: Provided in accompanying weights.zip
-
-## Key Processing Steps
-1. DICOM to NIfTI conversion
-2. Intensity normalization
-3. nnU-Net inference
-4. Post-processing (optional)
-```
+- **Unit tests**: Mock external clients (Gemini API, MinIO). Test real app functions.
+- **Integration tests**: No mock classes/methods. Use real credentials when applicable.
+- **Docker compatibility**: `conftest.py` conditionally mocks `google-genai` SDK when not installed.
 
 ---
 
-## 10. Error Handling
+## 11. Error Handling
 
-### 10.1 Error Categories
+### 11.1 Error Categories
 
 ```typescript
 enum ErrorCategory {
-  // Agent errors
   SCHOLAR_EXTRACTION_FAILED = "scholar_extraction_failed",
   ENGINEER_CWL_GENERATION_FAILED = "engineer_cwl_failed",
   REVIEWER_VALIDATION_FAILED = "reviewer_validation_failed",
-  
-  // Execution errors
   AIRFLOW_CONNECTION_FAILED = "airflow_connection_failed",
   DAG_TRIGGER_FAILED = "dag_trigger_failed",
   TOOL_EXECUTION_FAILED = "tool_execution_failed",
-  
-  // Storage errors
   MINIO_UPLOAD_FAILED = "minio_upload_failed",
-  MINIO_DOWNLOAD_FAILED = "minio_download_failed",
-  
-  // Data errors
   INVALID_PDF = "invalid_pdf",
   UNSUPPORTED_FORMAT = "unsupported_format",
   MISSING_DEPENDENCIES = "missing_dependencies"
 }
 ```
 
-### 10.2 Error Response Format
+### 11.2 Recovery Flow
 
-```typescript
-interface ErrorResponse {
-  error: {
-    code: ErrorCategory;
-    message: string;           // User-friendly message
-    details?: string;          // Technical details
-    suggestions?: string[];    // Reviewer Agent suggestions
-    recoverable: boolean;
-    retry_action?: string;     // Suggested retry endpoint
-  };
-  session_id?: string;
-  timestamp: string;
-}
-```
-
-### 10.3 Recovery Flow
+The Reviewer Agent provides error translation (Gemini 3 with `ErrorTranslationResult` schema) and auto-fix suggestions:
 
 ```
 Error Detected
-      │
-      ▼
-┌─────────────────┐
-│ Reviewer Agent  │
-│ analyzes error  │
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    ▼         ▼
-┌────────┐ ┌────────────┐
-│Auto-fix│ │Ask user for│
-│possible│ │clarification│
-└───┬────┘ └─────┬──────┘
-    │            │
-    ▼            ▼
-┌────────┐ ┌────────────┐
-│ Apply  │ │ User input │
-│ fix    │ └─────┬──────┘
-└───┬────┘       │
-    │      ┌─────┴─────┐
-    ▼      ▼           ▼
-┌──────────────┐ ┌──────────┐
-│ Retry step   │ │ Abort    │
-└──────────────┘ └──────────┘
+      |
+      v
++-------------------+
+| Reviewer Agent    |
+| (Gemini 3 Flash)  |
+| thinking: MEDIUM  |
++--------+----------+
+         |
+    +----+----+
+    v         v
++--------+ +------------+
+|Auto-fix| |Translate   |
+|possible| |to user msg |
++---+----+ +-----+------+
+    |             |
+    v             v
++--------+  +----------+
+| Apply  |  | Show to  |
+| fix    |  | user     |
++--------+  +----------+
 ```
 
 ---
 
 ## Appendix A: Docker Compose Configuration
 
+See `docker-compose.yml` for the full 9-service configuration:
+
 ```yaml
-version: '3.8'
-
 services:
-  veriflow-backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://veriflow:password@postgres:5432/veriflow
-      - MINIO_ENDPOINT=minio:9000
-      - AIRFLOW_URL=http://airflow-webserver:8080
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    depends_on:
-      - postgres
-      - minio
-      - airflow-webserver
-
-  veriflow-frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - veriflow-backend
-
-  postgres:
-    image: postgres:15
-    environment:
-      - POSTGRES_USER=veriflow
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=veriflow
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  minio:
-    image: minio/minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=veriflow
-      - MINIO_ROOT_PASSWORD=password
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-
-  airflow-webserver:
-    image: apache/airflow:2.8.0
-    ports:
-      - "8080:8080"
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql://veriflow:password@postgres:5432/airflow
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - minio_data:/data  # Shared with MinIO for Airflow access
-    depends_on:
-      - postgres
-
-volumes:
-  postgres_data:
-  minio_data:
+  dind:          # Docker-in-Docker for CWL execution
+  backend:       # FastAPI (port 8000, hot-reload in dev)
+  frontend:      # Vue 3 via nginx (port 3000)
+  postgres:      # PostgreSQL 15 (port 5432)
+  minio:         # MinIO object storage (ports 9000, 9001)
+  minio-init:    # Bucket initialization
+  airflow-apiserver:   # Airflow 3.0.6 API (port 8080)
+  airflow-scheduler:   # Airflow task scheduler
+  cwl:           # CWL runner (cwltool)
 ```
+
+**Environment Variables** (see `.env.example`):
+
+| Variable | Description |
+|----------|-------------|
+| `GEMINI_API_KEY` | Google AI Studio API key (required) |
+| `POSTGRES_USER/PASSWORD/DB` | PostgreSQL credentials |
+| `MINIO_ACCESS_KEY/SECRET_KEY` | MinIO credentials |
+| `AIRFLOW_USERNAME/PASSWORD` | Airflow credentials |
+| `AIRFLOW_FERNET_KEY` | Airflow encryption key |
 
 ---
 
 ## Appendix B: Database Schema
 
 ```sql
--- Sessions table
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE agent_sessions (
-    session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     upload_id VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    
-    -- Scholar state
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Scholar agent state
     scholar_extraction_complete BOOLEAN DEFAULT FALSE,
-    isa_json_path VARCHAR(500),
-    confidence_scores_path VARCHAR(500),
-    context_used TEXT,
-    
-    -- Engineer state
-    workflow_id VARCHAR(255),
-    cwl_path VARCHAR(500),
-    tools_generated JSONB DEFAULT '[]',
-    adapters_generated JSONB DEFAULT '[]',
-    
-    -- Reviewer state
-    validations_passed BOOLEAN DEFAULT FALSE,
-    validation_errors JSONB DEFAULT '[]',
-    suggestions JSONB DEFAULT '[]'
+    scholar_isa_json_path TEXT,
+    scholar_confidence_scores_path TEXT,
+    scholar_context_used TEXT,
+    -- Engineer agent state
+    engineer_workflow_id VARCHAR(255),
+    engineer_cwl_path TEXT,
+    engineer_tools_generated JSONB DEFAULT '[]'::jsonb,
+    engineer_adapters_generated JSONB DEFAULT '[]'::jsonb,
+    -- Reviewer agent state
+    reviewer_validations_passed BOOLEAN DEFAULT FALSE,
+    reviewer_validation_errors JSONB DEFAULT '[]'::jsonb,
+    reviewer_suggestions JSONB DEFAULT '[]'::jsonb
 );
 
--- Conversation history
 CREATE TABLE conversation_history (
     id SERIAL PRIMARY KEY,
-    session_id UUID REFERENCES agent_sessions(session_id),
-    agent VARCHAR(20) NOT NULL,  -- scholar, engineer, reviewer
-    role VARCHAR(20) NOT NULL,   -- user, assistant, system
+    session_id UUID REFERENCES agent_sessions(session_id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
     content TEXT NOT NULL,
-    timestamp TIMESTAMP DEFAULT NOW()
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    agent VARCHAR(50) NOT NULL CHECK (agent IN ('scholar', 'engineer', 'reviewer'))
 );
 
--- Executions
 CREATE TABLE executions (
-    execution_id VARCHAR(255) PRIMARY KEY,
+    execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     workflow_id VARCHAR(255) NOT NULL,
-    session_id UUID REFERENCES agent_sessions(session_id),
     dag_id VARCHAR(255),
-    status VARCHAR(50) DEFAULT 'pending',
-    config JSONB,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    results_path VARCHAR(500)
+    status VARCHAR(50) DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'success', 'partial_failure', 'failed')),
+    overall_progress INTEGER DEFAULT 0,
+    config JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    node_statuses JSONB DEFAULT '{}'::jsonb,
+    logs JSONB DEFAULT '[]'::jsonb
 );
-
--- Indexes
-CREATE INDEX idx_sessions_upload ON agent_sessions(upload_id);
-CREATE INDEX idx_history_session ON conversation_history(session_id);
-CREATE INDEX idx_executions_workflow ON executions(workflow_id);
 ```
 
 ---
 
 **Document End**
 
-*This specification is designed for engineers and AI agents implementing VeriFlow. For stakeholder-facing documentation, see PRD.md.*
+*This specification reflects the current implementation as of 2026-02-09, built for the Gemini 3 Hackathon.*

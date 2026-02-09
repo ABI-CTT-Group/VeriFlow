@@ -42,3 +42,19 @@ venv/
 archive/
 
 /backend/examples/data/
+
+# tmp
+tmp/
+
+# output
+output/
+out/
+
+# data
+cwl/input_data/
+data/*
+test_workflows/
+model_sds_nnunet_pretrained_weights/
+
+# others
+trigger_dag.py

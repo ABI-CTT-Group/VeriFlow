@@ -3,76 +3,37 @@ cwlVersion: v1.2
 class: CommandLineTool
 
 label: DICOM to NIfTI Converter
-doc: |
-  Converts DICOM image series to NIfTI format using dicom2nifti.
-  Loops through subfolders in the input directory and converts each to a NIfTI file.
-
-baseCommand: ["python", "create_nifti.py"]
+doc: Converts DICOM images in a directory to NIfTI format using dicom2nifti
 
 requirements:
   DockerRequirement:
-    dockerPull: python:3.9
+    dockerPull: clin864/create-nifiti:latest
   InitialWorkDirRequirement:
     listing:
-      - entryname: create_nifti.py
-        entry: |
-          import os
-          import dicom2nifti
-          import argparse
+      - entry: $(inputs.dicom_images)
+        writable: false
 
-          def convert_dicom_to_nifti(input_root, output_root):
-              if not os.path.exists(output_root):
-                  os.makedirs(output_root)
-                  print(f"Created output folder: {output_root}")
-
-              for item in os.listdir(input_root):
-                  folder_path = os.path.join(input_root, item)
-                  
-                  if os.path.isdir(folder_path):
-                      output_path = os.path.join(output_root, f"{item}_0000.nii.gz")
-                      
-                      try:
-                          dicom2nifti.dicom_series_to_nifti(folder_path, output_path, reorient_nifti=True)
-                      except Exception as e:
-                          print(f"failed to convert {item}: {e}")
-
-          if __name__ == "__main__":
-              parser = argparse.ArgumentParser(description="convert nifti images")
-              
-              parser.add_argument(
-                  "--input_folder", 
-                  type=str, 
-                  required=True, 
-                  help="Path to the folder containing input images"
-              )
-
-              parser.add_argument(
-                  "--output_folder", 
-                  type=str, 
-                  required=True, 
-                  help="Path to the folder where converted NIfTI files will be saved"
-              )
-              args = parser.parse_args()
-              
-              convert_dicom_to_nifti(args.input_folder, args.output_folder)
+# The Docker image has ENTRYPOINT set to "python create_nifti.py"
+# We just need to pass the arguments
+baseCommand: []
 
 inputs:
-  input_folder:
+  dicom_images:
     type: Directory
     inputBinding:
       prefix: --input_folder
-    doc: Directory containing DICOM image subfolders to convert
+    doc: Directory containing DICOM image files
 
   output_folder:
     type: string
-    default: "nifti_output"
+    default: "."
     inputBinding:
       prefix: --output_folder
-    doc: Name of the output directory for converted NIfTI files
+    doc: Output folder path (uses CWL working directory)
 
 outputs:
-  nifti_output:
-    type: Directory
+  nifti_images:
+    type: File[]
     outputBinding:
-      glob: $(inputs.output_folder)
-    doc: Directory containing the converted NIfTI files (.nii.gz)
+      glob: "*.nii.gz"
+    doc: The converted NIfTI image files

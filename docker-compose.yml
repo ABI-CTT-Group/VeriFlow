@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  # Docker-in-Docker Service
+  dind:
+    image: docker:dind
+    container_name: veriflow-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - ./cwl:/opt/airflow/cwl
+      - ./cwl/workflows:/workflows
+      - ./cwl/input_data:/input_data
+      - cwl-output:/opt/airflow/cwl-output
+      - cwl-tmp:/tmp
+    networks:
+      - veriflow-network
   # FastAPI Backend
   backend:
     build:
@@ -108,15 +123,30 @@ services:
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
       - AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.session
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth
       - _AIRFLOW_DB_MIGRATE=true
       - _AIRFLOW_WWW_USER_CREATE=true
       - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USERNAME}
       - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD}
+      # CWL runner configuration
+      - CWL_BASE_PATH=/opt/airflow/cwl
+      - DATA_BASE_PATH=/opt/airflow/data
+      - DOCKER_HOST=tcp://dind:2375
+      # Internal API client configuration for Airflow 3
+      - AIRFLOW__API__CLIENT_BASE_URL=http://airflow-apiserver:8080
+      - AIRFLOW__API__CLIENT_AUTH_BACKEND=airflow.sdk.api.auth.backend.basic_auth
+      - AIRFLOW__API__CLIENT_USERNAME=${AIRFLOW_USERNAME}
+      - AIRFLOW__API__CLIENT_PASSWORD=${AIRFLOW_PASSWORD}
+      - AIRFLOW__CORE__EXECUTION_API_SERVER_URL=http://airflow-apiserver:8080/execution/
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
-      - /var/run/docker.sock:/var/run/docker.sock
+      # - /var/run/docker.sock:/var/run/docker.sock # Removed in favor of dind
+      # CWL workflow files and data directories
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
+      - cwl-output:/opt/airflow/cwl-output
+      - cwl-tmp:/tmp
     depends_on:
       postgres:
         condition: service_healthy
@@ -142,10 +172,25 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      # CWL runner configuration
+      - CWL_BASE_PATH=/opt/airflow/cwl
+      - DATA_BASE_PATH=/opt/airflow/data
+      - DOCKER_HOST=tcp://dind:2375
+      # Internal API client configuration for Airflow 3
+      - AIRFLOW__API__CLIENT_BASE_URL=http://airflow-apiserver:8080
+      - AIRFLOW__API__CLIENT_AUTH_BACKEND=airflow.sdk.api.auth.backend.basic_auth
+      - AIRFLOW__API__CLIENT_USERNAME=${AIRFLOW_USERNAME}
+      - AIRFLOW__API__CLIENT_PASSWORD=${AIRFLOW_PASSWORD}
+      - AIRFLOW__CORE__EXECUTION_API_SERVER_URL=http://airflow-apiserver:8080/execution/
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
-      - /var/run/docker.sock:/var/run/docker.sock
+      # - /var/run/docker.sock:/var/run/docker.sock # Removed in favor of dind
+      # CWL workflow files and data directories
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
+      - cwl-output:/opt/airflow/cwl-output
+      - cwl-tmp:/tmp
     depends_on:
       airflow-apiserver:
         condition: service_healthy
@@ -153,10 +198,34 @@ services:
     networks:
       - veriflow-network
 
+  # CWL Runner Service
+  cwl:
+    build:
+      context: ./cwl
+      dockerfile: Dockerfile
+    image: veriflow-cwl:latest
+    container_name: veriflow-cwl
+    environment:
+      - DOCKER_HOST=tcp://dind:2375
+      - TMPDIR=/tmp
+      - HOME=/tmp
+    volumes:
+      - ./cwl/workflows:/workflows
+      - ./cwl/input_data:/input_data
+      - ./cwl/output:/output
+      - cwl-tmp:/tmp
+    working_dir: /workflows
+    depends_on:
+      - dind
+    networks:
+      - veriflow-network
+
 volumes:
   postgres-data:
   minio-data:
   airflow-logs:
+  cwl-output:
+  cwl-tmp:
 
 
 networks:

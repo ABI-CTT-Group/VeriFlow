@@ -1,0 +1,15 @@
+FROM python:3.10
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir dicom2nifti
+
+# Copy your script
+COPY create_nifti.py .
+
+RUN mkdir /input
+RUN mkdir /output
+
+# Usage: python create_nifti.py <input_folder> <output_folder>
+ENTRYPOINT ["python", "/app/create_nifti.py"]
+CMD ["--input_folder", "/input", "--output_folder", "/output"]

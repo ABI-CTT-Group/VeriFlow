@@ -1,0 +1,20 @@
+import requests
+
+def trigger_dag(airflow_url, dag_id, token, conf=None):
+    url = f"{airflow_url}/api/v2/dags/{dag_id}/dagRuns"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {"conf": conf or {}}
+    
+    response = requests.post(url, json=payload, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        response.raise_for_statu
+        s()
+
+# Usage
+# trigger_dag("http://localhost:8080", "my_pipeline", "your_jwt_here", {"env": "prod"})

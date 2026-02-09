@@ -1,0 +1,19 @@
+# Use the full PyTorch image (avoids the 'libgl' issues of slim)
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+# Install basic imaging dependencies
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install nnU-Net v2
+RUN pip install --no-cache-dir nnunetv2
+
+# Set the environment variables nnU-Net requires to function
+ENV nnUNet_raw="/app/nnUNet_raw"
+ENV nnUNet_preprocessed="/app/nnUNet_preprocessed"
+ENV nnUNet_results="/app/nnUNet_results"
+
