@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { 
   FileText, BookOpen, Layers, FlaskConical, 
-  ChevronLeft, ExternalLink, X, Plus, Loader2
+  ChevronLeft, ExternalLink, X, Plus, Loader2, Info
 } from 'lucide-vue-next'
 import { useWorkflowStore } from '../../stores/workflow'
 import { storeToRefs } from 'pinia'
@@ -154,6 +154,13 @@ void _updateStep
 
 const selectedItemClass = 'bg-blue-50 border border-blue-200'
 const hoverClass = 'hover:bg-slate-50'
+
+// --- New Feature Handler ---
+const showNotImplemented = ref(false)
+
+function handleSourceClick() {
+  showNotImplemented.value = true
+}
 </script>
 
 <template>
@@ -287,7 +294,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Title</label>
-                <button @click="emit('sourceClick', 'paper-title')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -297,7 +304,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Authors</label>
-                <button @click="emit('sourceClick', 'paper-authors')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -307,7 +314,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Publication Year</label>
-                <button @click="emit('sourceClick', 'paper-year')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -317,7 +324,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Abstract</label>
-                <button @click="emit('sourceClick', 'paper-abstract')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -344,7 +351,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Title</label>
-                <button @click="emit('sourceClick', 'inv-title')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -354,7 +361,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Description</label>
-                <button @click="emit('sourceClick', 'inv-description')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -364,7 +371,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Submission Date</label>
-                <button @click="emit('sourceClick', 'inv-date')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -391,7 +398,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Study Title</label>
-                <button @click="emit('sourceClick', 'study-title')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -401,7 +408,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Description</label>
-                <button @click="emit('sourceClick', 'study-description')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -411,7 +418,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Number of Subjects</label>
-                <button @click="emit('sourceClick', 'study-subjects')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -421,7 +428,7 @@ const hoverClass = 'hover:bg-slate-50'
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Study Design</label>
-                <button @click="emit('sourceClick', 'study-design')" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
+                <button @click="handleSourceClick()" class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1">
                   <ExternalLink class="w-3 h-3" /> Source
                 </button>
               </div>
@@ -458,7 +465,7 @@ const hoverClass = 'hover:bg-slate-50'
               <div class="flex items-center justify-between mb-1">
                 <label class="text-xs font-medium text-slate-700">Name</label>
                 <button
-                  @click="emit('sourceClick', 'assay-name')"
+                  @click="handleSourceClick()"
                   class="text-blue-600 hover:text-blue-700 text-xs flex items-center gap-1"
                 >
                   <ExternalLink class="w-3 h-3" />
@@ -494,7 +501,7 @@ const hoverClass = 'hover:bg-slate-50'
                       class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
-                      @click="emit('sourceClick', `step-${step.id}`)"
+                      @click="handleSourceClick()"
                       class="text-blue-600 hover:text-blue-700 p-2"
                     >
                       <ExternalLink class="w-3 h-3" />
@@ -538,4 +545,44 @@ const hoverClass = 'hover:bg-slate-50'
       </div>
     </div>
   </div>
+
+
+  <!-- Friendly Popup Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showNotImplemented"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      @click="showNotImplemented = false"
+    >
+      <div
+        class="bg-white rounded-xl shadow-2xl p-6 w-96 relative animate-in fade-in zoom-in duration-200"
+        @click.stop
+      >
+        <button
+          @click="showNotImplemented = false"
+          class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <X class="w-5 h-5" />
+        </button>
+        
+        <div class="text-center pt-2">
+          <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Info class="w-6 h-6 text-blue-600" />
+          </div>
+          
+          <h3 class="text-lg font-semibold text-slate-900 mb-2">Coming Soon</h3>
+          <p class="text-slate-500 text-sm mb-6 leading-relaxed">
+            To be implemented in the future. We are currently working on this feature!
+          </p>
+          
+          <button
+            @click="showNotImplemented = false"
+            class="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>

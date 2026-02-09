@@ -419,7 +419,7 @@ function handleExportResults() {
         >
           <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin" />
           <Package v-else class="w-4 h-4" />
-          {{ isLoading ? 'Generating Export...' : 'Export Execution Results' }}
+          {{ isLoading ? 'Generating Export...' : 'Export All Results' }}
         </button>
         <button 
           :disabled="!props.selectedDatasetId"
@@ -434,7 +434,7 @@ function handleExportResults() {
           Export Selected Data Object
         </button>
         <p class="text-xs text-slate-400 text-center mt-2">
-          Exports are packaged in SDS format with manifest.xlsx
+          Exports are packaged in SDS format
         </p>
       </div>
     </div>
