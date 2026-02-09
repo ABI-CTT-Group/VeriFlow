@@ -1,0 +1,295 @@
+/* Custom Intro.js Theme - VeriFlow */
+
+/* Modern Tooltip Styling */
+.introjs-tooltip {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(59, 130, 246, 0.1) !important;
+    padding: 0 !important;
+    max-width: 450px !important;
+    min-width: 320px !important;
+}
+
+/* Tooltip Header */
+.introjs-tooltip-header {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 20px 24px !important;
+    border-bottom: none !important;
+}
+
+.introjs-tooltip-title {
+    color: #ffffff !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Close Button in Header */
+.introjs-skipbutton {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 28px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    text-shadow: none !important;
+    padding: 4px 8px !important;
+    margin: -4px 0 0 0 !important;
+    transition: all 0.2s ease !important;
+    opacity: 0.8 !important;
+}
+
+.introjs-skipbutton:hover {
+    opacity: 1 !important;
+    transform: scale(1.1) !important;
+    color: #ffffff !important;
+}
+
+/* Tooltip Content */
+.introjs-tooltiptext {
+    padding: 24px !important;
+    color: #475569 !important;
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+    min-height: 60px !important;
+}
+
+/* Bullets/Progress Dots */
+.introjs-bullets {
+    padding: 16px 24px !important;
+    text-align: center !important;
+}
+
+.introjs-bullets ul {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    gap: 8px !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+.introjs-bullets ul li {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.introjs-bullets ul li a {
+    width: 8px !important;
+    height: 8px !important;
+    background: #cbd5e1 !important;
+    border-radius: 50% !important;
+    display: block !important;
+    transition: all 0.3s ease !important;
+    border: 2px solid transparent !important;
+}
+
+.introjs-bullets ul li a:hover {
+    background: #94a3b8 !important;
+    transform: scale(1.2) !important;
+}
+
+.introjs-bullets ul li a.active {
+    width: 24px !important;
+    height: 8px !important;
+    border-radius: 4px !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+}
+
+/* Progress Bar */
+.introjs-progress {
+    background: #e2e8f0 !important;
+    border-radius: 2px !important;
+    height: 4px !important;
+    margin: 0 24px 16px !important;
+    overflow: hidden !important;
+}
+
+.introjs-progressbar {
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%) !important;
+    border-radius: 2px !important;
+    height: 100% !important;
+    transition: width 0.3s ease !important;
+}
+
+/* Button Container */
+.introjs-tooltipbuttons {
+    border-top: 1px solid #e2e8f0 !important;
+    padding: 16px 24px !important;
+    display: flex !important;
+    gap: 12px !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: #f8fafc !important;
+    border-radius: 0 0 16px 16px !important;
+}
+
+/* Buttons */
+.introjs-button {
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+}
+
+.introjs-prevbutton {
+    background: #ffffff !important;
+    color: #64748b !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.introjs-prevbutton:hover {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
+    transform: translateY(-1px) !important;
+}
+
+.introjs-nextbutton,
+.introjs-donebutton {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2), 0 2px 4px -1px rgba(59, 130, 246, 0.1) !important;
+}
+
+.introjs-nextbutton:hover,
+.introjs-donebutton:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.3), 0 4px 6px -1px rgba(59, 130, 246, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+.introjs-button:focus {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px !important;
+}
+
+.introjs-button:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+/* Overlay */
+.introjs-overlay {
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(2px) !important;
+}
+
+/* Highlighted Element */
+.introjs-helperLayer {
+    background: transparent !important;
+    border: 2px solid #3b82f6 !important;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5),
+        0 0 20px rgba(59, 130, 246, 0.4) !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+.introjs-showElement {
+    z-index: 9999999 !important;
+}
+
+/* Tooltip Arrow */
+.introjs-arrow {
+    border: 8px solid transparent !important;
+}
+
+.introjs-arrow.top {
+    border-bottom-color: #3b82f6 !important;
+    top: -16px !important;
+}
+
+.introjs-arrow.bottom {
+    border-top-color: #f8fafc !important;
+    bottom: -16px !important;
+}
+
+.introjs-arrow.left {
+    border-right-color: #f8fafc !important;
+    left: -16px !important;
+}
+
+.introjs-arrow.right {
+    border-left-color: #f8fafc !important;
+    right: -16px !important;
+}
+
+/* Hint System */
+.introjs-hint {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    border: none !important;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3) !important;
+    width: 24px !important;
+    height: 24px !important;
+}
+
+.introjs-hint:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 8px -1px rgba(59, 130, 246, 0.4) !important;
+}
+
+.introjs-hint-pulse {
+    border: 2px solid rgba(59, 130, 246, 0.4) !important;
+    background: transparent !important;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+    .introjs-tooltip {
+        max-width: calc(100vw - 32px) !important;
+        min-width: calc(100vw - 32px) !important;
+    }
+
+    .introjs-tooltiptext {
+        font-size: 14px !important;
+        padding: 20px !important;
+    }
+
+    .introjs-tooltip-title {
+        font-size: 16px !important;
+    }
+
+    .introjs-tooltipbuttons {
+        flex-direction: column-reverse !important;
+    }
+
+    .introjs-button {
+        width: 100% !important;
+    }
+}
+
+/* Animation for tooltip appearance */
+@keyframes introjs-tooltip-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.introjs-tooltip {
+    animation: introjs-tooltip-fade-in 0.3s ease-out !important;
+}
+
+/* Fix for z-index issues */
+.introjs-fixParent {
+    z-index: auto !important;
+}
+
+.introjs-showElement,
+.introjs-relativePosition {
+    position: relative !important;
+    z-index: 9999999 !important;
+}

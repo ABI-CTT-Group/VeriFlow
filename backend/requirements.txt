@@ -29,18 +29,10 @@ python-dotenv>=1.0.0
 httpx>=0.26.0
 httpx>=0.26.0
 websockets>=12.0
-fastapi
-uvicorn
-python-multipart
-
 langgraph
 langchain-google-genai
 langchain-core
-
-python-dotenv
 json-repair
-
-
 docker>=7.0.0
 
 # Testing

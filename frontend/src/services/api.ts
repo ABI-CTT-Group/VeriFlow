@@ -77,8 +77,11 @@ export const endpoints = {
         api.post(`/publications/${uploadId}/additional-info`, { info }),
 
     // Workflow Management
-    assembleWorkflow: (assayId: string) =>
-        api.post<WorkflowResponse>('/workflows/assemble', { assay_id: assayId }),
+    assembleWorkflow: (assayId: string, runId: string) =>
+        api.post<WorkflowResponse>('/workflows/assemble', { run_id: runId, assay_id: assayId }),
+
+    assembleMamaMia: (assayId: string) =>
+        api.post<WorkflowResponse>('/workflows/mama-mia/assemble', { assay_id: assayId }),
 
     getWorkflow: (workflowId: string) =>
         api.get<WorkflowResponse>(`/workflows/${workflowId}`),
@@ -118,7 +121,16 @@ export const endpoints = {
 
     // Artifact Retrieval (Polling)
     getArtifact: (runId: string, agentName: string) =>
-        api.get(`/orchestrate/${runId}/artifacts/${agentName}`)
+        api.get(`/orchestrate/${runId}/artifacts/${agentName}`),
+
+    // Chat Validation (Plan & Apply)
+    chatWithAgent: (runId: string, agentName: string, message: string) =>
+        api.post<{ reply: string }>(`/chat/${runId}/${agentName}`, {
+            messages: [{ role: 'user', content: message }]
+        }),
+
+    applyAndRestart: (runId: string, agentName: string, directive: string) =>
+        api.post(`/chat/${runId}/${agentName}/apply`, { directive })
 }
 
 export interface OrchestrationResponse {

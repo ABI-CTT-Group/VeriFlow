@@ -9,39 +9,39 @@
       "paper": {
         "id": "root",
         "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
-        "authors": "Lidia Garrucho et al.",
-        "year": "2025",
-        "abstract": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. To address this, we present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA). To facilitate the annotation process, a deep learning model was trained to produce preliminary segmentations for the remaining cases. These were subsequently corrected and verified by 16 breast cancer experts, creating a fully annotated dataset. Additionally, the dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model trained on the annotated data."
+        "authors": "Smith, J., et al.",
+        "year": "2023",
+        "abstract": "This study presents a novel approach to automated breast cancer segmentation using deep learning techniques on DCE-MRI scans."
       },
       "investigation": {
-        "id": "inv-mama-mia",
-        "title": "MAMA-MIA Dataset Creation and Benchmarking",
-        "description": "Creation of a large-scale, multicenter, expert-annotated breast cancer DCE-MRI dataset and training of baseline segmentation models.",
-        "submissionDate": "2025-03-19"
+        "id": "inv-1",
+        "title": "Automated Tumor Detection Investigation",
+        "description": "Investigation of automated deep learning methods for breast tumor detection and segmentation in DCE-MRI images",
+        "submissionDate": "2023-01-15"
       },
       "study": {
-        "id": "study-mama-mia",
-        "title": "MAMA-MIA Multicenter Breast Cancer MRI Study",
-        "description": "Retrospective collection, harmonization, and segmentation of 1506 pre-treatment DCE-MRI cases from four public datasets (ISPY1, ISPY2, NACT, DUKE).",
-        "numSubjects": 1506,
-        "design": "Retrospective multicenter cohort study"
+        "id": "study-1",
+        "title": "MRI-based Segmentation Study",
+        "description": "Comprehensive study of U-Net based segmentation on breast MRI scans",
+        "numSubjects": 384,
+        "design": "Retrospective cohort study"
       },
       "assays": [
         {
           "id": "assay-1",
-          "name": "Dataset Curation and Model Training Pipeline",
-          "stepCount": 5,
+          "name": "Model Inference Assay",
+          "stepCount": 2,
           "workflowSteps": [
             {
               "id": "step-1",
-              "description": "Conversion of original DICOM images from TCIA to NIfTI format.",
+              "description": "Converts DICOM to NIfTI",
               "tool": {
                 "id": "tool-1",
-                "name": "pycad"
+                "name": "create_nifti"
               },
               "input": [
                 {
-                  "name": "dicom_directory",
+                  "name": "dicom_images",
                   "type": "Directory"
                 }
               ],
@@ -54,88 +54,24 @@
             },
             {
               "id": "step-2",
-              "description": "Standardization of image orientation (Axial to LAS, Sagittal to PSR).",
+              "description": "Run inference",
               "tool": {
                 "id": "tool-2",
-                "name": "nibabel/SimpleITK"
+                "name": "run_inference"
               },
               "input": [
                 {
                   "name": "nifti_image",
                   "type": "File"
-                }
-              ],
-              "output": [
-                {
-                  "name": "harmonized_nifti",
-                  "type": "File"
-                }
-              ]
-            },
-            {
-              "id": "step-3",
-              "description": "Generation of preliminary automatic segmentations using a deep learning model.",
-              "tool": {
-                "id": "tool-3",
-                "name": "nnU-Net"
-              },
-              "input": [
-                {
-                  "name": "harmonized_nifti",
-                  "type": "File"
-                }
-              ],
-              "output": [
-                {
-                  "name": "preliminary_segmentation",
-                  "type": "File"
-                }
-              ]
-            },
-            {
-              "id": "step-4",
-              "description": "Manual correction and verification of segmentations by experts.",
-              "tool": {
-                "id": "tool-4",
-                "name": "Mango"
-              },
-              "input": [
-                {
-                  "name": "preliminary_segmentation",
-                  "type": "File"
                 },
                 {
-                  "name": "harmonized_nifti",
-                  "type": "File"
+                  "name": "pre_trained_network",
+                  "type": "Directory"
                 }
               ],
               "output": [
                 {
-                  "name": "expert_segmentation",
-                  "type": "File"
-                }
-              ]
-            },
-            {
-              "id": "step-5",
-              "description": "Calculation of segmentation metrics (Dice coefficient, 95% Hausdorff Distance).",
-              "tool": {
-                "id": "tool-5",
-                "name": "seg-metrics"
-              },
-              "input": [
-                {
-                  "name": "expert_segmentation",
-                  "type": "File"
-                },
-                {
-                  "name": "automatic_segmentation",
-                  "type": "File"
-                }
-              ],
-              "output": [
-                {
-                  "name": "metrics_csv",
+                  "name": "segmentation",
                   "type": "File"
                 }
               ]

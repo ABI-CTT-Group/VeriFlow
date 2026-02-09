@@ -5,8 +5,9 @@
  * 
  * Contains the main 4-panel layout with resizable console and collapsible panels.
  */
-import { ref, watch } from 'vue'
-import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { ref, watch, nextTick } from 'vue'
+import { ChevronRight, ChevronDown, ChevronUp, HelpCircle } from 'lucide-vue-next'
+import { useTour } from './composables/useTour'
 import { storeToRefs } from 'pinia'
 import { useWorkflowStore } from './stores/workflow'
 
@@ -60,6 +61,7 @@ const collapseAllExceptSelected = ref(false)
 const isResizingConsole = ref(false)
 const defaultViewerPlugin = ref('auto')
 const showLandingPage = ref(true)
+const { startTour, startTourIfFirstVisit } = useTour()
 // Initialize visibility based on whether files are already uploaded (e.g. refresh)
 const isStudyDesignVisible = ref(hasUploadedFiles.value)
 // Initialize collapsed state: 
@@ -196,9 +198,9 @@ onMounted(() => {
     @touchmove="handleMouseMove"
     @touchend="handleMouseUp"
   >
-    <LandingPageOverlay 
-      v-if="showLandingPage" 
-      @get-started="showLandingPage = false" 
+    <LandingPageOverlay
+      v-if="showLandingPage"
+      @get-started="showLandingPage = false; nextTick(() => startTourIfFirstVisit())"
     />
     
     <div 
@@ -206,7 +208,7 @@ onMounted(() => {
       :class="{ 'blur-sm scale-[0.98]': showLandingPage }"
     >
     <!-- Header -->
-    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-sm z-10">
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-sm z-10" data-tour="header">
       <div class="flex items-center gap-3">
         <img src="/icon.svg" alt="VeriFlow Icon" class="w-8 h-8" />
         <div>
@@ -214,10 +216,19 @@ onMounted(() => {
           <p class="text-xs text-slate-500">Research Reproducibility Engineer</p>
         </div>
       </div>
-      <ConfigurationPanel 
-        :default-viewer-plugin="defaultViewerPlugin"
-        @viewer-plugin-change="defaultViewerPlugin = $event"
-      />
+      <div class="flex items-center gap-2">
+        <button
+          @click="startTour()"
+          class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          title="Take a tour"
+        >
+          <HelpCircle class="w-5 h-5" />
+        </button>
+        <ConfigurationPanel
+          :default-viewer-plugin="defaultViewerPlugin"
+          @viewer-plugin-change="defaultViewerPlugin = $event"
+        />
+      </div>
     </header>
 
     <!-- Main Content -->
@@ -318,43 +329,46 @@ onMounted(() => {
       </div>
 
       <!-- Right Panel - Visualise and Export Results -->
-      <CollapsibleHorizontalPanel
-        :is-collapsed="isDatasetNavCollapsed"
-        @toggle="isDatasetNavCollapsed = !isDatasetNavCollapsed"
-        side="right"
-        :default-width="320"
-        label="Visualise and Export Results"
-      >
-        <div class="h-full flex flex-col bg-white border-l border-slate-200 overflow-hidden">
-          <!-- Header with inline chevron -->
-          <div class="px-4 py-3 border-b border-slate-200 flex-shrink-0">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-slate-700">4. Visualise and Export Results</span>
-              <button
-                @click="isDatasetNavCollapsed = true"
-                class="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <ChevronRight class="w-4 h-4" />
-              </button>
+      <div data-tour="results-panel" class="flex flex-shrink-0 h-full">
+        <CollapsibleHorizontalPanel
+          :is-collapsed="isDatasetNavCollapsed"
+          @toggle="isDatasetNavCollapsed = !isDatasetNavCollapsed"
+          side="right"
+          :default-width="320"
+          label="Visualise and Export Results"
+        >
+          <div class="h-full flex flex-col bg-white border-l border-slate-200 overflow-hidden">
+            <!-- Header with inline chevron -->
+            <div class="px-4 py-3 border-b border-slate-200 flex-shrink-0">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-slate-700">4. Visualise and Export Results</span>
+                <button
+                  @click="isDatasetNavCollapsed = true"
+                  class="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <ChevronRight class="w-4 h-4" />
+                </button>
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">Select a Workflow Item to View it's Results</p>
             </div>
-            <p class="text-xs text-slate-400 mt-0.5">Select a Workflow Item to View it's Results</p>
-          </div>
 
-          <!-- Content -->
-          <div class="flex-1 flex flex-col overflow-hidden">
-            <DatasetNavigationModule 
-              :selected-node="selectedNode"
-              :default-viewer-plugin="defaultViewerPlugin"
-              :selected-dataset-id="selectedDatasetId"
-            />
+            <!-- Content -->
+            <div class="flex-1 flex flex-col overflow-hidden">
+              <DatasetNavigationModule
+                :selected-node="selectedNode"
+                :default-viewer-plugin="defaultViewerPlugin"
+                :selected-dataset-id="selectedDatasetId"
+              />
+            </div>
           </div>
-        </div>
-      </CollapsibleHorizontalPanel>
+        </CollapsibleHorizontalPanel>
+      </div>
     </div>
 
     <!-- Bottom Panel - Console -->
-    <div 
-      class="border-t border-slate-200 flex-shrink-0 bg-white relative flex flex-col" 
+    <div
+      data-tour="console"
+      class="border-t border-slate-200 flex-shrink-0 bg-white relative flex flex-col"
       :style="{ height: isConsoleCollapsed ? 'auto' : consoleHeight + 'px' }"
     >
       <!-- Resize handle (only visible when expanded) -->

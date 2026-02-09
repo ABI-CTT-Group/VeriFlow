@@ -41,6 +41,8 @@ venv/
 # archive
 archive/
 
+/backend/examples/data/
+
 # tmp
 tmp/
 
@@ -56,5 +58,8 @@ model_sds_nnunet_pretrained_weights/
 
 # others
 trigger_dag.py
+
 create_nifti.py
 run_inference.py
+
+/backend/db/veriflow.db
