@@ -15,10 +15,6 @@ const emit = defineEmits<{
   delete: [connectionId: string]
 }>()
 
-// Use Vue Flow's getBezierPath for standard behavior, or keep custom logic if preferred.
-// The original used a custom adaptive offset. Let's try to keep the custom feel but using the correct props.
-// However, getBezierPath is very robust. Let's see if we can just use our custom path logic with the new props.
-
 const pathD = computed(() => {
   const distX = props.targetX - props.sourceX
   // Adaptive offset prevents huge loops when nodes are close
@@ -45,11 +41,14 @@ const pathD = computed(() => {
       stroke="#94a3b8"
       stroke-width="2"
       fill="none"
-      class="group-hover:stroke-red-400 transition-colors"
+      :class="[
+        'transition-colors',
+        props.animated ? 'running-edge' : 'group-hover:stroke-red-400'
+      ]"
     />
     
-    <!-- Delete indicator on hover -->
-    <g class="opacity-0 group-hover:opacity-100 transition-opacity" @click="emit('delete', id)">
+    <!-- Delete indicator on hover (only if not running) -->
+    <g v-if="!props.animated" class="opacity-0 group-hover:opacity-100 transition-opacity" @click="emit('delete', id)">
       <circle
         :cx="(sourceX + targetX) / 2"
         :cy="(sourceY + targetY) / 2"
@@ -71,3 +70,20 @@ const pathD = computed(() => {
     </g>
   </g>
 </template>
+
+<style scoped>
+.running-edge {
+  stroke: #3b82f6; /* Blue-500 */
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+</style>

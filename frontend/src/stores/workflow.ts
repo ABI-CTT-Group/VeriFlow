@@ -546,6 +546,45 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
     function updateNodeStatus(nodeId: string, status: NodeStatus) {
         nodeStatuses.value[nodeId] = status
+
+        // Update node data for reactivity in GraphNode
+        const nodeIndex = nodes.value.findIndex(n => n.id === nodeId)
+        if (nodeIndex !== -1) {
+            console.log(`Updating Status for ${nodeId} to ${status.status}`)
+            // Create a new object to ensure reactivity triggers
+            const node = nodes.value[nodeIndex]
+            nodes.value[nodeIndex] = {
+                ...node,
+                data: {
+                    ...node.data,
+                    status: status.status,
+                    progress: status.progress
+                }
+            }
+            // Force array update for deep watchers (Vue Flow might need this)
+            nodes.value = [...nodes.value]
+
+            // Update edge animations based on node status
+            updateEdgeAnimations(nodeId, status.status)
+        } else {
+            console.warn(`Node ${nodeId} not found for status update`)
+        }
+    }
+
+    function updateEdgeAnimations(nodeId: string, status: 'pending' | 'running' | 'completed' | 'error') {
+        // Rule: When a tool card is running, animate all connected edges
+        // When a tool card is not running, remove animation
+        const isRunning = status === 'running'
+
+        edges.value = edges.value.map(edge => {
+            // Check if this edge is connected to the node
+            const isConnected = edge.source === nodeId || edge.target === nodeId
+
+            if (isConnected) {
+                return { ...edge, animated: isRunning }
+            }
+            return edge
+        })
     }
 
     function addLog(entry: LogEntry) {
@@ -557,32 +596,91 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
         try {
             isWorkflowRunning.value = true
-            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Starting workflow execution...' })
+            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Starting MAMA-MIA workflow execution...' })
 
-            // Find first tool node (sorted by X position)
-            const tools = nodes.value.filter(n => n.type === 'tool')
-            tools.sort((a, b) => a.position.x - b.position.x)
+            // Find all nodes by type and position
+            const tools = nodes.value.filter(n => n.type === 'tool').sort((a, b) => a.position.x - b.position.x)
+            const outputMeasurement = nodes.value.find(n => n.type === 'measurement' && n.data.role === 'output')
+            const inputMeasurements = nodes.value.filter(n => n.type === 'measurement' && n.data.role === 'input')
 
-            if (tools.length > 0) {
-                const firstTool = tools[0]
-                // 1. Set First Tool -> Running
-                updateNodeStatus(firstTool.id, { status: 'running', progress: 0 })
+            console.log('Starting MAMA-MIA Execution')
+            console.log('Tools:', tools.map(t => t.id))
+            console.log('Output Measurement:', outputMeasurement?.id)
 
-                // 2. Find Input Measurements -> Completed
-                // Find edges where target is the first tool
-                const inputEdges = edges.value.filter(e => e.target === firstTool.id)
-                inputEdges.forEach(edge => {
-                    const sourceNode = nodes.value.find(n => n.id === edge.source)
-                    if (sourceNode && (sourceNode.type === 'measurement' || sourceNode.type === 'dataset')) {
-                        updateNodeStatus(sourceNode.id, { status: 'completed', progress: 100 })
-                    }
-                })
+            if (tools.length === 0) {
+                console.warn('No tools found to run!')
+                return
             }
 
-            // Mock execution start
+            // Set input measurements to completed immediately
+            inputMeasurements.forEach(node => {
+                updateNodeStatus(node.id, { status: 'completed', progress: 100 })
+            })
+
+            // Mock execution ID
             executionId.value = `exec_${Date.now()}`
 
-            startPolling()
+            // Step 1: First tool -> running
+            updateNodeStatus(tools[0].id, { status: 'running', progress: 0 })
+            addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[0].data.name} started...` })
+
+            // Step 2: After 3s, first tool -> complete, second tool -> running
+            setTimeout(() => {
+                if (!isWorkflowRunning.value) return
+                updateNodeStatus(tools[0].id, { status: 'completed', progress: 100 })
+                addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[0].data.name} completed` })
+
+                if (tools.length > 1) {
+                    updateNodeStatus(tools[1].id, { status: 'running', progress: 0 })
+                    addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[1].data.name} started...` })
+                }
+            }, 3000)
+
+            // Step 3: After 6s (3s + 3s), second tool -> complete
+            setTimeout(() => {
+                if (!isWorkflowRunning.value) return
+                if (tools.length > 1) {
+                    updateNodeStatus(tools[1].id, { status: 'completed', progress: 100 })
+                    addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: `${tools[1].data.name} completed` })
+                }
+            }, 6000)
+
+            // Step 4: After 11s (3s + 3s + 5s), output measurement -> complete
+            setTimeout(() => {
+                if (!isWorkflowRunning.value) return
+                if (outputMeasurement) {
+                    updateNodeStatus(outputMeasurement.id, { status: 'completed', progress: 100 })
+                    addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Workflow execution completed successfully!' })
+
+                    // Auto-select output node and dataset
+                    // First, deselect all nodes
+                    nodes.value = nodes.value.map(n => ({ ...n, selected: false } as any))
+
+                    // Then select the output measurement node (for visual highlight)
+                    const outputNodeIndex = nodes.value.findIndex(n => n.id === outputMeasurement.id)
+                    if (outputNodeIndex !== -1) {
+                        nodes.value[outputNodeIndex] = {
+                            ...nodes.value[outputNodeIndex],
+                            selected: true
+                        } as any
+                        nodes.value = [...nodes.value] // Force reactivity
+                    }
+
+                    // Set selected node ID for DataObjectCatalogue
+                    selectedNode.value = outputMeasurement.id
+
+                    // Find the output dataset from the node's outputs
+                    const outputData = outputMeasurement.data.outputs?.[0]
+                    if (outputData?.datasetId) {
+                        selectedDatasetId.value = outputData.datasetId
+                    }
+
+                    // Open the Dataset Navigation panel (right panel)
+                    isRightPanelCollapsed.value = false
+                }
+                isWorkflowRunning.value = false
+            }, 8000)
+
         } catch (error) {
             console.error('Execution failed:', error)
             isWorkflowRunning.value = false
@@ -590,32 +688,27 @@ export const useWorkflowStore = defineStore('workflow', () => {
         }
     }
 
-    function startPolling() {
-        if (pollingInterval.value) clearInterval(pollingInterval.value)
+    function stopWorkflow() {
+        if (!isWorkflowRunning.value) return
 
-        pollingInterval.value = window.setInterval(async () => {
-            if (!executionId.value) return
-            simulateProgress()
-        }, 2000)
+        isWorkflowRunning.value = false
+        addLog({ timestamp: new Date().toISOString(), level: 'INFO', message: 'Workflow execution stopped by user' })
+
+        // Set all nodes to completed
+        nodes.value.forEach(node => {
+            updateNodeStatus(node.id, { status: 'completed', progress: 100 })
+        })
+
+        // Remove all edge animations
+        edges.value = edges.value.map(edge => ({ ...edge, animated: false }))
+    }
+
+    function startPolling() {
+        // Legacy polling - no longer used in MAMA-MIA simulation
     }
 
     function simulateProgress() {
-        // Mock progress
-        const nodeIds = nodes.value.map(n => n.id)
-        const randomNode = nodeIds[Math.floor(Math.random() * nodeIds.length)]
-
-        if (randomNode) {
-            updateNodeStatus(randomNode, {
-                status: 'running',
-                progress: Math.floor(Math.random() * 100)
-            })
-            addLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `Node ${randomNode} progress update`,
-                node_id: randomNode
-            })
-        }
+        // Legacy simulation - no longer used in MAMA-MIA simulation
     }
 
     function toggleLeftPanel() {
@@ -739,6 +832,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         updateNodeStatus,
         addLog,
         runWorkflow,
+        stopWorkflow,
         toggleLeftPanel,
         toggleRightPanel,
         toggleConsole,

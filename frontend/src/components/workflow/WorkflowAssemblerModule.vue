@@ -65,12 +65,12 @@ const store = useWorkflowStore()
 const { 
   nodes, 
   edges: storeEdges, 
-  isAssembled 
+  isAssembled,
+  isWorkflowRunning
 } = storeToRefs(store)
-const { runWorkflow } = store
+const { runWorkflow, stopWorkflow } = store
 
 // Local UI state
-const isRunning = ref(false)
 const numSubjects = ref(1)
 const isViewerCollapsed = ref(!props.isViewerVisible)
 const isCatalogueCollapsed = ref(false)
@@ -111,9 +111,12 @@ watch(() => props.shouldCollapseViewer, (shouldCollapse) => {
 
 // Handlers
 function handleRunWorkflow() {
-  isRunning.value = true
   runWorkflow() // Call store action
   emit('runWorkflow') // Keep emit for parent UI updates if needed
+}
+
+function handleStopWorkflow() {
+  stopWorkflow() // Call store action
 }
 
 function onPaneReady(instance: any) {
@@ -232,16 +235,16 @@ function handleNodeClick(event: any) {
           <input
             type="number"
             min="1"
-            max="384"
+            max="2"
             v-model="numSubjects"
             class="w-16 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <span class="text-xs text-slate-500">/ 384</span>
+          <span class="text-xs text-slate-500">/ 2</span>
         </div>
         <div class="w-px h-6 bg-slate-200"></div>
         <div class="flex items-center gap-2">
           <button
-            v-if="!isRunning"
+            v-if="!isWorkflowRunning"
             @click="handleRunWorkflow"
             class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors flex items-center gap-1.5"
           >
@@ -250,7 +253,7 @@ function handleNodeClick(event: any) {
           </button>
           <button
             v-else
-            @click="isRunning = false"
+            @click="handleStopWorkflow"
             class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors flex items-center gap-1.5"
           >
             <Square class="w-3.5 h-3.5" />

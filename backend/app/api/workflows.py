@@ -164,8 +164,8 @@ async def assemble_workflow(request: AssembleRequest):
                 label="Input Measurements",
                 name="Input Measurements",
                 role="input",
-                status=NodeStatus.PENDING,
-                totalSubjects=384,
+                status=NodeStatus.COMPLETED,
+                totalSubjects=2,
                 outputs=[
                     PortDefinition(
                         id="out-0", 
@@ -180,7 +180,7 @@ async def assemble_workflow(request: AssembleRequest):
         VueFlowNode(
             id="tool-1",
             type=NodeType.TOOL,
-            position=Position(x=45, y=50),
+            position=Position(x=250, y=50),
             data=NodeData(
                 label="DICOM to NIfTI",
                 name="DICOM to NIfTI",
@@ -198,10 +198,10 @@ async def assemble_workflow(request: AssembleRequest):
         VueFlowNode(
             id="tool-2",
             type=NodeType.TOOL,
-            position=Position(x=80, y=50),
+            position=Position(x=450, y=50),
             data=NodeData(
-                label="nnU-Net Segmentation",
-                name="nnU-Net Segmentation",
+                label="Run Inference",
+                name="Run Inference",
                 status=NodeStatus.PENDING,
                 confidence=0.88,
                 inputs=[
@@ -217,37 +217,20 @@ async def assemble_workflow(request: AssembleRequest):
         VueFlowNode(
             id="model-1",
             type=NodeType.MODEL,
-            position=Position(x=45, y=320),
+            position=Position(x=450, y=200),
             data=NodeData(
                 label="nnU-Net Pretrained Weights",
                 name="nnU-Net Pretrained Weights",
-                status=NodeStatus.PENDING,
+                status=NodeStatus.COMPLETED,
                 outputs=[
                     PortDefinition(id="out-0", label="Weights"),
                 ],
             ),
         ),
         VueFlowNode(
-            id="tool-3",
-            type=NodeType.TOOL,
-            position=Position(x=115, y=50),
-            data=NodeData(
-                label="Post-processing",
-                name="Post-processing",
-                status=NodeStatus.PENDING,
-                confidence=0.92,
-                inputs=[
-                    PortDefinition(id="in-0", label="Segmentation Mask"),
-                ],
-                outputs=[
-                    PortDefinition(id="out-0", label="Refined Mask"),
-                ],
-            ),
-        ),
-        VueFlowNode(
             id="output-1",
             type=NodeType.MEASUREMENT,
-            position=Position(x=150, y=50),
+            position=Position(x=650, y=50),
             data=NodeData(
                 label="Output Measurements",
                 name="Output Measurements",
@@ -269,8 +252,7 @@ async def assemble_workflow(request: AssembleRequest):
         VueFlowEdge(id="conn-1", source="input-1", target="tool-1", sourceHandle="out-0", targetHandle="in-0"),
         VueFlowEdge(id="conn-2", source="tool-1", target="tool-2", sourceHandle="out-0", targetHandle="in-0"),
         VueFlowEdge(id="conn-3", source="model-1", target="tool-2", sourceHandle="out-0", targetHandle="in-1"),
-        VueFlowEdge(id="conn-4", source="tool-2", target="tool-3", sourceHandle="out-0", targetHandle="in-0"),
-        VueFlowEdge(id="conn-5", source="tool-3", target="output-1", sourceHandle="out-0", targetHandle="in-0"),
+        VueFlowEdge(id="conn-4", source="tool-2", target="output-1", sourceHandle="out-0", targetHandle="in-0"),
     ]
     
     graph = WorkflowGraph(nodes=nodes, edges=edges)

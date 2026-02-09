@@ -40,7 +40,7 @@ const activeInputMeasurements = [
   {
     id: 'meas-active-1',
     name: 'DCE-MRI Scans',
-    description: '384 subjects, T1-weighted, DICOM format',
+    description: '2 subjects, T1-weighted, DICOM format',
     icon: 'database',
     inUse: true,
     nodeId: 'input-1' // Added for linking
@@ -69,19 +69,11 @@ const activeTools = [
   },
   {
     id: 'tool-active-2',
-    name: 'nnU-Net Segmentation',
-    description: 'U-Net based tumor segmentation',
+    name: 'Run Inference',
+    description: 'Run inference using pre-trained network',
     icon: 'tool',
     inUse: true,
     nodeId: 'tool-2'
-  },
-  {
-    id: 'tool-active-3',
-    name: 'Post-processing',
-    description: 'Refines segmentation masks',
-    icon: 'tool',
-    inUse: true,
-    nodeId: 'tool-3'
   }
 ]
 
@@ -166,7 +158,6 @@ const nodeToDataObjectMap: Record<string, string> = {
   'output-1': 'meas-active-2',
   'tool-1': 'tool-active-1',
   'tool-2': 'tool-active-2',
-  'tool-3': 'tool-active-3',
   'model-1': 'model-active-1'
 }
 
