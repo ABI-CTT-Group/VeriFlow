@@ -11,7 +11,7 @@ import tempfile
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Form
 from typing import Optional
 
 from app.models.isa import (
@@ -204,6 +204,40 @@ async def _process_publication_async(
     except Exception as e:
         _upload_cache[upload_id]["status"] = "error"
         _upload_cache[upload_id]["error"] = str(e)
+
+
+
+@router.post("/publications/upload_with_id")
+async def upload_publication_with_id(
+    pdf_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """
+    Upload a PDF with a client-generated ID.
+    Saves to backend/examples/data/{pdf_id}/{filename}.
+    Returns paths for orchestration.
+    """
+    try:
+        # Define base path
+        base_path = Path(__file__).parent.parent.parent / "examples" / "data" / pdf_id
+        base_path.mkdir(parents=True, exist_ok=True)
+        
+        file_path = base_path / file.filename
+        
+        # Write file
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+            
+        return {
+            "status": "success",
+            "upload_id": pdf_id,
+            "filename": file.filename,
+            "pdf_path": str(file_path.absolute()),
+            "folder_path": str(base_path.absolute())
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/publications/{upload_id}/additional-info")

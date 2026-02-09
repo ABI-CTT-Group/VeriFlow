@@ -1,0 +1,13 @@
+{
+  "inputs": {
+    "generated_code_keys": [
+      "raw_parsed"
+    ]
+  },
+  "final_output": {
+    "errors": [
+      "Dockerfile is missing or invalid (no FROM instruction).",
+      "CWL is missing or invalid (no cwlVersion declared)."
+    ]
+  }
+}

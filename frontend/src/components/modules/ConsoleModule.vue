@@ -9,6 +9,7 @@ import { ref, nextTick, onMounted, watch } from 'vue'
 import { User, Bot } from 'lucide-vue-next'
 import { useConsoleStore } from '../../stores/console'
 import { storeToRefs } from 'pinia'
+import SmartMessageRenderer from '../common/SmartMessageRenderer.vue'
 
 const store = useConsoleStore()
 const { messages } = storeToRefs(store)
@@ -74,27 +75,27 @@ onMounted(() => {
         <span class="text-slate-400 whitespace-nowrap">
           {{ formatTime(message.timestamp) }}
         </span>
-        <div class="flex-1">
+        <div class="flex-1 min-w-0"> <!-- Added flex-1 and min-w-0 to prevent overflow -->
           <!-- User message -->
           <div v-if="message.type === 'user'" class="flex items-start gap-2">
-            <User class="w-4 h-4 text-slate-600 mt-0.5" />
-            <span class="text-slate-900">{{ message.content }}</span>
+            <User class="w-4 h-4 text-slate-600 mt-0.5 flex-shrink-0" />
+            <span class="text-slate-900 break-words">{{ message.content }}</span>
           </div>
           
           <!-- Agent message -->
           <div v-else-if="message.type === 'agent'" class="flex items-start gap-2">
-            <Bot :class="['w-4 h-4 mt-0.5', getAgentColor(message.agent)]" />
-            <div>
-              <span :class="['font-semibold', getAgentColor(message.agent)]">
+            <Bot :class="['w-4 h-4 mt-0.5 flex-shrink-0', getAgentColor(message.agent)]" />
+            <div class="flex-1 min-w-0">
+              <span :class="['font-semibold block mb-1', getAgentColor(message.agent)]">
                 {{ getAgentName(message.agent) }}:
               </span>
-              {{ ' ' }}
-              <span class="text-slate-700">{{ message.content }}</span>
+              <!-- Use SmartMessageRenderer for agent messages -->
+              <SmartMessageRenderer :content="message.content" />
             </div>
           </div>
           
           <!-- System message -->
-          <span v-else class="text-slate-500 italic">{{ message.content }}</span>
+          <span v-else class="text-slate-500 italic break-words">{{ message.content }}</span>
         </div>
       </div>
       <div ref="messagesEndRef" />

@@ -3,7 +3,7 @@ import axios from 'axios'
 const api = axios.create({
     // Use relative path to leverage Vite proxy (dev) and Nginx proxy (prod)
     baseURL: '/api/v1',
-    timeout: 2000, // Fail fast (2s) to allow fallbacks to kick in
+    timeout: 0, // No timeout for long-running orchestration processes
     headers: {
         'Content-Type': 'application/json'
     }
@@ -15,6 +15,8 @@ export interface UploadResponse {
     filename: string
     status: string
     message: string
+    pdf_path?: string
+    folder_path?: string
 }
 
 export interface HierarchyResponse {
@@ -48,6 +50,15 @@ export const endpoints = {
         const formData = new FormData()
         formData.append('file', file)
         return api.post<UploadResponse>('/publications/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+    },
+
+    uploadPublicationWithId: (file: File, pdfId: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('pdf_id', pdfId)
+        return api.post<UploadResponse>('/publications/upload_with_id', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         })
     },
@@ -95,7 +106,27 @@ export const endpoints = {
 
     // Viewers
     getSourceSnippet: (sourceId: string) =>
-        api.get(`/sources/${sourceId}`)
+        api.get(`/sources/${sourceId}`),
+
+    // Orchestrate Workflow
+    orchestrateWorkflow: (pdfPath: string, repoPath: string, userContext?: string, clientId?: string) =>
+        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, user_context: userContext, client_id: clientId }),
+
+    // Cached MAMA-MIA Demo
+    mamaMiaCache: (clientId?: string) =>
+        api.get<OrchestrationResponse>('/mama-mia-cache', { params: { client_id: clientId } })
+}
+
+export interface OrchestrationResponse {
+    status: string
+    message: string
+    result: {
+        isa_json: any
+        generated_code: any
+        review_decision: string
+        review_feedback: string
+        errors: string[]
+    }
 }
 
 export default api

@@ -1,26 +1,26 @@
 <script setup lang="ts">
-/**
- * StudyDesignModule.vue
- * Ported from: planning/UI/src/components/StudyDesignModule.tsx
- * 
- * ISA hierarchy tree viewer with property editing and source citations.
- */
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { 
-  FileText, BookOpen, FlaskConical, Layers, 
-  ChevronLeft, 
-  ExternalLink, X, Plus 
+  FileText, BookOpen, Layers, FlaskConical, 
+  ChevronLeft, ExternalLink, X, Plus, Loader2
 } from 'lucide-vue-next'
+import { useWorkflowStore } from '../../stores/workflow'
+import { storeToRefs } from 'pinia'
 
 interface Props {
   selectedAssay: string | null
   hasUploadedFiles: boolean
 }
 
+// Store access
+const workflowStore = useWorkflowStore()
+const { hierarchy, isLoading, loadingMessage } = storeToRefs(workflowStore)
+
 interface SelectedItem {
   id: string
   type: 'paper' | 'investigation' | 'study' | 'assay'
   name: string
+  data?: any // Hold reference to the actual data object
 }
 
 interface WorkflowStep {
@@ -43,38 +43,75 @@ const emit = defineEmits<{
 
 const selectedItem = ref<SelectedItem | null>(null)
 
-// Paper properties
-const paperTitle = ref('Breast Cancer Segmentation Using Deep Learning')
-const paperAuthors = ref('Smith, J., et al.')
-const paperYear = ref('2023')
-const paperAbstract = ref('This study presents a novel approach to automated breast cancer segmentation using deep learning techniques on DCE-MRI scans.')
+// --- Computed Properties for Reactivity ---
 
-// Investigation properties
-const investigationTitle = ref('Automated Tumor Detection Investigation')
-const investigationDescription = ref('Investigation of automated deep learning methods for breast tumor detection and segmentation in DCE-MRI images')
-const investigationSubmissionDate = ref('2023-01-15')
+// Helper to safely access hierarchy parts
+const investigation = computed(() => hierarchy.value)
+const study = computed(() => investigation.value?.studies?.[0])
+const assays = computed(() => study.value?.assays || [])
 
-// Study properties
-const studyTitle = ref('MRI-based Segmentation Study')
-const studyDescription = ref('Comprehensive study of U-Net based segmentation on breast MRI scans')
-const studyNumSubjects = ref('384')
-const studyDesign = ref('Retrospective cohort study')
+// Values used in template, now reactive
+// Note: In a real edit scenario, we'd need local state initialized from these computed values
+// For now, we display the store values directly or fallback
 
-// Assay properties
-const assayName = ref('U-Net Training Assay')
-const workflowSteps = ref<WorkflowStep[]>([
-  { id: 'step-1', description: 'Data acquisition: Collect 120 MRI scans' },
-  { id: 'step-2', description: 'Preprocessing: DICOM to NIfTI conversion' },
-  { id: 'step-3', description: 'Normalization: Z-score normalization' },
-  { id: 'step-4', description: 'Training: U-Net model with Adam optimizer' },
-  { id: 'step-5', description: 'Validation: 5-fold cross-validation' },
-  { id: 'step-6', description: 'Evaluation: Calculate DICE scores' },
-])
+const paperTitle = computed({
+  get: () => hierarchy.value?.paper?.title || 'No Paper Title',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.title = val }
+})
+const paperAuthors = computed({
+  get: () => hierarchy.value?.paper?.authors || 'Unknown Authors',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.authors = val }
+})
+const paperYear = computed({
+  get: () => hierarchy.value?.paper?.year || '',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.year = val }
+})
+const paperAbstract = computed({
+  get: () => hierarchy.value?.paper?.abstract || '',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.abstract = val }
+})
 
-// Expand when files are uploaded
+const investigationTitle = computed({
+  get: () => investigation.value?.title || 'No Investigation',
+  set: (val) => { if (investigation.value) investigation.value.title = val }
+})
+const investigationDescription = computed({
+    get: () => investigation.value?.description || '',
+    set: (val) => { if (investigation.value) investigation.value.description = val }
+})
+const investigationSubmissionDate = ref('2024-06-20') // Not in current interface
 
+const studyTitle = computed({
+    get: () => study.value?.title || 'No Study',
+    set: (val) => { if (study.value) study.value.title = val }
+})
+const studyDescription = computed({
+    get: () => study.value?.description || '',
+    set: (val) => { if (study.value) study.value.description = val }
+})
+const studyNumSubjects = ref('1506') // Not explicitly in Study interface
+const studyDesign = ref('Retrospective multicenter cohort study')
 
-function handleNodeClick(id: string, type: SelectedItem['type'], name: string, event?: Event) {
+// Assay Handling
+// When an assay is selected, populate the local editable state
+const assayName = ref('')
+const workflowSteps = ref<WorkflowStep[]>([])
+
+// Watch for selection changes to update local assay state
+watch(() => selectedItem.value, (newItem) => {
+    if (newItem?.type === 'assay' && newItem.data) {
+        assayName.value = newItem.data.name || ''
+        // Map store steps to UI steps
+        workflowSteps.value = (newItem.data.steps || []).map((s: any) => ({
+            id: s.id || `step-${Math.random()}`,
+            description: s.description || s.name || 'Unknown Step'
+        }))
+    }
+})
+
+// --- Interaction Handlers ---
+
+function handleNodeClick(id: string, type: SelectedItem['type'], name: string, data: any = null, event?: Event) {
   if (event) {
     event.stopPropagation()
   }
@@ -86,7 +123,7 @@ function handleNodeClick(id: string, type: SelectedItem['type'], name: string, e
       emit('selectAssay', null)
     }
   } else {
-    selectedItem.value = { id, type, name }
+    selectedItem.value = { id, type, name, data }
     emit('propertiesOpened')
     if (type === 'assay') {
       emit('selectAssay', id)
@@ -141,7 +178,25 @@ const hoverClass = 'hover:bg-slate-50'
 
     <!-- Content Area -->
     <template v-if="hasUploadedFiles">
-      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      
+      <!-- Loading State -->
+      <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+        <div class="relative w-16 h-16 flex items-center justify-center">
+            <div class="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+            <Loader2 class="w-6 h-6 text-blue-500 animate-bounce" />
+        </div>
+        <div class="text-center">
+            <h3 class="text-slate-900 font-medium text-lg">Analyzing Publication</h3>
+            <p class="text-slate-500 text-sm mt-1">{{ loadingMessage || 'Extracting study design and assay details...' }}</p>
+        </div>
+        <!-- Simple Progress Bar -->
+        <div class="w-64 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+            <div class="h-full bg-blue-500 animate-pulse rounded-full w-2/3"></div>
+        </div>
+      </div>
+
+      <div v-else class="flex-1 flex flex-col min-h-0 overflow-hidden">
         <!-- Tree View -->
         <div class="overflow-y-auto border-b border-slate-200 max-h-[50%] shrink-0">
           <div class="px-3 py-3 space-y-1">
@@ -151,11 +206,11 @@ const hoverClass = 'hover:bg-slate-50'
                   'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
                   selectedItem?.id === 'root' ? selectedItemClass : hoverClass
                 ]"
-                @click="handleNodeClick('root', 'paper', 'Breast Cancer Segmentation Using Deep Learning', $event)"
+                @click="handleNodeClick('root', 'paper', paperTitle, null, $event)"
               >
                 <FileText class="w-4 h-4 text-blue-600 flex-shrink-0" />
                 <span class="text-sm font-medium text-slate-900 truncate">
-                  Breast Cancer Segmentation Using Dee...
+                  {{ paperTitle }}
                 </span>
               </div>
 
@@ -164,12 +219,12 @@ const hoverClass = 'hover:bg-slate-50'
                 <div
                   :class="[
                     'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
-                    selectedItem?.id === 'inv-1' ? selectedItemClass : hoverClass
+                    selectedItem?.id === investigation?.identifier ? selectedItemClass : hoverClass
                   ]"
-                  @click="handleNodeClick('inv-1', 'investigation', 'Automated Tumor Detection Investigation', $event)"
+                  @click="handleNodeClick(investigation?.identifier || 'inv-1', 'investigation', investigationTitle, investigation, $event)"
                 >
                   <BookOpen class="w-4 h-4 text-green-600 flex-shrink-0" />
-                  <span class="text-sm text-slate-700 truncate">Automated Tumor Detection Investigation</span>
+                  <span class="text-sm text-slate-700 truncate">{{ investigationTitle }}</span>
                 </div>
 
                 <div class="ml-6 space-y-1">
@@ -177,45 +232,30 @@ const hoverClass = 'hover:bg-slate-50'
                   <div
                     :class="[
                       'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
-                      selectedItem?.id === 'study-1' ? selectedItemClass : hoverClass
+                      selectedItem?.id === study?.identifier ? selectedItemClass : hoverClass
                     ]"
-                    @click="handleNodeClick('study-1', 'study', 'MRI-based Segmentation Study', $event)"
+                    @click="handleNodeClick(study?.identifier || 'study-1', 'study', studyTitle, study, $event)"
                   >
                     <Layers class="w-4 h-4 text-purple-600 flex-shrink-0" />
-                    <span class="text-sm text-slate-700 truncate">MRI-based Segmentation Study</span>
+                    <span class="text-sm text-slate-700 truncate">{{ studyTitle }}</span>
                   </div>
 
                   <div class="ml-6 space-y-1">
-                    <!-- Assay 1 -->
+                    <!-- Dynamic Assays List -->
                     <div
+                      v-for="assay in assays"
+                      :key="assay.identifier"
                       :class="[
                         'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
-                        selectedItem?.id === 'assay-1' ? selectedItemClass : hoverClass
+                        selectedItem?.id === assay.identifier ? selectedItemClass : hoverClass
                       ]"
-                      @click="handleNodeClick('assay-1', 'assay', 'U-Net Training Assay', $event)"
+                      @click="handleNodeClick(assay.identifier || 'u-assay', 'assay', assay.filename, assay, $event)"
                     >
                       <FlaskConical class="w-4 h-4 text-orange-600 flex-shrink-0" />
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
-                          <p class="text-sm text-slate-700 truncate">U-Net Training Assay</p>
-                          <span class="text-xs text-slate-500 flex-shrink-0">(6 steps)</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Assay 2 -->
-                    <div
-                      :class="[
-                        'flex items-center gap-2 p-2 rounded cursor-pointer transition-colors',
-                        selectedItem?.id === 'assay-2' ? selectedItemClass : hoverClass
-                      ]"
-                      @click="handleNodeClick('assay-2', 'assay', 'Model Inference Assay', $event)"
-                    >
-                      <FlaskConical class="w-4 h-4 text-orange-600 flex-shrink-0" />
-                      <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                          <p class="text-sm text-slate-700 truncate">Model Inference Assay</p>
-                          <span class="text-xs text-slate-500 flex-shrink-0">(4 steps)</span>
+                          <p class="text-sm text-slate-700 truncate">{{ assay.filename }}</p>
+                          <span class="text-xs text-slate-500 flex-shrink-0">({{ (assay.steps?.length || 0) }} steps)</span>
                         </div>
                       </div>
                     </div>

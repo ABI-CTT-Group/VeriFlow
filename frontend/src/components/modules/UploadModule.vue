@@ -10,6 +10,7 @@ import { ref, computed } from 'vue'
 import { Upload, File, X, ChevronLeft, Loader2, Beaker, Plus, Info } from 'lucide-vue-next'
 import { endpoints } from '../../services/api'
 import { useWorkflowStore } from '../../stores/workflow'
+import { useConsoleStore } from '../../stores/console'
 import AdditionalInfoModal from './AdditionalInfoModal.vue'
 
 interface Props {
@@ -38,6 +39,9 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const showInfoModal = ref(false)
 const previewPdfUrl = ref('')
 const isDemoMode = ref(false)
+const uploadedPdfPath = ref('')
+const uploadedRepoPath = ref('')
+const isUploading = ref(false)
 
 const fileCountText = computed(() => {
   if (files.value.length > 0) {
@@ -46,7 +50,7 @@ const fileCountText = computed(() => {
   return 'Upload a scientific paper (PDF)'
 })
 
-function handleDrop(e: DragEvent) {
+async function handleDrop(e: DragEvent) {
   e.preventDefault()
   setIsDragging(false)
   
@@ -57,22 +61,8 @@ function handleDrop(e: DragEvent) {
       
       const pdfFile = droppedFiles.find(f => f.name.toLowerCase().endsWith('.pdf'))
       if (pdfFile) {
-          const objectUrl = URL.createObjectURL(pdfFile)
-          previewPdfUrl.value = objectUrl
-          emit('pdfUpload', pdfFile.name)
-          
-           // Auto-collapse and show modal after PDF upload
-
-          isDemoMode.value = false
-          showInfoModal.value = true
+          await processPdfUpload(pdfFile)
       }
-  } else {
-      // Fallback for mock/testing if needed
-      const mockPdf = 'breast_cancer_segmentation.pdf'
-      files.value.push(mockPdf)
-      emit('pdfUpload', mockPdf)
-
-      setTimeout(() => { showInfoModal.value = true }, 500)
   }
 }
 
@@ -89,7 +79,7 @@ function handleBrowseClick() {
   fileInputRef.value?.click()
 }
 
-function handleFileInput(e: Event) {
+async function handleFileInput(e: Event) {
   const target = e.target as HTMLInputElement
   const uploadedFiles = target.files
   if (uploadedFiles && uploadedFiles.length > 0) {
@@ -100,18 +90,47 @@ function handleFileInput(e: Event) {
     // Find and notify about PDF
     const pdfFile = fileList.find(f => f.name.toLowerCase().endsWith('.pdf'))
     if (pdfFile) {
-      const objectUrl = URL.createObjectURL(pdfFile)
-      previewPdfUrl.value = objectUrl
-      emit('pdfUpload', pdfFile.name)
-      
-      // Auto-open modal after PDF upload
-      isDemoMode.value = false
-      showInfoModal.value = true
+      await processPdfUpload(pdfFile)
     }
     
     // Auto-collapse after file upload
 
   }
+}
+
+async function processPdfUpload(file: File) {
+    const objectUrl = URL.createObjectURL(file)
+    previewPdfUrl.value = objectUrl
+    
+    // 1. Generate ID
+    const pdfId = crypto.randomUUID()
+    
+    try {
+        isUploading.value = true
+        // 2. Upload to backend
+        const response = await endpoints.uploadPublicationWithId(file, pdfId)
+        
+        // 3. Store paths
+        if (response.data.pdf_path && response.data.folder_path) {
+            uploadedPdfPath.value = response.data.pdf_path
+            uploadedRepoPath.value = response.data.folder_path
+            // Store upload_id in the store for subsequent calls (e.g. additional info)
+            store.uploadId = response.data.upload_id
+            emit('pdfUpload', file.name)
+        }
+        
+        isDemoMode.value = false
+        showInfoModal.value = true
+    } catch (error: any) {
+        console.error("Upload failed", error)
+        if (error.response && error.response.status === 413) {
+            alert("File is too large. Please upload a smaller file (max 2GB).")
+        } else {
+            alert("Upload failed: " + (error.message || "Unknown error"))
+        }
+    } finally {
+        isUploading.value = false
+    }
 }
 
 function handleLoadDemo() {
@@ -143,16 +162,70 @@ async function handleModalSubmit(info: string) {
 
   // If we have an ID, send it. If not, maybe we should queue it? 
   // For this Refactor, I'll keep existing logic: try to send if ID exists.
-  if (store.uploadId) {
+  
+  // Trigger Orchestration
+  if (!isDemoMode.value && uploadedPdfPath.value && uploadedRepoPath.value) {
+      // Don't await orchestration - let it run in background to allow UI transition
+      console.log("Starting orchestration in background...")
+      
+      // Emit immediately to switch UI
+      emit('uploadComplete')
+      
+      // Open Console Panel
+      store.isConsoleCollapsed = false
+
+      // Add start message to console
+      const consoleStore = useConsoleStore()
+      consoleStore.addSystemMessage("Starting orchestration in background...")
+      
+      // Set loading state
+      store.isLoading = true
+      store.loadingMessage = "Analyzing publication and generating study design..."
+      
+      // Ensure WebSocket is connected for real-time updates
       try {
-        await endpoints.sendAdditionalInfo(store.uploadId, info)
-        console.log("Additional info submitted")
-      } catch (error) {
-        console.error("Failed to submit additional info", error)
+        await store.initWebSocket()
+      } catch (wsError) {
+        console.error("Failed to initialize WebSocket:", wsError)
+        // Proceed anyway, but real-time updates might fail
       }
-  } else {
-      console.warn("Skipping additional info submission: No uploadId")
+
+      const clientId = store.clientId || undefined
+      
+      endpoints.orchestrateWorkflow(
+          uploadedPdfPath.value, 
+          uploadedRepoPath.value,
+          info, // Pass additional info as userContext
+          clientId 
+      ).then(response => {
+          console.log("Orchestration completed:", response.data)
+          
+          if (response.data.status === 'completed' && response.data.result) {
+              const res = response.data.result
+              // Update store with ISA JSON
+              if (res.isa_json) {
+                  // Map to store hierarchy format 
+                  // (Logic similar to loadExample in store, likely need a store action for this)
+                   console.log("Setting hierarchy from orchestration result")
+                   // Direct store manipulation for now or call a specific action if refactored
+                   // reusing logic from manual mapping if needed, or better:
+                   // Call a store action to process the result
+                   store.setHierarchyFromOrchestration(res.isa_json)
+              }
+          }
+      }).catch(error => {
+          console.error("Orchestration failed", error)
+          // We can't alert easily as user might have moved on, 
+          // but Console should show error via WS if backend sent it.
+          // Or we can use a store error state.
+          store.error = "Orchestration failed: " + (error.message || "Unknown error")
+      }).finally(() => {
+          store.isLoading = false
+          store.loadingMessage = null
+      })
   }
+  
+
   
   showInfoModal.value = false
   

@@ -1,0 +1,132 @@
+{
+  "inputs": {
+    "pdf_path": "C:\\Users\\lgao142\\Desktop\\AI Agent 2026\\a-google-hackathon\\VeriFlow\\backend\\tests\\mamamiaworkflow.pdf"
+  },
+  "prompt_truncated": "You are an expert Scientific Data Curator.\nAnalyze the PDF and extract the experimental design into ISA JSON format.\n\nCRITICAL:\n- Identify if steps require 'File' inputs or 'Directory' inputs based on...",
+  "model_thoughts": [],
+  "final_output": {
+    "studyDesign": {
+      "paper": {
+        "id": "root",
+        "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
+        "authors": "Lidia Garrucho et al.",
+        "year": "2025",
+        "abstract": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. To address this, we present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA), where only 163 cases with expert segmentations were initially available. To facilitate the annotation process, a deep learning model was trained to produce preliminary segmentations for the remaining cases. These were subsequently corrected and verified by 16 breast cancer experts (averaging 9 years of experience), creating a fully annotated dataset. Additionally, the dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model trained on the annotated data. This resource addresses a critical gap in publicly available breast cancer datasets, enabling the development, validation, and benchmarking of advanced deep learning models, thus driving progress in breast cancer diagnostics, treatment response prediction, and personalized care."
+      },
+      "investigation": {
+        "id": "inv-1",
+        "title": "Breast Cancer DCE-MRI Analysis with Expert Segmentations",
+        "description": "An investigation into leveraging a large-scale breast cancer DCE-MRI dataset with expert segmentations for the development, validation, and benchmarking of advanced deep learning models.",
+        "submissionDate": "2024-06-20"
+      },
+      "study": {
+        "id": "study-1",
+        "title": "Multicenter Breast Cancer DCE-MRI Benchmark Dataset Study",
+        "description": "A study focused on creating a comprehensive breast cancer DCE-MRI benchmark dataset with expert segmentations from multiple centers to advance AI-driven diagnostics and personalized care.",
+        "numSubjects": 1506,
+        "design": "Retrospective, multicenter data collection and annotation study"
+      },
+      "assays": [
+        {
+          "id": "assay-1",
+          "name": "Image Segmentation and Analysis",
+          "stepCount": 4,
+          "workflowSteps": [
+            {
+              "id": "step-1",
+              "description": "Collection of DCE-MRI Cases",
+              "tool": {
+                "id": "tool-1",
+                "name": "TCIA Data Retriever"
+              },
+              "input": [
+                {
+                  "name": "TCIA Collections",
+                  "type": "string"
+                }
+              ],
+              "output": [
+                {
+                  "name": "DCE-MRI Images",
+                  "type": "Directory"
+                }
+              ]
+            },
+            {
+              "id": "step-2",
+              "description": "Preliminary Automatic Segmentation",
+              "tool": {
+                "id": "tool-2",
+                "name": "nnU-Net"
+              },
+              "input": [
+                {
+                  "name": "DCE-MRI Images",
+                  "type": "Directory"
+                },
+                {
+                  "name": "Pre-trained Segmentation Model",
+                  "type": "File"
+                }
+              ],
+              "output": [
+                {
+                  "name": "Automatic Segmentations",
+                  "type": "Directory"
+                }
+              ]
+            },
+            {
+              "id": "step-3",
+              "description": "Expert Segmentation Correction and Verification",
+              "tool": {
+                "id": "tool-3",
+                "name": "Manual Annotation Tool"
+              },
+              "input": [
+                {
+                  "name": "Automatic Segmentations",
+                  "type": "Directory"
+                },
+                {
+                  "name": "DCE-MRI Images",
+                  "type": "Directory"
+                }
+              ],
+              "output": [
+                {
+                  "name": "Expert Segmentations",
+                  "type": "Directory"
+                }
+              ]
+            },
+            {
+              "id": "step-4",
+              "description": "Model Training and Validation",
+              "tool": {
+                "id": "tool-4",
+                "name": "nnU-Net"
+              },
+              "input": [
+                {
+                  "name": "DCE-MRI Images",
+                  "type": "Directory"
+                },
+                {
+                  "name": "Expert Segmentations",
+                  "type": "Directory"
+                }
+              ],
+              "output": [
+                {
+                  "name": "Trained Segmentation Model",
+                  "type": "File"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

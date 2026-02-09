@@ -56,3 +56,4 @@ model_sds_nnunet_pretrained_weights/
 
 # others
 trigger_dag.py
+/backend/examples/data/

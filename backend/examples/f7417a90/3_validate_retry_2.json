@@ -1,0 +1,18 @@
+{
+  "inputs": {
+    "generated_code_keys": [
+      "tcia_data_retriever.cwl",
+      "nnunet_segmentation.cwl",
+      "manual_annotation_tool.cwl",
+      "model_training.cwl",
+      "workflow.cwl",
+      "Dockerfile"
+    ]
+  },
+  "final_output": {
+    "errors": [
+      "Dockerfile is missing or invalid (no FROM instruction).",
+      "CWL is missing or invalid (no cwlVersion declared)."
+    ]
+  }
+}
