@@ -1,0 +1,253 @@
+<mxfile host="app.diagrams.net" modified="2026-02-09T00:00:00.000Z" agent="VeriFlow" version="24.0.0" type="device">
+  <diagram id="veriflow-architecture" name="VeriFlow System Infrastructure">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== TITLE ===== -->
+        <mxCell id="title" value="&lt;b&gt;VeriFlow — System Infrastructure&lt;/b&gt;&lt;br&gt;Autonomous Research Reliability Engineer | Gemini 3 Hackathon" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="500" y="10" width="600" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== USER ===== -->
+        <mxCell id="user" value="Researcher / User" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="770" y="70" width="30" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== FRONTEND CONTAINER ===== -->
+        <mxCell id="frontend-group" value="Vue 3 Frontend (Port 3000)" style="swimlane;startSize=25;fillColor=#FFF3CD;strokeColor=#e8a200;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="160" width="700" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="upload" value="UploadModule&lt;br&gt;PDF Upload + Demo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBBC04;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="20" y="35" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="studydesign" value="StudyDesignModule&lt;br&gt;ISA Hierarchy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBBC04;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="20" y="105" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="workflow-ui" value="WorkflowAssembler&lt;br&gt;Vue Flow Graph" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBBC04;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="175" y="35" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="catalogue-ui" value="DataObjectCatalogue&lt;br&gt;Tools / Models / Data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBBC04;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="175" y="105" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="dataset-nav" value="DatasetNavigation&lt;br&gt;Results &amp; SDS Export" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBBC04;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="330" y="35" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="console-ui" value="ConsoleModule&lt;br&gt;Real-time Logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBBC04;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="330" y="105" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="pinia" value="Pinia Store" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="490" y="35" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="axios" value="axios API Client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="490" y="90" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="dagre" value="dagre Layout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;strokeColor=#e8a200;fontColor=#000;" vertex="1" parent="frontend-group">
+          <mxGeometry x="610" y="35" width="80" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== BACKEND CONTAINER ===== -->
+        <mxCell id="backend-group" value="FastAPI Backend (Port 8000)" style="swimlane;startSize=25;fillColor=#FCE4EC;strokeColor=#c5221f;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="400" width="660" height="350" as="geometry"/>
+        </mxCell>
+        <mxCell id="fastapi" value="&lt;b&gt;FastAPI App&lt;/b&gt;&lt;br&gt;(main.py)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;" vertex="1" parent="backend-group">
+          <mxGeometry x="260" y="35" width="130" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="api-pub" value="publications" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#c5221f;fontSize=11;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="90" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="api-wf" value="workflows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#c5221f;fontSize=11;" vertex="1" parent="backend-group">
+          <mxGeometry x="130" y="90" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="api-exec" value="executions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#c5221f;fontSize=11;" vertex="1" parent="backend-group">
+          <mxGeometry x="240" y="90" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="api-cat" value="catalogue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#c5221f;fontSize=11;" vertex="1" parent="backend-group">
+          <mxGeometry x="350" y="90" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="api-set" value="settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#c5221f;fontSize=11;" vertex="1" parent="backend-group">
+          <mxGeometry x="460" y="90" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ws" value="WebSocket&lt;br&gt;/ws/logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#c5221f;fontSize=11;" vertex="1" parent="backend-group">
+          <mxGeometry x="570" y="90" width="80" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Agents -->
+        <mxCell id="scholar" value="&lt;b&gt;ScholarAgent&lt;/b&gt;&lt;br&gt;PDF Analysis&lt;br&gt;ISA Extraction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34A853;strokeColor=#1e8e3e;fontColor=#fff;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="145" width="130" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="engineer" value="&lt;b&gt;EngineerAgent&lt;/b&gt;&lt;br&gt;CWL Generation&lt;br&gt;Dockerfiles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34A853;strokeColor=#1e8e3e;fontColor=#fff;" vertex="1" parent="backend-group">
+          <mxGeometry x="165" y="145" width="130" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="reviewer" value="&lt;b&gt;ReviewerAgent&lt;/b&gt;&lt;br&gt;CWL Validation&lt;br&gt;Auto-Fix" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34A853;strokeColor=#1e8e3e;fontColor=#fff;" vertex="1" parent="backend-group">
+          <mxGeometry x="310" y="145" width="130" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="gemini-client" value="&lt;b&gt;GeminiClient&lt;/b&gt;&lt;br&gt;google-genai SDK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34A853;strokeColor=#1e8e3e;fontColor=#fff;" vertex="1" parent="backend-group">
+          <mxGeometry x="460" y="145" width="130" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Core Services -->
+        <mxCell id="cwlparser" value="CWLParser" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="230" width="90" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="daggen" value="DAGGenerator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="120" y="230" width="90" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="dockerbuild" value="DockerBuilder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="220" y="230" width="90" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="execengine" value="ExecutionEngine" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="320" y="230" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="sdsexport" value="SDSExporter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="430" y="230" width="90" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="promptmgr" value="PromptManager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="530" y="230" width="100" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Data Services -->
+        <mxCell id="dbservice" value="DatabaseService&lt;br&gt;(asyncpg)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="290" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="miniosvc" value="MinIOService&lt;br&gt;(S3 Client)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="160" y="290" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="airflowclient" value="AirflowClient&lt;br&gt;(httpx REST)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#c5221f;fontColor=#fff;fontSize=10;" vertex="1" parent="backend-group">
+          <mxGeometry x="300" y="290" width="120" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== GEMINI 3 API ===== -->
+        <mxCell id="gemini-group" value="Gemini 3 API (External)" style="swimlane;startSize=25;fillColor=#E8F0FE;strokeColor=#4285F4;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="750" y="400" width="400" height="350" as="geometry"/>
+        </mxCell>
+        <mxCell id="gem-pro" value="&lt;b&gt;gemini-3-pro-preview&lt;/b&gt;&lt;br&gt;Complex Reasoning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285F4;strokeColor=#1a73e8;fontColor=#fff;" vertex="1" parent="gemini-group">
+          <mxGeometry x="20" y="40" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="gem-flash" value="&lt;b&gt;gemini-3-flash-preview&lt;/b&gt;&lt;br&gt;Fast Validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285F4;strokeColor=#1a73e8;fontColor=#fff;" vertex="1" parent="gemini-group">
+          <mxGeometry x="210" y="40" width="170" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- Gemini Features -->
+        <mxCell id="f1" value="1. Pydantic Structured Output&lt;br&gt;&lt;i&gt;response_schema parameter&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="20" y="105" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="f2" value="2. Thinking Level Control&lt;br&gt;&lt;i&gt;ThinkingConfig(thinking_budget)&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="210" y="105" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="f3" value="3. Grounding with Google Search&lt;br&gt;&lt;i&gt;GoogleSearch() tool&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="20" y="160" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="f4" value="4. Native PDF Upload&lt;br&gt;&lt;i&gt;client.files.upload()&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="210" y="160" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="f5" value="5. Thought Signature Preservation&lt;br&gt;&lt;i&gt;types.Part(thought=True)&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="20" y="215" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="f6" value="6. Agentic Vision&lt;br&gt;&lt;i&gt;Page Image Extraction&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="210" y="215" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="f7" value="7. Agentic Function Calling&lt;br&gt;&lt;i&gt;Think-Act-Observe Loops&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#4285F4;fontColor=#1a73e8;fontSize=10;" vertex="1" parent="gemini-group">
+          <mxGeometry x="115" y="270" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Feature usage labels -->
+        <mxCell id="usage-scholar" value="Scholar: F1,F2,F3,F4,F6" style="text;html=1;fontSize=9;fontColor=#1e8e3e;fontStyle=2;" vertex="1" parent="gemini-group">
+          <mxGeometry x="20" y="320" width="140" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="usage-engineer" value="Engineer: F1,F2,F5,F7" style="text;html=1;fontSize=9;fontColor=#1e8e3e;fontStyle=2;" vertex="1" parent="gemini-group">
+          <mxGeometry x="150" y="320" width="120" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="usage-reviewer" value="Reviewer: F1,F2,F5" style="text;html=1;fontSize=9;fontColor=#1e8e3e;fontStyle=2;" vertex="1" parent="gemini-group">
+          <mxGeometry x="280" y="320" width="100" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== DATA LAYER ===== -->
+        <mxCell id="data-group" value="Data Layer" style="swimlane;startSize=25;fillColor=#F5F5F5;strokeColor=#5f6368;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="810" width="450" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="postgres" value="&lt;b&gt;PostgreSQL 15&lt;/b&gt;&lt;br&gt;Port 5432&lt;br&gt;Sessions + Executions&lt;br&gt;+ Conversation History" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#9AA0A6;strokeColor=#5f6368;fontColor=#fff;fontSize=10;" vertex="1" parent="data-group">
+          <mxGeometry x="20" y="30" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="minio" value="&lt;b&gt;MinIO S3&lt;/b&gt;&lt;br&gt;Ports 9000/9001&lt;br&gt;measurements | workflow&lt;br&gt;workflow-tool | process" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#9AA0A6;strokeColor=#5f6368;fontColor=#fff;fontSize=10;" vertex="1" parent="data-group">
+          <mxGeometry x="200" y="30" width="160" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== EXECUTION LAYER ===== -->
+        <mxCell id="exec-group" value="Workflow Execution Layer" style="swimlane;startSize=25;fillColor=#FFF3E0;strokeColor=#e85d00;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="530" y="810" width="620" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="airflow-api" value="&lt;b&gt;Airflow 3.0.6&lt;/b&gt;&lt;br&gt;API Server&lt;br&gt;Port 8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6D01;strokeColor=#e85d00;fontColor=#fff;" vertex="1" parent="exec-group">
+          <mxGeometry x="20" y="35" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="airflow-sched" value="&lt;b&gt;Airflow Scheduler&lt;/b&gt;&lt;br&gt;LocalExecutor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6D01;strokeColor=#e85d00;fontColor=#fff;" vertex="1" parent="exec-group">
+          <mxGeometry x="170" y="35" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dind" value="&lt;b&gt;Docker-in-Docker&lt;/b&gt;&lt;br&gt;(dind)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6D01;strokeColor=#e85d00;fontColor=#fff;" vertex="1" parent="exec-group">
+          <mxGeometry x="340" y="35" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="cwlrunner" value="&lt;b&gt;CWL Runner&lt;/b&gt;&lt;br&gt;cwltool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6D01;strokeColor=#e85d00;fontColor=#fff;" vertex="1" parent="exec-group">
+          <mxGeometry x="490" y="35" width="110" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== EDGES ===== -->
+        <!-- User -> Frontend -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="user" target="frontend-group" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Frontend -> Backend (REST) -->
+        <mxCell id="e2" value="REST /api/v1" style="edgeStyle=orthogonalEdgeStyle;fontStyle=2;fontSize=10;" edge="1" source="axios" target="fastapi" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Agents -> GeminiClient -->
+        <mxCell id="e3" style="" edge="1" source="scholar" target="gemini-client" parent="backend-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" style="" edge="1" source="engineer" target="gemini-client" parent="backend-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" style="" edge="1" source="reviewer" target="gemini-client" parent="backend-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- GeminiClient -> Gemini API -->
+        <mxCell id="e6" value="google-genai SDK" style="edgeStyle=orthogonalEdgeStyle;fontStyle=2;fontSize=10;strokeColor=#4285F4;strokeWidth=2;" edge="1" source="gemini-client" target="gemini-group" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Backend -> Data Layer -->
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="dbservice" target="postgres" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="miniosvc" target="minio" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Backend -> Execution -->
+        <mxCell id="e9" value="REST API" style="edgeStyle=orthogonalEdgeStyle;fontStyle=2;fontSize=10;" edge="1" source="airflowclient" target="airflow-api" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Execution internal -->
+        <mxCell id="e10" style="" edge="1" source="airflow-api" target="airflow-sched" parent="exec-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="DockerOperator" style="fontStyle=2;fontSize=9;" edge="1" source="airflow-sched" target="dind" parent="exec-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e12" style="" edge="1" source="dind" target="cwlrunner" parent="exec-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- CWL Runner -> MinIO -->
+        <mxCell id="e13" value="Read/Write Data" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontStyle=2;fontSize=9;" edge="1" source="cwlrunner" target="minio" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -3,658 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VeriFlow Architecture - Gemini 3 Hackathon</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <title>VeriFlow Architecture Diagram</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
-            color: #1e293b;
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #202124;
         }
-        .header {
-            background: linear-gradient(135deg, #1a73e8, #4285f4, #ea4335);
-            color: white;
-            padding: 2rem 3rem;
-            text-align: center;
-        }
-        .header h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .header p { font-size: 1.1rem; opacity: 0.9; }
-        .header .badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            padding: 4px 16px;
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-        }
-        .nav {
-            background: white;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .nav-inner {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .nav a {
-            text-decoration: none;
-            color: #475569;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        .nav a:hover { background: #f1f5f9; color: #1a73e8; }
-        .nav a.gemini { background: #e8f0fe; color: #1a73e8; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
-        .diagram-section {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-            overflow: hidden;
-        }
-        .diagram-header {
-            padding: 1.5rem 2rem;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        .diagram-header .number {
+        header {
             background: #1a73e8;
             color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            padding: 20px 32px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.9rem;
-            flex-shrink: 0;
         }
-        .diagram-header .number.gemini { background: #ea4335; }
-        .diagram-header h2 { font-size: 1.25rem; font-weight: 600; }
-        .diagram-header p { font-size: 0.85rem; color: #64748b; margin-top: 2px; }
-        .diagram-body { padding: 2rem; overflow-x: auto; }
-        .diagram-body .mermaid { display: flex; justify-content: center; }
-        .legend {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            margin: 1rem 2rem 2rem;
-        }
-        .legend h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; color: #475569; }
-        .legend-items { display: flex; flex-wrap: wrap; gap: 1rem; }
-        .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
-        .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
-        .gemini-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: #fce8e6;
-            color: #c5221f;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
+        header h1 {
+            font-size: 24px;
             font-weight: 600;
         }
-        footer {
-            text-align: center;
-            padding: 2rem;
-            color: #94a3b8;
-            font-size: 0.85rem;
+        header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 16px 32px;
+            background: white;
+            border-bottom: 1px solid #dadce0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        .diagram-container {
+            padding: 24px;
+            overflow: auto;
+            min-height: calc(100vh - 140px);
+            display: flex;
+            justify-content: center;
+        }
+        .mermaid {
+            max-width: 100%;
+        }
+        .controls {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            gap: 8px;
+        }
+        .controls button {
+            background: white;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .controls button:hover {
+            background: #f1f3f4;
+        }
+        .gemini-badge {
+            background: #4285F4;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>VeriFlow Architecture</h1>
-        <p>Autonomous Research Reliability Engineer</p>
-        <span class="badge">Gemini 3 Hackathon Submission</span>
+    <header>
+        <div>
+            <h1>VeriFlow &mdash; Architecture Diagram</h1>
+            <p>Autonomous Research Reliability Engineer &bull; Gemini 3 Hackathon</p>
+        </div>
+        <span class="gemini-badge">7 Gemini 3 Features</span>
+    </header>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background:#4285F4"></div> Gemini 3 Models</div>
+        <div class="legend-item"><div class="legend-color" style="background:#E8F0FE;border:1px solid #4285F4"></div> Gemini 3 Features</div>
+        <div class="legend-item"><div class="legend-color" style="background:#34A853"></div> AI Agents &amp; SDK Client</div>
+        <div class="legend-item"><div class="legend-color" style="background:#FBBC04"></div> Frontend Components</div>
+        <div class="legend-item"><div class="legend-color" style="background:#EA4335"></div> Backend Services</div>
+        <div class="legend-item"><div class="legend-color" style="background:#9AA0A6"></div> Storage Layer</div>
+        <div class="legend-item"><div class="legend-color" style="background:#FF6D01"></div> Execution Engine</div>
     </div>
 
-    <nav class="nav">
-        <div class="nav-inner">
-            <a href="#system-infra">System Infrastructure</a>
-            <a href="#gemini-integration" class="gemini">Gemini 3 Integration</a>
-            <a href="#data-flow">Data Flow Pipeline</a>
-            <a href="#gemini-client" class="gemini">GeminiClient SDK</a>
-            <a href="#frontend">Frontend Components</a>
-            <a href="#docker">Docker Services</a>
-            <a href="#sequence">End-to-End Sequence</a>
-            <a href="#thinking" class="gemini">Thinking Budget</a>
-        </div>
-    </nav>
+    <div class="diagram-container">
+        <pre class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4285F4', 'primaryTextColor': '#fff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#5f6368', 'secondaryColor': '#34A853', 'tertiaryColor': '#FBBC04'}}}%%
 
-    <div class="container">
-
-        <!-- Diagram 1: System Infrastructure -->
-        <section id="system-infra" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number">1</span>
-                <div>
-                    <h2>System Infrastructure Overview</h2>
-                    <p>Complete architecture: Vue 3 Frontend, FastAPI Backend, 3 Gemini AI Agents, Airflow Execution</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
 graph TB
-    subgraph Frontend["Vue 3 Frontend :3000"]
-        UI["App.vue\n4-Panel Layout"]
-        WF["WorkflowAssemblerModule\nVue Flow Graph"]
-        SD["StudyDesignModule\nISA Hierarchy Viewer"]
-        UP["UploadModule\nPDF Upload + Demo"]
-        DS["DatasetNavigationModule\nResults & Export"]
-        CS["ConsoleModule\nReal-time Logs"]
-    end
+    User["fa:fa-user Researcher / User"]
 
-    subgraph Backend["FastAPI Backend :8000"]
-        API["REST API\n5 Routers"]
-        subgraph Agents["Gemini 3 AI Agents"]
-            SA["ScholarAgent\ngemini-3-pro-preview\nThinking: HIGH 24576"]
-            EA["EngineerAgent\ngemini-3-pro-preview\nThinking: HIGH 24576"]
-            RA["ReviewerAgent\ngemini-3-flash-preview\nThinking: MEDIUM 8192"]
-        end
-        GC["GeminiClient\ngoogle-genai SDK"]
-        subgraph Services["Core Services"]
-            CWP["CWLParser"]
-            DAGGEN["DAGGenerator"]
-            DBuild["DockerBuilder"]
-            EE["ExecutionEngine"]
-            SDSE["SDSExporter"]
-        end
-        PM["PromptManager\nprompts.yaml"]
-        CFG["AppConfig\nconfig.yaml"]
-    end
+    subgraph Frontend["Vue 3 Frontend (Port 3000)"]
+        direction TB
+        App["App.vue &mdash; 4-Panel Layout"]
 
-    subgraph Storage["Data Layer"]
-        PG[("PostgreSQL 15\n:5432")]
-        MN[("MinIO S3\n:9000")]
-    end
-
-    subgraph Execution["Workflow Execution"]
-        AF["Airflow 3.0.6\nAPI Server :8080"]
-        AS["Airflow Scheduler"]
-        DIND["Docker-in-Docker"]
-        CWLR["CWL Runner\ncwltool"]
-    end
-
-    subgraph Gemini["Gemini 3 API"]
-        G3["Google Gemini 3\nPro + Flash"]
-    end
-
-    Frontend -->|"axios /api/v1"| API
-    API --> SA & EA & RA
-    SA & EA & RA --> GC
-    GC -->|"google-genai SDK"| G3
-    API --> Services
-    EE --> CWP & DAGGEN & DBuild
-    EE -->|"Trigger DAG"| AF
-    AF --> AS
-    AS -->|"DockerOperator"| DIND
-    DIND --> CWLR
-    API --> PG & MN
-    EE --> MN
-
-    classDef gemini fill:#4285F4,stroke:#1a73e8,color:#fff
-    classDef agent fill:#EA4335,stroke:#c5221f,color:#fff
-    classDef frontend fill:#34A853,stroke:#1e8e3e,color:#fff
-    classDef storage fill:#FBBC04,stroke:#f9ab00,color:#333
-    classDef execution fill:#9334E6,stroke:#7627bb,color:#fff
-
-    class G3 gemini
-    class SA,EA,RA,GC agent
-    class UI,WF,SD,UP,DS,CS frontend
-    class PG,MN storage
-    class AF,AS,DIND,CWLR execution
-                </pre>
-            </div>
-            <div class="legend">
-                <h3>Legend</h3>
-                <div class="legend-items">
-                    <div class="legend-item"><div class="legend-dot" style="background:#EA4335"></div> Gemini 3 Agents</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#4285F4"></div> Gemini 3 API</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#34A853"></div> Frontend</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#FBBC04"></div> Storage</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#9334E6"></div> Execution</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Diagram 2: Gemini 3 Integration -->
-        <section id="gemini-integration" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number gemini">2</span>
-                <div>
-                    <h2>Gemini 3 Feature Integration Map <span class="gemini-badge">GEMINI 3</span></h2>
-                    <p>All 7 Gemini 3 features mapped to their usage across the 3 AI agents</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-graph LR
-    subgraph Features["Gemini 3 Features Used"]
-        F1["Pydantic Structured Output\nresponse_schema parameter"]
-        F2["Thinking Level Control\nThinkingConfig + budget"]
-        F3["Grounding with Google Search\nGoogleSearch tool"]
-        F4["Native PDF Upload\nclient.files.upload()"]
-        F5["Thought Signature Preservation\nMulti-turn reasoning chains"]
-        F6["Agentic Vision\nPage image extraction"]
-        F7["Agentic Function Calling\nThink-Act-Observe loops"]
-    end
-
-    subgraph Schemas["Pydantic Output Schemas"]
-        S1["AnalysisResult\nScholar Agent"]
-        S2["WorkflowResult\nEngineer Agent"]
-        S3["ValidationResult\nReviewer Agent"]
-        S4["ErrorTranslationResult\nReviewer Agent"]
-    end
-
-    subgraph AgentsUsage["Agent Usage"]
-        SA["ScholarAgent\nanalyze_publication\nanalyze_with_vision"]
-        EA["EngineerAgent\ngenerate_workflow\ngenerate_workflow_agentic"]
-        RA["ReviewerAgent\nvalidate_workflow\nvalidate_and_fix\ntranslate_errors"]
-    end
-
-    F1 -->|"AnalysisResult"| SA
-    F1 -->|"WorkflowResult"| EA
-    F1 -->|"ValidationResult"| RA
-    F1 -->|"ErrorTranslationResult"| RA
-    F2 -->|"HIGH 24576"| SA
-    F2 -->|"HIGH 24576"| EA
-    F2 -->|"MEDIUM 8192"| RA
-    F3 -->|"Tool verification"| SA
-    F4 -->|"PDF analysis"| SA
-    F5 -->|"Iterative generation"| EA
-    F5 -->|"Iterative validation"| RA
-    F6 -->|"Diagram extraction"| SA
-    F7 -->|"CWL validate loop"| EA
-
-    classDef feature fill:#4285F4,stroke:#1a73e8,color:#fff
-    classDef schema fill:#34A853,stroke:#1e8e3e,color:#fff
-    classDef agent fill:#EA4335,stroke:#c5221f,color:#fff
-
-    class F1,F2,F3,F4,F5,F6,F7 feature
-    class S1,S2,S3,S4 schema
-    class SA,EA,RA agent
-                </pre>
-            </div>
-        </section>
-
-        <!-- Diagram 3: Data Flow -->
-        <section id="data-flow" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number">3</span>
-                <div>
-                    <h2>Data Flow Pipeline</h2>
-                    <p>End-to-end data flow from PDF upload to SDS-compliant results export</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-graph LR
-    PDF["Scientific\nPublication\n(PDF)"] -->|"Upload"| UP["UploadModule"]
-    UP -->|"MinIO storage\n+ temp file"| SA["ScholarAgent"]
-    SA -->|"Gemini 3 Pro\n+ Grounding\n+ PDF Upload\n+ Structured Output"| ISA["ISA-JSON\nHierarchy"]
-    ISA -->|"User selects assay"| EA["EngineerAgent"]
-    EA -->|"Gemini 3 Pro\n+ Structured Output\n+ Thinking HIGH"| WFR["CWL Workflow\n+ Dockerfiles\n+ Vue Flow Graph"]
-    WFR -->|"Validate"| RA["ReviewerAgent"]
-    RA -->|"Gemini 3 Flash\n+ Structured Output\n+ Thought Signatures"| VAL{"Valid?"}
-    VAL -->|"Yes"| EXE["ExecutionEngine"]
-    VAL -->|"No - Auto Fix"| RA
-    EXE -->|"CWL Parse\nDAG Generate"| AF["Airflow 3.0.6"]
-    AF -->|"DockerOperator"| DIND["Docker-in-Docker"]
-    DIND -->|"cwltool"| RES["Results"]
-    RES -->|"SDS Exporter"| ZIP["SDS ZIP\ndataset_description.json\nmanifest.xlsx\nprovenance.json"]
-
-    classDef agent fill:#EA4335,stroke:#c5221f,color:#fff
-    classDef data fill:#34A853,stroke:#1e8e3e,color:#fff
-    classDef execution fill:#9334E6,stroke:#7627bb,color:#fff
-
-    class SA,EA,RA agent
-    class ISA,WFR,RES,ZIP data
-    class AF,DIND,EXE execution
-                </pre>
-            </div>
-        </section>
-
-        <!-- Diagram 4: GeminiClient Architecture -->
-        <section id="gemini-client" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number gemini">4</span>
-                <div>
-                    <h2>GeminiClient - google-genai SDK Integration <span class="gemini-badge">GEMINI 3</span></h2>
-                    <p>Central Gemini client with 3 methods mapping to SDK types</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-graph TB
-    subgraph GeminiClient["GeminiClient (gemini_client.py)"]
-        INIT["__init__\ngenai.Client(api_key)"]
-        BC["_build_generation_config\nGenerateContentConfig"]
-
-        subgraph Methods["3 Core Methods"]
-            AFM["analyze_file()\nPDF Upload + Analysis"]
-            GT["generate_text()\nText Generation"]
-            GH["generate_with_history()\nMulti-turn + Thought Sigs"]
-        end
-
-        subgraph ConfigB["Gemini 3 Config Builder"]
-            SO["response_schema\nPydantic Model"]
-            TC["thinking_config\nThinkingConfig(budget)"]
-            GR["tools\nGoogleSearch()"]
-            SYS["system_instruction"]
-        end
-    end
-
-    subgraph SDK["google-genai SDK"]
-        CL["genai.Client"]
-        FU["client.files.upload()"]
-        GCM["client.models.generate_content()"]
-        TP["types.GenerateContentConfig"]
-        TK["types.ThinkingConfig"]
-        GS["types.GoogleSearch"]
-        PT["types.Part(thought=True)"]
-    end
-
-    AFM -->|"Upload PDF"| FU
-    AFM & GT & GH -->|"Generate"| GCM
-    BC --> SO & TC & GR & SYS
-    BC --> TP
-    TC --> TK
-    GR --> GS
-    GH -->|"Preserve thoughts"| PT
-
-    classDef method fill:#4285F4,stroke:#1a73e8,color:#fff
-    classDef sdk fill:#34A853,stroke:#1e8e3e,color:#fff
-    classDef config fill:#FBBC04,stroke:#f9ab00,color:#333
-
-    class AFM,GT,GH method
-    class CL,FU,GCM,TP,TK,GS,PT sdk
-    class SO,TC,GR,SYS config
-                </pre>
-            </div>
-        </section>
-
-        <!-- Diagram 5: Frontend Architecture -->
-        <section id="frontend" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number">5</span>
-                <div>
-                    <h2>Frontend Component Architecture</h2>
-                    <p>Vue 3 + Vue Flow + Pinia + Tailwind CSS 4</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-graph TB
-    subgraph AppVue["App.vue - Main Layout"]
-        LP["LandingPageOverlay"]
-        HD["Header + ConfigurationPanel"]
-
-        subgraph LeftPanels["Left Panels"]
-            UM["UploadModule\nPDF Upload + Demo Load"]
-            SDM["StudyDesignModule\nISA Tree + Assay Select"]
+        subgraph LeftPanel["Left Panel"]
+            Upload["UploadModule.vue<br/>PDF Upload + Demo"]
+            StudyDesign["StudyDesignModule.vue<br/>ISA Hierarchy + Confidence Scores"]
         end
 
         subgraph CenterPanel["Center Panel"]
-            WAM["WorkflowAssemblerModule"]
-            subgraph VueFlowCanvas["Vue Flow Canvas"]
-                GN["GraphNode\nCustom Nodes"]
-                CLN["ConnectionLine\nCustom Edges"]
-            end
-            VP["ViewerPanel\nPDF Viewer"]
-            DOC["DataObjectCatalogue\nTools/Models/Data"]
+            Workflow["WorkflowAssemblerModule.vue<br/>Vue Flow Graph Canvas"]
+            GraphNode["GraphNode.vue<br/>Custom Node Types"]
+            Catalogue["DataObjectCatalogue.vue"]
+            Viewer["ViewerPanel.vue"]
         end
 
         subgraph RightPanel["Right Panel"]
-            DNM["DatasetNavigationModule\nResults + Export"]
-            FTN["FileTreeNode\nSDS Structure"]
+            DatasetNav["DatasetNavigationModule.vue<br/>Results &amp; SDS Export"]
         end
 
         subgraph BottomPanel["Bottom Panel"]
-            CM["ConsoleModule\nLog Stream"]
-            CI["ConsoleInput"]
+            Console["ConsoleModule.vue<br/>Real-time Agent Logs"]
+        end
+
+        Store["Pinia Store (workflow.ts)"]
+        ApiService["API Service (axios)"]
+    end
+
+    subgraph Backend["FastAPI Backend (Port 8000)"]
+        direction TB
+        FastAPI["FastAPI App (main.py)"]
+
+        subgraph APIRouters["REST API &mdash; 5 Routers"]
+            PubAPI["publications"]
+            WfAPI["workflows"]
+            ExecAPI["executions"]
+            CatAPI["catalogue"]
+            SetAPI["settings"]
+        end
+
+        WS["WebSocket /ws/logs"]
+
+        subgraph Agents["Gemini 3 AI Agent System"]
+            Scholar["ScholarAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
+            Engineer["EngineerAgent<br/>gemini-3-pro-preview<br/>Thinking: HIGH (24576)"]
+            Reviewer["ReviewerAgent<br/>gemini-3-flash-preview<br/>Thinking: MEDIUM (8192)"]
+        end
+
+        GeminiClient["GeminiClient<br/>google-genai SDK Wrapper"]
+
+        subgraph CoreServices["Core Services"]
+            CWLParser["CWLParser"]
+            DAGGen["DAGGenerator"]
+            DockerBuild["DockerBuilder"]
+            ExecEngine["ExecutionEngine"]
+            SDSExport["SDSExporter"]
+            PromptMgr["PromptManager"]
+        end
+
+        subgraph DataServices["Data Services"]
+            DBService["DatabaseService (asyncpg)"]
+            MinIOSvc["MinIOService (S3)"]
+            AirflowClient["AirflowClient (httpx)"]
         end
     end
 
-    subgraph StateLayer["State Management"]
-        WS["workflowStore\nPinia"]
-        CST["consoleStore\nPinia"]
-    end
+    subgraph GeminiAPI["Gemini 3 API (External)"]
+        direction TB
+        GemPro["gemini-3-pro-preview"]
+        GemFlash["gemini-3-flash-preview"]
 
-    subgraph APILayer["API Layer"]
-        AX["api.ts\naxios /api/v1"]
-    end
-
-    UM & SDM & WAM & DNM --> WS
-    CM --> CST
-    WS & CST --> AX
-
-    classDef component fill:#34A853,stroke:#1e8e3e,color:#fff
-    classDef state fill:#4285F4,stroke:#1a73e8,color:#fff
-    classDef api fill:#EA4335,stroke:#c5221f,color:#fff
-
-    class UM,SDM,WAM,GN,CLN,VP,DOC,DNM,FTN,CM,CI,LP,HD component
-    class WS,CST state
-    class AX api
-                </pre>
-            </div>
-        </section>
-
-        <!-- Diagram 6: Docker Services -->
-        <section id="docker" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number">6</span>
-                <div>
-                    <h2>Docker Compose - 9 Services</h2>
-                    <p>Complete service orchestration with networking and volume configuration</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-graph TB
-    subgraph DockerCompose["docker-compose.yml"]
-        subgraph AppLayer["Application Layer"]
-            BE["backend\nFastAPI :8000\nPython 3.11"]
-            FEd["frontend\nVue 3 + Nginx :3000"]
-        end
-
-        subgraph DataLayer["Data Layer"]
-            PGd["postgres\nPostgreSQL 15 :5432"]
-            MNd["minio\nMinIO S3 :9000/:9001"]
-            MI["minio-init\nBucket Setup (ephemeral)"]
-        end
-
-        subgraph AirflowLayer["Airflow Layer"]
-            AAd["airflow-apiserver\nAirflow 3.0.6 :8080"]
-            AASd["airflow-scheduler\nLocalExecutor"]
-        end
-
-        subgraph CWLLayer["CWL Execution Layer"]
-            DId["dind\nDocker-in-Docker"]
-            CWd["cwl\ncwltool Runner"]
+        subgraph GeminiFeatures["7 Gemini 3 Features"]
+            F1["1. Pydantic Structured Output"]
+            F2["2. Thinking Level Control"]
+            F3["3. Grounding with Google Search"]
+            F4["4. Native PDF Upload"]
+            F5["5. Thought Signature Preservation"]
+            F6["6. Agentic Vision"]
+            F7["7. Agentic Function Calling"]
         end
     end
 
-    FEd -->|"HTTP"| BE
-    BE -->|"asyncpg"| PGd
-    BE -->|"minio SDK"| MNd
-    MI -->|"mc alias set"| MNd
-    BE -->|"httpx"| AAd
-    AAd --> AASd
-    AASd -->|"DockerOperator"| DId
-    DId --> CWd
-    AAd -->|"SQL"| PGd
-
-    subgraph Buckets["MinIO Buckets (4)"]
-        B1["measurements"]
-        B2["workflow"]
-        B3["workflow-tool"]
-        B4["process"]
+    subgraph DataLayer["Data Layer"]
+        Postgres[("PostgreSQL 15 (5432)")]
+        MinIO[("MinIO S3 (9000/9001)<br/>4 Buckets")]
     end
 
-    MNd --> Buckets
-
-    classDef app fill:#34A853,stroke:#1e8e3e,color:#fff
-    classDef data fill:#FBBC04,stroke:#f9ab00,color:#333
-    classDef airflow fill:#9334E6,stroke:#7627bb,color:#fff
-    classDef cwl fill:#EA4335,stroke:#c5221f,color:#fff
-
-    class BE,FEd app
-    class PGd,MNd,MI data
-    class AAd,AASd airflow
-    class DId,CWd cwl
-                </pre>
-            </div>
-        </section>
-
-        <!-- Diagram 7: Sequence -->
-        <section id="sequence" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number">7</span>
-                <div>
-                    <h2>End-to-End Sequence: Upload to Execution</h2>
-                    <p>Full request flow showing all Gemini 3 API calls with their configurations</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-sequenceDiagram
-    actor User
-    participant FE as Vue Frontend
-    participant API as FastAPI
-    participant Scholar as ScholarAgent
-    participant Gemini as Gemini 3 API
-    participant Engineer as EngineerAgent
-    participant Reviewer as ReviewerAgent
-    participant Engine as ExecutionEngine
-    participant Airflow as Airflow 3.0.6
-    participant DinD as Docker-in-Docker
-
-    User->>FE: Upload PDF
-    FE->>API: POST /publications/upload
-    API->>API: Store in MinIO
-    API-->>FE: upload_id (processing)
-
-    Note over API,Gemini: Background Task
-    API->>Scholar: analyze_publication()
-    Scholar->>Gemini: client.files.upload() [PDF]
-    Scholar->>Gemini: generate_content() with<br/>response_schema=AnalysisResult<br/>thinking_budget=24576<br/>google_search=True
-    Gemini-->>Scholar: Structured ISA-JSON
-    Scholar-->>API: AnalysisResult
-
-    FE->>API: GET /study-design/{id}
-    API-->>FE: ISA Hierarchy + Confidence Scores
-
-    User->>FE: Select Assay
-    FE->>API: POST /workflows/assemble
-    API->>Engineer: generate_workflow()
-    Engineer->>Gemini: generate_content() with<br/>response_schema=WorkflowResult<br/>thinking_budget=24576
-    Gemini-->>Engineer: CWL + Graph + Dockerfiles
-    API->>Reviewer: validate_workflow()
-    Reviewer->>Gemini: generate_content() with<br/>response_schema=ValidationResult<br/>thinking_budget=8192
-    Gemini-->>Reviewer: Validation Result
-    API-->>FE: Workflow Graph + Validation
-
-    User->>FE: Run Workflow
-    FE->>API: POST /executions
-    API->>Engine: prepare_execution()
-    Engine->>Engine: CWL Parse + DAG Generate
-    Engine->>Airflow: Trigger DAG
-    Airflow->>DinD: DockerOperator
-    DinD->>DinD: cwltool execute
-
-    loop Status Polling
-        FE->>API: GET /executions/{id}
-        API-->>FE: Progress + Node Status
+    subgraph Execution["Workflow Execution"]
+        AirflowAPI["Airflow 3.0.6 API (8080)"]
+        AirflowSched["Airflow Scheduler"]
+        DIND["Docker-in-Docker"]
+        CWLRunner["CWL Runner (cwltool)"]
     end
 
-    API-->>FE: Execution Complete
-    User->>FE: Export Results
-    FE->>API: GET /executions/{id}/export
-    API-->>FE: SDS ZIP Download
-                </pre>
-            </div>
-        </section>
+    User -->|Browser| Frontend
+    App --> LeftPanel & CenterPanel & RightPanel & BottomPanel
+    Store --> ApiService
+    ApiService -->|"REST /api/v1"| FastAPI
+    Console -.->|"WebSocket"| WS
 
-        <!-- Diagram 8: Thinking Budget -->
-        <section id="thinking" class="diagram-section">
-            <div class="diagram-header">
-                <span class="number gemini">8</span>
-                <div>
-                    <h2>Gemini 3 Thinking Budget Allocation <span class="gemini-badge">GEMINI 3</span></h2>
-                    <p>Strategic allocation of thinking budgets based on task complexity</p>
-                </div>
-            </div>
-            <div class="diagram-body">
-                <pre class="mermaid">
-graph LR
-    subgraph ThinkingBudgets["Thinking Budget Strategy"]
-        H["HIGH\n24,576 tokens"]
-        M["MEDIUM\n8,192 tokens"]
-        L["LOW\n2,048 tokens"]
-    end
+    FastAPI --> APIRouters & WS
+    PubAPI --> Scholar
+    WfAPI --> Engineer & Reviewer
+    ExecAPI --> ExecEngine & SDSExport
 
-    subgraph HighTasks["Complex Scientific Reasoning"]
-        H1["Scholar: PDF Analysis\nISA Extraction"]
-        H2["Engineer: CWL Generation\nDockerfile Creation"]
-        H3["Engineer: Agentic Loop\nValidate-Fix-Regenerate"]
-    end
+    Scholar --> GeminiClient
+    Engineer --> GeminiClient
+    Reviewer --> GeminiClient
 
-    subgraph MedTasks["Validation & Checking"]
-        M1["Reviewer: Semantic Validation\nType Compatibility"]
-        M2["Reviewer: Iterative Fix\nThought Signature Chain"]
-    end
+    GeminiClient -->|"google-genai SDK"| GemPro & GemFlash
 
-    subgraph LowTasks["Simple Translation"]
-        L1["Reviewer: Error Translation\nUser-friendly Messages"]
-    end
+    Scholar -.->|Uses| F1 & F2 & F3 & F4 & F6
+    Engineer -.->|Uses| F1 & F2 & F5 & F7
+    Reviewer -.->|Uses| F1 & F2 & F5
 
-    H --> H1 & H2 & H3
-    M --> M1 & M2
-    L --> L1
+    ExecEngine --> CWLParser & DAGGen & DockerBuild & AirflowClient
+    DBService --> Postgres
+    MinIOSvc --> MinIO
 
-    classDef high fill:#EA4335,stroke:#c5221f,color:#fff
-    classDef medium fill:#FBBC04,stroke:#f9ab00,color:#333
-    classDef low fill:#34A853,stroke:#1e8e3e,color:#fff
+    AirflowClient -->|REST| AirflowAPI
+    AirflowAPI --> AirflowSched
+    AirflowSched -->|DockerOperator| DIND
+    DIND --> CWLRunner
+    CWLRunner --> MinIO
 
-    class H,H1,H2,H3 high
-    class M,M1,M2 medium
-    class L,L1 low
-                </pre>
-            </div>
-        </section>
+    classDef gemini fill:#4285F4,stroke:#1a73e8,color:#fff,stroke-width:2px
+    classDef geminiFeature fill:#E8F0FE,stroke:#4285F4,color:#1a73e8,stroke-width:1px
+    classDef agent fill:#34A853,stroke:#1e8e3e,color:#fff,stroke-width:2px
+    classDef frontend fill:#FBBC04,stroke:#e8a200,color:#000,stroke-width:2px
+    classDef service fill:#EA4335,stroke:#c5221f,color:#fff,stroke-width:2px
+    classDef storage fill:#9AA0A6,stroke:#5f6368,color:#fff,stroke-width:2px
+    classDef execution fill:#FF6D01,stroke:#e85d00,color:#fff,stroke-width:2px
 
+    class GemPro,GemFlash gemini
+    class F1,F2,F3,F4,F5,F6,F7 geminiFeature
+    class Scholar,Engineer,Reviewer,GeminiClient agent
+    class App,Upload,StudyDesign,Workflow,DatasetNav,Console,Store,ApiService,GraphNode,Catalogue,Viewer frontend
+    class CWLParser,DAGGen,DockerBuild,ExecEngine,SDSExport,PromptMgr,DBService,MinIOSvc,AirflowClient service
+    class Postgres,MinIO storage
+    class AirflowAPI,AirflowSched,DIND,CWLRunner execution
+        </pre>
     </div>
 
-    <footer>
-        <p>VeriFlow Architecture Documentation - Generated for the Gemini 3 Hackathon</p>
-        <p>Built with Mermaid.js v11</p>
-    </footer>
+    <div class="controls">
+        <button onclick="document.querySelector('.diagram-container').style.zoom = (parseFloat(document.querySelector('.diagram-container').style.zoom || 1) + 0.1)">Zoom +</button>
+        <button onclick="document.querySelector('.diagram-container').style.zoom = (parseFloat(document.querySelector('.diagram-container').style.zoom || 1) - 0.1)">Zoom -</button>
+        <button onclick="document.querySelector('.diagram-container').style.zoom = 1">Reset</button>
+    </div>
 
-    <script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         mermaid.initialize({
             startOnLoad: true,
-            theme: 'default',
-            securityLevel: 'loose',
-            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
-            sequence: { useMaxWidth: true, showSequenceNumbers: false },
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#4285F4',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#1a73e8',
+                lineColor: '#5f6368',
+                secondaryColor: '#34A853',
+                tertiaryColor: '#FBBC04'
+            },
+            flowchart: {
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            securityLevel: 'loose'
         });
     </script>
 </body>
