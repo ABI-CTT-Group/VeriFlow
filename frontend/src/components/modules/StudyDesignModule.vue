@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { 
   FileText, BookOpen, Layers, FlaskConical, 
-  ChevronLeft, ExternalLink, X, Plus 
+  ChevronLeft, ExternalLink, X, Plus, Loader2
 } from 'lucide-vue-next'
 import { useWorkflowStore } from '../../stores/workflow'
 import { storeToRefs } from 'pinia'
@@ -14,7 +14,7 @@ interface Props {
 
 // Store access
 const workflowStore = useWorkflowStore()
-const { hierarchy } = storeToRefs(workflowStore)
+const { hierarchy, isLoading, loadingMessage } = storeToRefs(workflowStore)
 
 interface SelectedItem {
   id: string
@@ -54,10 +54,22 @@ const assays = computed(() => study.value?.assays || [])
 // Note: In a real edit scenario, we'd need local state initialized from these computed values
 // For now, we display the store values directly or fallback
 
-const paperTitle = computed(() => 'Breast Cancer Segmentation Using Deep Learning' ) // Paper info not currently in hierarchy root
-const paperAuthors = computed(() => 'Lidia Garrucho, et al.') // Placeholder until paper info added to hierarchy
-const paperYear = computed(() => '2025')
-const paperAbstract = computed(() => 'Dataset: A large-scale multicenter breast cancer DCE-MRI benchmark dataset.')
+const paperTitle = computed({
+  get: () => hierarchy.value?.paper?.title || 'No Paper Title',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.title = val }
+})
+const paperAuthors = computed({
+  get: () => hierarchy.value?.paper?.authors || 'Unknown Authors',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.authors = val }
+})
+const paperYear = computed({
+  get: () => hierarchy.value?.paper?.year || '',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.year = val }
+})
+const paperAbstract = computed({
+  get: () => hierarchy.value?.paper?.abstract || '',
+  set: (val) => { if (hierarchy.value?.paper) hierarchy.value.paper.abstract = val }
+})
 
 const investigationTitle = computed({
   get: () => investigation.value?.title || 'No Investigation',
@@ -166,7 +178,25 @@ const hoverClass = 'hover:bg-slate-50'
 
     <!-- Content Area -->
     <template v-if="hasUploadedFiles">
-      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      
+      <!-- Loading State -->
+      <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+        <div class="relative w-16 h-16 flex items-center justify-center">
+            <div class="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+            <Loader2 class="w-6 h-6 text-blue-500 animate-bounce" />
+        </div>
+        <div class="text-center">
+            <h3 class="text-slate-900 font-medium text-lg">Analyzing Publication</h3>
+            <p class="text-slate-500 text-sm mt-1">{{ loadingMessage || 'Extracting study design and assay details...' }}</p>
+        </div>
+        <!-- Simple Progress Bar -->
+        <div class="w-64 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+            <div class="h-full bg-blue-500 animate-pulse rounded-full w-2/3"></div>
+        </div>
+      </div>
+
+      <div v-else class="flex-1 flex flex-col min-h-0 overflow-hidden">
         <!-- Tree View -->
         <div class="overflow-y-auto border-b border-slate-200 max-h-[50%] shrink-0">
           <div class="px-3 py-3 space-y-1">

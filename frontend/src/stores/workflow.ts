@@ -31,6 +31,15 @@ export interface Investigation {
     title: string
     description: string
     studies: Study[]
+    paper?: Paper // Stage 6: Paper metadata from orchestration
+}
+
+export interface Paper {
+    id: string
+    title: string
+    authors: string
+    year: string
+    abstract: string
 }
 
 export interface Study {
@@ -361,6 +370,52 @@ export const useWorkflowStore = defineStore('workflow', () => {
         hierarchy.value = data
     }
 
+    function setHierarchyFromOrchestration(isa: any) {
+        if (isa && isa.studyDesign) {
+            const sd = isa.studyDesign
+            const inv = sd.investigation || {}
+            const paper = sd.paper || {} // Extract paper data
+
+            console.log('Orchestration response:', sd);
+            console.log('Isa:', isa);
+
+            // Construct Hierarchy
+            hierarchy.value = {
+                identifier: inv.id || 'inv_orchestrated',
+                title: inv.title || 'Orchestrated Investigation',
+                description: inv.description || '',
+                paper: {
+                    id: paper.id || 'root',
+                    title: paper.title || 'Unknown Paper',
+                    authors: paper.authors || 'Unknown Authors',
+                    year: paper.year || new Date().getFullYear().toString(),
+                    abstract: paper.abstract || ''
+                },
+                studies: [
+                    {
+                        identifier: sd.study?.id || 'study_orchestrated',
+                        title: sd.study?.title || 'Main Study',
+                        description: sd.study?.description || '',
+                        assays: (sd.assays || []).map((assay: any) => ({
+                            identifier: assay.id,
+                            filename: assay.name || 'Assay',
+                            name: assay.name,
+                            description: assay.name,
+                            steps: assay.workflowSteps || [],
+                            measurementType: { term: 'N/A' },
+                            technologyType: { term: 'N/A' }
+                        }))
+                    }
+                ]
+            }
+            addLog({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                message: `Orchestration complete. Hierarchy updated.`
+            })
+        }
+    }
+
     function selectAssay(assayId: string) {
         selectedAssay.value = assayId
     }
@@ -604,6 +659,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         reset,
         loadExample,
         fetchStudyDesignFromApi,
+        setHierarchyFromOrchestration,
         exportResults,
         clearError,
         clientId,

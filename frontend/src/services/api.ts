@@ -15,6 +15,8 @@ export interface UploadResponse {
     filename: string
     status: string
     message: string
+    pdf_path?: string
+    folder_path?: string
 }
 
 export interface HierarchyResponse {
@@ -48,6 +50,15 @@ export const endpoints = {
         const formData = new FormData()
         formData.append('file', file)
         return api.post<UploadResponse>('/publications/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+    },
+
+    uploadPublicationWithId: (file: File, pdfId: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('pdf_id', pdfId)
+        return api.post<UploadResponse>('/publications/upload_with_id', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         })
     },

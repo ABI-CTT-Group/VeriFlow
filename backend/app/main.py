@@ -52,6 +52,7 @@ async def orchestrate_workflow(request: OrchestrationRequest):
     Asynchronously invokes the VeriFlow LangGraph.
     Generates Docker/CWL/Airflow artifacts from PDF and Repo.
     """
+    print(request)
     # 1. Validate Paths
     if not os.path.exists(request.pdf_path):
         raise HTTPException(status_code=404, detail=f"PDF not found at {request.pdf_path}")
