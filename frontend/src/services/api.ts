@@ -77,8 +77,11 @@ export const endpoints = {
         api.post(`/publications/${uploadId}/additional-info`, { info }),
 
     // Workflow Management
-    assembleWorkflow: (assayId: string) =>
-        api.post<WorkflowResponse>('/workflows/assemble', { assay_id: assayId }),
+    assembleWorkflow: (assayId: string, runId: string) =>
+        api.post<WorkflowResponse>('/workflows/assemble', { run_id: runId, assay_id: assayId }),
+
+    assembleMamaMia: (assayId: string) =>
+        api.post<WorkflowResponse>('/workflows/mama-mia/assemble', { assay_id: assayId }),
 
     getWorkflow: (workflowId: string) =>
         api.get<WorkflowResponse>(`/workflows/${workflowId}`),

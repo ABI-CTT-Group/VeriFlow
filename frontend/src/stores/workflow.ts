@@ -109,6 +109,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const loadingMessage = ref<string | null>(null)
     const error = ref<string | null>(null)
     const currentRunId = ref<string | null>(null)
+    const isDemoMode = ref(false)
 
     // Computed
     const graph = computed(() => ({
@@ -191,6 +192,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
             let response;
 
             if (exampleName === 'mama-mia') {
+                isDemoMode.value = true
                 response = await endpoints.mamaMiaCache(currentClientId)
                 if ((response.data.result as any)?.run_id) {
                     currentRunId.value = (response.data.result as any).run_id
@@ -486,14 +488,22 @@ export const useWorkflowStore = defineStore('workflow', () => {
     }
 
     async function assembleWorkflow(assayId: string) {
-        console.log('Assembling workflow for assay:', assayId)
+        console.log('Assembling workflow for assay:', assayId, 'isDemoMode:', isDemoMode.value, 'runId:', currentRunId.value)
 
         isLoading.value = true
         loadingMessage.value = 'Assembling workflow with AI Agents...'
         error.value = null
 
         try {
-            const response = await endpoints.assembleWorkflow(assayId)
+            let response
+            if (isDemoMode.value) {
+                response = await endpoints.assembleMamaMia(assayId)
+            } else {
+                if (!currentRunId.value) {
+                    throw new Error('No run_id available for workflow assembly')
+                }
+                response = await endpoints.assembleWorkflow(assayId, currentRunId.value)
+            }
             const data = response.data
 
             // Update store with graph data from backend
@@ -703,14 +713,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
         edges.value = edges.value.map(edge => ({ ...edge, animated: false }))
     }
 
-    function startPolling() {
-        // Legacy polling - no longer used in MAMA-MIA simulation
-    }
-
-    function simulateProgress() {
-        // Legacy simulation - no longer used in MAMA-MIA simulation
-    }
-
     function toggleLeftPanel() {
         isLeftPanelCollapsed.value = !isLeftPanelCollapsed.value
     }
@@ -788,6 +790,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         nodeStatuses.value = {}
         logs.value = []
         currentRunId.value = null
+        isDemoMode.value = false
         if (pollingInterval.value) clearInterval(pollingInterval.value)
     }
 
@@ -844,6 +847,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         clearError,
         clientId,
         initWebSocket,
-        currentRunId
+        currentRunId,
+        isDemoMode
     }
 })
