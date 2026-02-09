@@ -16,6 +16,19 @@ logger = logging.getLogger(__name__)
 
 # --- Helper Functions ---
 
+def get_repo_value(isa_json: Dict[str, Any]) -> str:
+    """
+    Extracts the Repository URL from the ISA JSON.
+    Used for prompt formatting.
+    """
+    try:
+        if not isa_json:
+            return ""
+        # Common ISA structure path for github link
+        return isa_json.get("studyDesign", {}).get("paper", {}).get("github", "")
+    except Exception:
+        return ""
+
 def _create_stream_callback(client_id: str, agent_name: str):
     async def callback(chunk: str):
         if client_id:
@@ -45,6 +58,15 @@ def _log_node_execution(run_id: str, step_name: str, data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Failed to log node execution for {step_name}: {e}")
 
+def _persist_artifact(run_id: str, filename: str, data: Any) -> str:
+    """Saves artifact to disk and returns the absolute path."""
+    output_dir = Path("data/runs") / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+    file_path = output_dir / filename
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, default=str)
+    return str(file_path.absolute())
+
 def _resolve_model_name(agent_name: str) -> str:
     agent_conf = config.get_agent_config(agent_name)
     model_alias = agent_conf.get("default_model", "gemini-2.0-flash")
@@ -53,17 +75,18 @@ def _resolve_model_name(agent_name: str) -> str:
 
 def _get_prompt_version(agent_name: str) -> str:
     agent_conf = config.get_agent_config(agent_name)
-    return agent_conf.get("default_prompt_version", "v2_standard")
+    default = "v3_standard" if agent_name == "engineer" else "v1_standard"
+    return agent_conf.get("default_prompt_version", default)
 
 def _read_repo_context(repo_path: str) -> str:
     context = []
-    MAX_CHARS = 50000 
+    MAX_CHARS = 100000 
     total_chars = 0
     try:
         for root, _, files in os.walk(repo_path):
             if total_chars >= MAX_CHARS: break
             for file in files:
-                if file.endswith(('.py', '.txt', '.md', '.sh', '.yaml', '.yml', 'Dockerfile')):
+                if file.endswith(('.py', '.txt', '.md', '.sh', '.yaml', '.yml', 'Dockerfile', 'CWL', 'cwl')):
                     file_path = os.path.join(root, file)
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
@@ -76,41 +99,21 @@ def _read_repo_context(repo_path: str) -> str:
     except Exception: return "Error reading repository context."
     return "\n".join(context)
 
-def _mock_validate_artifacts(artifacts: Dict[str, str]) -> List[str]:
+def _mock_validate_artifacts(artifacts: Dict[str, Any]) -> List[str]:
     errors = []
     if not isinstance(artifacts, dict):
         return ["Artifact generation failed or returned invalid format."]
-    dockerfile = artifacts.get("dockerfile", "")
-    cwl = artifacts.get("cwl", "")
-    if not dockerfile or "FROM" not in str(dockerfile):
-        errors.append("Dockerfile is missing or invalid (no FROM instruction).")
-    if not cwl or "cwlVersion" not in str(cwl):
-        errors.append("CWL is missing or invalid (no cwlVersion declared).")
+    
+    # Support v3_standard structure check
+    workflow = artifacts.get("workflow", {})
+    components = artifacts.get("components", [])
+    
+    if not workflow and not components:
+        # Fallback to v1 flat check
+        if "dockerfile" not in str(artifacts).lower() and "cwl" not in str(artifacts).lower():
+             errors.append("Output missing essential 'workflow' or 'components' sections.")
+    
     return errors
-
-
-def get_repo_value(data):
-    """
-    Recursively finds the repo_url from isa_json
-    """
-    target_key="github"
-    if isinstance(data, dict):
-        if target_key in data:
-            return data[target_key]
-
-        for value in data.values():
-            result = get_repo_value(value)
-            if result is not None:
-                return result
-
-    elif isinstance(data, list):
-        for item in data:
-            result = get_repo_value(item)
-            if result is not None:
-                return result
-
-    return "Not found!"
-
 
 # --- Node Implementations ---
 
@@ -119,7 +122,6 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     run_id = state.get("run_id", str(uuid.uuid4()))
     client_id = state.get("client_id")
     user_context = state.get("user_context", None)
-    
     directive = state.get("agent_directives", {}).get("scholar")
     step_name = "1_scholar"
     
@@ -135,7 +137,7 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
     
     if user_context:
-        full_prompt += f"\n\\CRITICAL USER CONTEXT THAT SHOULD BE INCLUDED IN YOUR ANALYSIS AND EXTRACTION:\n{user_context}"
+        full_prompt += f"\n\nINITIAL USER CONTEXT:\n{user_context}"
         
     if directive:
         full_prompt += f"\n\nIMPORTANT UPDATE - USER DIRECTIVE:\nThe user has reviewed previous outputs and provided this instruction:\n'{directive}'\nPlease adjust your analysis to strictly follow this directive."
@@ -149,6 +151,17 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     
     result = response["result"]
     
+    # --- PERSISTENCE ---
+    isa_path = _persist_artifact(run_id, "scholar_isa.json", result)
+    
+    from app.services.database_sqlite import database_service
+    database_service.create_or_update_agent_session(
+        run_id=run_id,
+        scholar_extraction_complete=True,
+        scholar_isa_json_path=isa_path
+    )
+    # -------------------
+
     _log_node_execution(run_id, step_name, {
         "inputs": {"pdf_path": state["pdf_path"], "directive": directive},
         "prompt_truncated": full_prompt[:200] + "...",
@@ -164,13 +177,9 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     """Engineer Agent: Generates CWL/Dockerfile."""
     run_id = state.get("run_id")
     client_id = state.get("client_id")
-    
-    # FIX: Safe access with default value
     current_retry_count = state.get("retry_count", 0)
-    
     step_name = f"2_engineer_retry_{current_retry_count}"
 
-    # Check for Directives
     directive = state.get("agent_directives", {}).get("engineer")
 
     msg = f"Engineer Agent: Refining artifacts (Attempt {current_retry_count + 1})..." if current_retry_count > 0 else "Engineer Agent: Generating workflow artifacts..."
@@ -181,32 +190,48 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     
     client = GeminiClient()
     model_name = _resolve_model_name("engineer")
-    prompt_version = _get_prompt_version("engineer")
     
+    # Enforce v3 standard for structure
+    prompt_version = _get_prompt_version("engineer")
+    if prompt_version == "v1_standard": prompt_version = "v3_standard"
+
     isa_json = state.get("isa_json", {})
     repo_path = state.get("repo_path")
     repo_context = state.get("repo_context")
+    
     if not repo_context:
         repo_context = _read_repo_context(repo_path)
-    ## Provide the ISA JSON and github URL
+    
     base_prompt = prompt_manager.get_prompt("engineer_cwl_gen", version=prompt_version)
+    
+    # --- USER REQUESTED FORMATTING LOGIC ---
     if '**ISA JSON:**' not in base_prompt:
+        # Standard format fallback
         prompt = base_prompt.format(
             isa_json=json.dumps(isa_json, indent=2),
             repo_context=repo_context,
             previous_errors=state.get("validation_errors", [])
         )
     else:
-        repo_url=get_repo_value(isa_json)
-        # Use safer method:
-        prompt = base_prompt.replace("{isa_json}", json.dumps(isa_json)) \
-                    .replace("{repo_url}", repo_url) \
-                    .replace("{repo_context}", repo_context) \
-                    .replace("{previous_errors}", str(state.get("validation_errors", [])))
+        # Specific User Replace Logic
+        repo_url = get_repo_value(isa_json)
+        # Use safer method as requested:
+        prompt = base_prompt.replace("{isa_json}", json.dumps(isa_json, indent=2)) \
+                            .replace("{repo_url}", str(repo_url)) \
+                            .replace("{repo_context}", str(repo_context)) \
+                            .replace("{previous_errors}", str(state.get("validation_errors", [])))
+    # ---------------------------------------
 
-    
     if directive:
-        prompt += f"\n\nIMPORTANT USER DIRECTIVE:\nThe user has reviewed your previous work and requests the following changes:\n'{directive}'\nPlease regenerate the code strictly following this directive."
+        prompt += f"""
+        
+        IMPORTANT USER DIRECTIVE:
+        The user has reviewed your previous work and requests the following changes:
+        '{directive}'
+        
+        Please regenerate the code strictly following this directive.
+        CRITICAL: You MUST maintain the exact JSON structure defined in the system prompt (keys: 'mapping_logic', 'components', 'workflow'). 
+        """
     
     response = await client.generate_content(
         prompt=prompt,
@@ -214,9 +239,19 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
         stream_callback=_create_stream_callback(client_id, "Engineer")
     )
     
-    await _notify_status(client_id, "Engineer Agent: Generation complete.", status="completed")
-    
     result = response["result"]
+
+    # --- PERSISTENCE ---
+    engineer_path = _persist_artifact(run_id, "engineer_output.json", result)
+    
+    from app.services.database_sqlite import database_service
+    database_service.create_or_update_agent_session(
+        run_id=run_id,
+        engineer_cwl_path=engineer_path
+    )
+    # -------------------
+    
+    await _notify_status(client_id, "Engineer Agent: Generation complete.", status="completed")
     
     _log_node_execution(run_id, step_name, {
         "inputs": {"isa_summary": "ISA JSON present", "directive": directive},
@@ -227,7 +262,7 @@ async def engineer_node(state: AgentState) -> Dict[str, Any]:
     return {
         "repo_context": repo_context,
         "generated_code": result,
-        "retry_count": current_retry_count + 1 
+        "retry_count": current_retry_count + 1
     }
 
 
@@ -235,7 +270,7 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
     """Validation Node: Mocks execution."""
     run_id = state.get("run_id")
     client_id = state.get("client_id")
-    current_retry_count = state.get("retry_count", 0) # FIX: Safe access
+    current_retry_count = state.get("retry_count", 0)
     step_name = f"3_validate_retry_{current_retry_count}"
     
     await _notify_status(client_id, "System: Validating generated artifacts...", status="running")
@@ -244,7 +279,7 @@ async def validate_node(state: AgentState) -> Dict[str, Any]:
     errors = _mock_validate_artifacts(generated_code)
     
     _log_node_execution(run_id, step_name, {
-        "inputs": {"generated_code_keys": list(generated_code.keys()) if isinstance(generated_code, dict) else "Invalid Format"},
+        "inputs": {"generated_code_keys": list(generated_code.keys()) if isinstance(generated_code, dict) else "Invalid"},
         "final_output": {"errors": errors}
     })
     
@@ -305,6 +340,14 @@ async def reviewer_node(state: AgentState) -> Dict[str, Any]:
     
     if "APPROVED" in feedback_text.upper() and not validation_errors:
         decision = "approved"
+
+    # --- PERSISTENCE ---
+    from app.services.database_sqlite import database_service
+    database_service.create_or_update_agent_session(
+        run_id=run_id,
+        workflow_complete=True
+    )
+    # -------------------
 
     _log_node_execution(run_id, step_name, {
         "inputs": {"validation_status": "Passed" if not validation_errors else "Failed", "directive": directive},

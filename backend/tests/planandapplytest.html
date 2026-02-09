@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VeriFlow: Human-in-the-Loop Workbench</title>
     <style>
-        :root { --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0; --accent: #3b82f6; --success: #22c55e; --error: #ef4444; }
+        :root { --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0; --accent: #3b82f6; --success: #22c55e; --error: #ef4444; --code-bg: #0b1120; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; }
         
         /* Layout */
         .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #334155; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+        .grid { display: grid; grid-template-columns: 35% 65%; gap: 20px; flex: 1; min-height: 0; }
         .card { background: var(--panel); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 15px; border: 1px solid #334155; min-height: 0; }
         
         /* Components */
@@ -24,26 +24,29 @@
         button.apply { background: var(--success); }
         
         /* Logs Area */
-        #logs { flex: 1; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; background: #0b1120; padding: 10px; border-radius: 4px; }
+        #logs { flex: 1; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; background: var(--code-bg); padding: 10px; border-radius: 4px; }
         .log-entry { margin-bottom: 5px; border-left: 3px solid transparent; padding-left: 8px; }
         .log-info { color: #94a3b8; }
         .log-agent { color: var(--accent); border-left-color: var(--accent); }
         .log-success { color: var(--success); }
         .log-error { color: var(--error); }
+        .log-update { color: #a5b4fc; }
         
         /* Chat Area */
-        .chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; }
+        .chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; min-height: 200px; background: #0b1120; border-radius: 4px; padding: 10px;}
         .msg { padding: 10px; border-radius: 6px; max-width: 85%; font-size: 0.9rem; }
         .msg.user { background: #3b82f630; align-self: flex-end; border: 1px solid #3b82f6; }
         .msg.agent { background: #334155; align-self: flex-start; }
         .msg-header { font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; font-weight: bold; }
         
-        /* Status Badges */
-        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; background: #475569; }
-        .status-running { background: #eab308; color: black; }
-        .status-completed { background: var(--success); color: black; }
-        
-        /* Tab toggle */
+        /* Artifact Viewer */
+        .artifact-viewer { background: var(--code-bg); color: #a5b4fc; padding: 15px; border-radius: 4px; overflow: auto; font-family: monospace; font-size: 0.85rem; flex: 1; white-space: pre-wrap; }
+        .artifact-section { margin-bottom: 20px; border-bottom: 1px dashed #334155; padding-bottom: 20px; }
+        .artifact-title { color: var(--success); font-weight: bold; margin-bottom: 10px; display: block; }
+        .file-block { background: #1e293b; padding: 10px; border-radius: 4px; margin-top: 5px; }
+        .file-name { color: #e2e8f0; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #334155; display:block;}
+
+        /* Tabs */
         .tabs { display: flex; gap: 10px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
         .tab { padding: 5px 10px; cursor: pointer; border-radius: 4px; color: #94a3b8; }
         .tab.active { background: #334155; color: white; }
@@ -64,13 +67,15 @@
     <div class="grid">
         <div class="card">
             <h2>1. Configuration</h2>
-            <div>
-                <label>PDF Path (Local)</label>
-                <input type="text" id="pdfPath" value="VeriFlow/backend/tests/mamamiaworkflow.pdf">
-            </div>
-            <div>
-                <label>Repository Path (Local)</label>
-                <input type="text" id="repoPath" value="VeriFlow/backend/examples/mama-mia">
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label>PDF Path</label>
+                    <input type="text" id="pdfPath" value="VeriFlow/backend/tests/mamamiaworkflow.pdf">
+                </div>
+                <div style="flex:1;">
+                    <label>Repo Path</label>
+                    <input type="text" id="repoPath" value="VeriFlow/backend/examples/mama-mia">
+                </div>
             </div>
             <div>
                 <label>Initial User Context</label>
@@ -86,15 +91,16 @@
 
         <div class="card">
             <div class="tabs">
-                <div class="tab active" onclick="switchTab('chat')" id="tab-chat">Intervention (Chat)</div>
+                <div class="tab active" onclick="switchTab('chat')" id="tab-chat">Chat & Plan</div>
+                <div class="tab" onclick="switchTab('artifacts')" id="tab-artifacts">Artifacts (Code)</div>
                 <div class="tab" onclick="switchTab('restart')" id="tab-restart">Manual Restart</div>
             </div>
 
             <div id="view-chat" style="display:flex; flex-direction:column; flex:1; min-height:0;">
                 <div style="display:flex; gap:10px; margin-bottom:10px;">
                     <select id="agentSelect" onchange="clearChatUI()">
-                        <option value="scholar">Scholar Agent</option>
                         <option value="engineer" selected>Engineer Agent</option>
+                        <option value="scholar">Scholar Agent</option>
                         <option value="reviewer">Reviewer Agent</option>
                     </select>
                 </div>
@@ -107,7 +113,7 @@
                 </div>
 
                 <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
-                    <textarea id="chatInput" rows="3" placeholder="Critique the output or give new instructions..."></textarea>
+                    <textarea id="chatInput" rows="2" placeholder="Critique the output or give new instructions..."></textarea>
                     <div style="display:flex; gap:10px;">
                         <button class="secondary" onclick="sendChatMessage()" style="flex:1;">Send Message</button>
                         <button class="apply" onclick="applyAndRestart()" style="flex:1;">⚡ Apply & Restart</button>
@@ -115,17 +121,23 @@
                 </div>
             </div>
 
+            <div id="view-artifacts" style="display:none; flex-direction:column; flex:1; min-height:0;">
+                <div id="artifactsContent" class="artifact-viewer">
+                    Waiting for Engineer output...
+                </div>
+                <button class="secondary" onclick="fetchResults()" style="margin-top:10px;">Refresh Artifacts</button>
+            </div>
+
             <div id="view-restart" style="display:none; flex-direction:column; gap:15px;">
                 <p style="color:#94a3b8; font-size:0.9rem;">
                     Force the workflow to restart from a specific node without changing directives.
-                    Useful for retrying transient errors.
                 </p>
                 <div>
                     <label>Restart From Node:</label>
                     <select id="restartNodeSelect">
-                        <option value="scholar">Scholar (Full Restart)</option>
                         <option value="engineer" selected>Engineer (Regenerate Code)</option>
                         <option value="reviewer">Reviewer (Re-evaluate)</option>
+                        <option value="scholar">Scholar (Full Restart)</option>
                     </select>
                 </div>
                 <button class="secondary" onclick="manualRestart()">Restart Workflow</button>
@@ -142,12 +154,8 @@
         let currentRunId = null;
         let ws = null;
 
-        // --- Initialization ---
         function init() {
             connectWebSocket();
-            
-            // Auto-fill paths if running in typical dev environment structure
-            // Users will likely need to adjust these in the UI
             console.log("Client ID:", clientId);
         }
 
@@ -165,7 +173,7 @@
             ws.onclose = () => {
                 statusEl.innerText = "Disconnected";
                 statusEl.style.background = '#ef4444';
-                setTimeout(connectWebSocket, 3000); // Reconnect
+                setTimeout(connectWebSocket, 3000); 
             };
 
             ws.onmessage = (event) => {
@@ -177,20 +185,24 @@
         function handleWsMessage(msg) {
             const logs = document.getElementById('logs');
             const type = msg.type;
-            const content = msg.message || msg.chunk || JSON.stringify(msg);
             
             let div = document.createElement('div');
             div.className = 'log-entry';
 
             if (type === 'agent_stream') {
-                // For streams, append to last element if it's the same agent, or create new
-                // Simplified: just log chunk for now
                 div.innerHTML = `<span style="color:#3b82f6">[${msg.agent}]</span> ${msg.chunk}`;
             } else if (type === 'status_update') {
                 div.innerHTML = `<span style="color:#eab308">[STATUS]</span> ${msg.message}`;
-            } else if (type.includes('complete')) {
+            } else if (type === 'node_update') {
+                div.innerHTML = `<span class="log-update">[NODE]</span> Processing: ${msg.data.node}`;
+            } else if (type && type.includes('complete')) {
                 div.innerHTML = `<span style="color:#22c55e">[DONE]</span> ${type.toUpperCase()} - Run ID: ${msg.data?.run_id}`;
-                if (msg.data?.run_id) currentRunId = msg.data.run_id;
+                if (msg.data?.run_id) {
+                    currentRunId = msg.data.run_id;
+                    if(type === 'engineer_complete' || type === 'workflow_complete') {
+                        fetchResults(); // Auto-fetch
+                    }
+                }
             } else if (type === 'error') {
                 div.innerHTML = `<span style="color:#ef4444">[ERROR]</span> ${msg.data}`;
             } else {
@@ -201,7 +213,7 @@
             logs.scrollTop = logs.scrollHeight;
         }
 
-        // --- Actions ---
+        // --- API Actions ---
 
         async function startWorkflow() {
             const btn = document.getElementById('startBtn');
@@ -236,16 +248,73 @@
             }
         }
 
-        async function sendChatMessage() {
-            if (!currentRunId) return alert("No active run. Start a workflow first.");
+        async function fetchResults() {
+            if (!currentRunId) return;
+            appendLog('System', 'Fetching generated artifacts...');
             
+            try {
+                const res = await fetch(`${API_BASE}/veriflow/results/${currentRunId}`);
+                if(!res.ok) throw new Error("Failed to fetch results");
+                
+                const data = await res.json();
+                const container = document.getElementById('artifactsContent');
+                
+                // Format the output specifically for v3_standard structure
+                if (data.engineer && !data.engineer.error) {
+                    let displayHtml = "";
+                    const eng = data.engineer;
+
+                    // 1. Mapping Logic
+                    if (eng.mapping_logic) {
+                        displayHtml += `<div class="artifact-section"><span class="artifact-title">Mapping Logic</span>${eng.mapping_logic}</div>`;
+                    }
+
+                    // 2. Workflow Files
+                    if (eng.workflow) {
+                        displayHtml += `<div class="artifact-section"><span class="artifact-title">Workflow Definition</span>`;
+                        for (const [filename, content] of Object.entries(eng.workflow)) {
+                            displayHtml += `<div class="file-block"><span class="file-name">${filename}</span>${escapeHtml(content)}</div>`;
+                        }
+                        displayHtml += `</div>`;
+                    }
+
+                    // 3. Components (Steps)
+                    if (eng.components && Array.isArray(eng.components)) {
+                        displayHtml += `<div class="artifact-section"><span class="artifact-title">Workflow Components</span>`;
+                        eng.components.forEach(comp => {
+                            displayHtml += `<div style="margin-left:10px; margin-bottom:15px;">`;
+                            displayHtml += `<div style="color:#38bdf8; font-weight:bold;">Step: ${comp.step_name}</div>`;
+                            if (comp.files) {
+                                for (const [filename, content] of Object.entries(comp.files)) {
+                                    displayHtml += `<div class="file-block"><span class="file-name">${filename}</span>${escapeHtml(content)}</div>`;
+                                }
+                            }
+                            displayHtml += `</div>`;
+                        });
+                        displayHtml += `</div>`;
+                    }
+                    
+                    // Fallback if structure is unknown
+                    if(!displayHtml) displayHtml = JSON.stringify(eng, null, 2);
+                    
+                    container.innerHTML = displayHtml;
+                    
+                } else {
+                    container.innerText = "No engineer artifacts found yet.";
+                }
+                
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function sendChatMessage() {
+            if (!currentRunId) return alert("No active run.");
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
             if (!message) return;
-
             const agent = document.getElementById('agentSelect').value;
             
-            // Add User Message to UI
             addChatBubble('User', message, 'user');
             input.value = '';
 
@@ -253,30 +322,19 @@
                 const res = await fetch(`${API_BASE}/chat/${currentRunId}/${agent}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        messages: [{ role: "user", content: message }]
-                    })
+                    body: JSON.stringify({ messages: [{ role: "user", content: message }] })
                 });
-                
                 const data = await res.json();
-                // Add Agent Reply
                 addChatBubble(agent.toUpperCase(), data.reply, 'agent');
-                
             } catch (e) {
-                addChatBubble('System', 'Error sending message: ' + e.message, 'agent');
+                addChatBubble('System', 'Error: ' + e.message, 'agent');
             }
         }
 
         async function applyAndRestart() {
             if (!currentRunId) return alert("No active run.");
-            
             const agent = document.getElementById('agentSelect').value;
-            // In a real app, we might summarize the chat history into a directive.
-            // Here we assume the user types the *Final Directive* into the chat box 
-            // OR we just take the last thing they said. 
-            // For better UX, let's ask for the specific directive to apply.
-            
-            const directive = prompt(`Enter the specific instruction to apply to ${agent}:`, "Fix the issue discussed.");
+            const directive = prompt(`Enter instruction for ${agent}:`, "Fix the issue discussed.");
             if (!directive) return;
 
             appendLog('System', `Applying directive to ${agent} and restarting...`);
@@ -287,34 +345,28 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ directive: directive })
                 });
-
                 const data = await res.json();
                 appendLog('System', data.message);
-                
+                document.getElementById('artifactsContent').innerText = "Restarting... Waiting for new artifacts...";
             } catch (e) {
                 appendLog('Error', e.message, true);
             }
         }
-
+        
         async function manualRestart() {
             if (!currentRunId) return alert("No active run.");
             const node = document.getElementById('restartNodeSelect').value;
-            
-            appendLog('System', `Manual restart requested from: ${node}`);
-            
-            try {
-                const res = await fetch(`${API_BASE}/workflows/${currentRunId}/restart?start_node=${node}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                appendLog('System', data.message);
-            } catch (e) {
-                appendLog('Error', e.message, true);
-            }
+            appendLog('System', `Manual restart from: ${node}`);
+            await fetch(`${API_BASE}/workflows/${currentRunId}/restart?start_node=${node}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
-        // --- UI Helpers ---
+        // --- Helpers ---
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
 
         function appendLog(source, text, isError = false) {
             const logs = document.getElementById('logs');
@@ -335,18 +387,17 @@
         }
 
         function clearChatUI() {
-            document.getElementById('chatHistory').innerHTML = '<div class="log-info" style="text-align:center; margin-top:20px;">Switched Agent context. Previous chat hidden.</div>';
+            document.getElementById('chatHistory').innerHTML = '<div class="log-info" style="text-align:center; margin-top:20px;">Switched context.</div>';
         }
 
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(`tab-${tabName}`).classList.add('active');
-            
-            document.getElementById('view-chat').style.display = tabName === 'chat' ? 'flex' : 'none';
-            document.getElementById('view-restart').style.display = tabName === 'restart' ? 'flex' : 'none';
+            ['chat', 'artifacts', 'restart'].forEach(t => {
+                document.getElementById(`view-${t}`).style.display = (t === tabName) ? 'flex' : 'none';
+            });
         }
 
-        // Run
         init();
     </script>
 </body>

@@ -22,7 +22,7 @@ class AgentState(TypedDict):
     
     # Step 2: Engineer Context & Output
     repo_context: Optional[str]         # Summary of files in the repo
-    generated_code: Optional[Dict[str, str]]  # Keys: 'dockerfile', 'cwl', 'airflow_dag'
+    generated_code: Optional[Dict[str, Any]]  # Keys: 'dockerfile', 'cwl', 'airflow_dag'
     
     # Validation & Self-Healing
     validation_errors: List[str]
