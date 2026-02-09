@@ -441,10 +441,6 @@ cd frontend && npx vitest run
 ## Documentation
 
 - [Technical Specification](SPEC.md) — Full implementation spec with API endpoints, data structures, and agent details
-- [Architecture Diagram](docs/architecture.html) — Interactive Mermaid.js component and dependency diagram
-- [System Infrastructure (draw.io)](docs/infrastructure.drawio.xml) — draw.io-compatible system infrastructure diagram
-- [About VeriFlow](docs/about.md) — Project story, Gemini 3 integration details, inspiration, and future plans
-- [Testing Instructions](docs/testing.md) — How to run unit, integration, and E2E tests
 
 ## License
 
