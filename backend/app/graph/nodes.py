@@ -124,6 +124,7 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     """Scholar Agent: Extracts ISA JSON from PDF."""
     run_id = state.get("run_id", str(uuid.uuid4()))
     client_id = state.get("client_id")
+    user_context = state.get("user_context", None)
     step_name = "1_scholar"
     
     await _notify_status(client_id, "Scholar Agent: Analyzing publication...", status="running")
@@ -134,7 +135,12 @@ async def scholar_node(state: AgentState) -> Dict[str, Any]:
     
     system_prompt = prompt_manager.get_prompt("scholar_system", version=prompt_version)
     extraction_prompt = prompt_manager.get_prompt("scholar_extraction", version=prompt_version)
-    full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
+    
+    if user_context is not None:
+        logger.info(f"Received additional user context {user_context}")
+        full_prompt = f"{system_prompt}\n\n{extraction_prompt}\n\nHere is some additional context that you need to consider during your analysis and extraction\n\n{user_context}"
+    else:
+        full_prompt = f"{system_prompt}\n\n{extraction_prompt}"
     
     # Note: analyze_file doesn't support streaming yet in this implementation plan 
     # but we can add it later. For now, we notify start/end.

@@ -109,8 +109,8 @@ export const endpoints = {
         api.get(`/sources/${sourceId}`),
 
     // Orchestrate Workflow
-    orchestrateWorkflow: (pdfPath: string, repoPath: string, clientId?: string) =>
-        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, client_id: clientId }),
+    orchestrateWorkflow: (pdfPath: string, repoPath: string, userContext?: string, clientId?: string) =>
+        api.post<OrchestrationResponse>('/orchestrate', { pdf_path: pdfPath, repo_path: repoPath, user_context: userContext, client_id: clientId }),
 
     // Cached MAMA-MIA Demo
     mamaMiaCache: (clientId?: string) =>

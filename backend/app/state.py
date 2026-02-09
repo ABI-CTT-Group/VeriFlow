@@ -10,6 +10,7 @@ class AgentState(TypedDict):
     # Inputs
     pdf_path: str
     repo_path: str
+    user_context: Optional[str]
     
     # Step 1: Scholar Output
     isa_json: Optional[Dict[str, Any]]  # The extracted ISA model

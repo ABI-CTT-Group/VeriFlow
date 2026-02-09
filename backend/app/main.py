@@ -35,6 +35,7 @@ app.include_router(websockets.router) # WebSocket endpoint /ws/{client_id}
 class OrchestrationRequest(BaseModel):
     pdf_path: str
     repo_path: str
+    user_context: Optional[str] = None #Optional user provided context for the agent
     client_id: Optional[str] = None # Optional client_id for real-time updates
 
 class OrchestrationResponse(BaseModel):
@@ -64,6 +65,7 @@ async def orchestrate_workflow(request: OrchestrationRequest):
         "pdf_path": request.pdf_path,
         "repo_path": request.repo_path,
         "client_id": request.client_id, # Pass client_id to graph state
+        "user_context":request.user_context,
         "isa_json": None,
         "repo_context": None,
         "generated_code": {},
