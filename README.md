@@ -386,5 +386,3 @@ cd frontend && npx vitest run
 ## Documentation
 
 - [Technical Specification](SPEC.md) — Full implementation spec with API endpoints, data structures, and agent details
-- [Architecture Diagrams](docs/architecture.html) — 8 interactive Mermaid diagrams (system infrastructure, data flow, Gemini integration, etc.)
-- [System Infrastructure (draw.io)](docs/architecture-system-infrastructure.drawio) — Editable system architecture diagram
