@@ -3,6 +3,7 @@ import axios from 'axios'
 const api = axios.create({
     // Use relative path to leverage Vite proxy (dev) and Nginx proxy (prod)
     baseURL: '/api/v1',
+    timeout: 2000, // Fail fast (2s) to allow fallbacks to kick in
     headers: {
         'Content-Type': 'application/json'
     }

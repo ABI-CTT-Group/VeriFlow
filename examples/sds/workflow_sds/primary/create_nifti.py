@@ -6,16 +6,23 @@ def convert_dicom_to_nifti(input_root, output_root):
     """
     Loops through the subfolders in input_root and converts each to a NIfTI file.
     """
+    print(f"input_root: {input_root}")
+    print(f"output_root: {output_root}")
+
     if not os.path.exists(output_root):
         os.makedirs(output_root)
         print(f"Created output folder: {output_root}")
 
+    folder_path = input_root
+
     for item in os.listdir(input_root):
         folder_path = os.path.join(input_root, item)
+        print(f"Processing folder: {folder_path}")
         
         if os.path.isdir(folder_path):
             output_path = os.path.join(output_root, f"{item}_0000.nii.gz")
-            
+
+            print(f"output_path: {output_path}")
             
             try:
                 dicom2nifti.dicom_series_to_nifti(folder_path, output_path, reorient_nifti=True)

@@ -45,13 +45,30 @@ const datasetNameMap: Record<string, string> = {
   'tumor-segmentation': 'Tumor-Segmentation'
 }
 
+// Helper to add paths to nodes
+function enrichNodesWithPaths(nodes: FileNode[], parentPath: string = ''): FileNode[] {
+  return nodes.map(node => {
+    const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name
+    const enriched: any = { 
+      ...node, 
+      path: currentPath 
+    }
+    if (node.children) {
+      enriched.children = enrichNodesWithPaths(node.children, currentPath)
+    }
+    return enriched
+  })
+}
+
 // Generate file tree based on selected node or dataset
 function generateFileTree(): FileNode[] {
+  let tree: FileNode[] = []
+
   // If a specific dataset is selected, use its name
   if (props.selectedDatasetId && datasetNameMap[props.selectedDatasetId]) {
     const datasetName = datasetNameMap[props.selectedDatasetId]
     
-    return [{
+    tree = [{
       name: datasetName,
       type: 'folder',
       children: [
@@ -82,21 +99,86 @@ function generateFileTree(): FileNode[] {
         { name: 'code', type: 'folder', children: [] }
       ]
     }]
+    return enrichNodesWithPaths(tree)
   }
   
   if (!props.selectedNode) {
-    return [{
+    return enrichNodesWithPaths([{
       name: 'No-Data-Object-Selected',
       type: 'folder',
       children: []
-    }]
+    }])
   }
 
-  const nodeName = props.selectedNode.name?.replace(/\s+/g, '-') || 'Data-Object'
+  // Robustly access properties whether they are top-level or in data
+  const node = props.selectedNode
+  const nodeData = node.data || {}
+  const nodeName = node.name?.replace(/\s+/g, '-') || nodeData.name?.replace(/\s+/g, '-') || 'Data-Object'
+  const nodeType = node.type || nodeData.type
   
-  // Generate different SDS structures based on node type
-  if (props.selectedNode.type === 'measurement' && props.selectedNode.role === 'input') {
-    return [{
+  // Try to find a dataset configuration within the node's inputs or outputs
+  let nodeDatasetId = node.selectedDatasetId || nodeData.selectedDatasetId
+  
+  if (!nodeDatasetId) {
+    // Check outputs first (e.g. for Output Measurements node)
+    if (nodeData.outputs && Array.isArray(nodeData.outputs)) {
+      const outputWithDataset = nodeData.outputs.find((o: any) => o.datasetId)
+      if (outputWithDataset) {
+        nodeDatasetId = outputWithDataset.datasetId
+      }
+    }
+    
+    // Check inputs if no output dataset found
+    if (!nodeDatasetId && nodeData.inputs && Array.isArray(nodeData.inputs)) {
+      const inputWithDataset = nodeData.inputs.find((i: any) => i.datasetId)
+      if (inputWithDataset) {
+        nodeDatasetId = inputWithDataset.datasetId
+      }
+    }
+  }
+  
+  // If specific dataset is selected (either via prop or derived from node config), use that
+  const effectiveDatasetId = props.selectedDatasetId || nodeDatasetId
+  
+  if (effectiveDatasetId && datasetNameMap[effectiveDatasetId]) {
+    const datasetName = datasetNameMap[effectiveDatasetId]
+    
+    tree = [{
+      name: datasetName,
+      type: 'folder',
+      children: [
+        { name: 'dataset_description.json', type: 'file', extension: 'json' },
+        { name: 'subjects.tsv', type: 'file', extension: 'tsv' },
+        {
+          name: 'primary',
+          type: 'folder',
+          children: [
+            {
+              name: 'Subject_001',
+              type: 'folder',
+              children: [
+                { name: 'T1w.nii.gz', type: 'file', extension: 'nii.gz' },
+                { name: 'metadata.json', type: 'file', extension: 'json' }
+              ]
+            },
+            {
+              name: 'Subject_002',
+              type: 'folder',
+              children: [
+                { name: 'T1w.nii.gz', type: 'file', extension: 'nii.gz' },
+                { name: 'metadata.json', type: 'file', extension: 'json' }
+              ]
+            }
+          ]
+        },
+        { name: 'code', type: 'folder', children: [] }
+      ]
+    }]
+    return enrichNodesWithPaths(tree)
+  }
+  // Support both input and output roles for measurements
+  if (nodeType === 'measurement') {
+    tree = [{
       name: nodeName,
       type: 'folder',
       children: [
@@ -118,8 +200,8 @@ function generateFileTree(): FileNode[] {
         }
       ]
     }]
-  } else if (props.selectedNode.type === 'tool') {
-    return [{
+  } else if (nodeType === 'tool') {
+    tree = [{
       name: nodeName,
       type: 'folder',
       children: [
@@ -134,8 +216,8 @@ function generateFileTree(): FileNode[] {
         }
       ]
     }]
-  } else if (props.selectedNode.type === 'model') {
-    return [{
+  } else if (nodeType === 'model') {
+    tree = [{
       name: nodeName,
       type: 'folder',
       children: [
@@ -151,17 +233,51 @@ function generateFileTree(): FileNode[] {
         }
       ]
     }]
+  } else if (nodeType === 'dataset') {
+      // Handle dataset nodes explicitly
+      tree = [{
+        name: nodeName,
+        type: 'folder',
+        children: [
+            { name: 'dataset_description.json', type: 'file', extension: 'json' },
+            { name: 'subjects.tsv', type: 'file', extension: 'tsv' },
+            {
+            name: 'primary',
+            type: 'folder',
+            children: [
+                {
+                name: 'Subject_001',
+                type: 'folder',
+                children: [
+                    { name: 'T1w.nii.gz', type: 'file', extension: 'nii.gz' },
+                    { name: 'metadata.json', type: 'file', extension: 'json' }
+                ]
+                },
+                {
+                name: 'Subject_002',
+                type: 'folder',
+                children: [
+                    { name: 'T1w.nii.gz', type: 'file', extension: 'nii.gz' },
+                    { name: 'metadata.json', type: 'file', extension: 'json' }
+                ]
+                }
+            ]
+            }
+        ]
+      }]
+  } else {
+    // Default structure
+    tree = [{
+        name: nodeName,
+        type: 'folder',
+        children: [
+        { name: 'dataset_description.json', type: 'file', extension: 'json' },
+        { name: 'README.md', type: 'file', extension: 'md' }
+        ]
+    }]
   }
-
-  // Default structure
-  return [{
-    name: nodeName,
-    type: 'folder',
-    children: [
-      { name: 'dataset_description.json', type: 'file', extension: 'json' },
-      { name: 'README.md', type: 'file', extension: 'md' }
-    ]
-  }]
+  
+  return enrichNodesWithPaths(tree)
 }
 
 const fileTree = computed(() => generateFileTree())
@@ -190,11 +306,10 @@ const plugins = [
 const activePlugin = computed(() => {
   if (!selectedFile.value) return null
   
-  // Find node in tree to get extension (simplified lookup)
-  // In a real app we'd need better tree traversal
+  // Find node in tree to get extension
   const findExtension = (nodes: FileNode[]): string | undefined => {
     for (const node of nodes) {
-      if (node.name === selectedFile.value) return node.extension
+      if ((node as any).path === selectedFile.value) return node.extension
       if (node.children) {
         const found = findExtension(node.children)
         if (found) return found
@@ -207,8 +322,8 @@ const activePlugin = computed(() => {
   return determineViewer(ext)
 })
 
-function handleFileClick(node: FileNode) {
-  selectedFile.value = node.name
+function handleFileClick(node: any) {
+  selectedFile.value = node.path
 }
 
 // Stage 6: Computed for export button states
@@ -222,7 +337,7 @@ function handleExportResults() {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 flex flex-col overflow-y-auto">
     <!-- Dataset Navigation Panel -->
     <ResizablePanel 
       orientation="vertical" 
@@ -235,6 +350,7 @@ function handleExportResults() {
           v-for="(node, index) in fileTree"
           :key="index"
           :node="node"
+          :selected-path="selectedFile"
           @file-click="handleFileClick"
         />
       </div>
@@ -249,26 +365,31 @@ function handleExportResults() {
     >
       <div class="p-4">
         <div v-if="activePlugin" class="border border-slate-200 rounded-lg p-4 bg-slate-50">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <Eye v-if="activePlugin === 'volview'" class="w-5 h-5 text-blue-600" />
-              <Edit v-else-if="activePlugin === 'editor'" class="w-5 h-5 text-blue-600" />
-              <Image v-else-if="activePlugin === 'image'" class="w-5 h-5 text-blue-600" />
-              <div>
-                <span class="text-sm font-medium text-slate-900">
+          <div class="flex items-center justify-between mb-3 gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <Eye v-if="activePlugin === 'volview'" class="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <Edit v-else-if="activePlugin === 'editor'" class="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <Image v-else-if="activePlugin === 'image'" class="w-5 h-5 text-blue-600 flex-shrink-0" />
+              <div class="min-w-0">
+                <span class="text-sm font-medium text-slate-900 truncate block">
                   {{ plugins.find(p => p.id === activePlugin)?.name }}
                 </span>
-                <p v-if="selectedFile" class="text-xs text-slate-500">{{ selectedFile }}</p>
+                <p v-if="selectedFile" class="text-xs text-slate-500 truncate" :title="selectedFile">{{ selectedFile }}</p>
               </div>
             </div>
-            <button @click="selectedFile = null" class="text-xs text-slate-500 hover:text-slate-700">
+            <button @click="selectedFile = null" class="text-xs text-slate-500 hover:text-slate-700 flex-shrink-0">
               Close
             </button>
           </div>
-          <div class="bg-slate-900 rounded aspect-video flex items-center justify-center">
-            <p class="text-slate-400 text-sm">
-              <span v-if="activePlugin === 'volview'">3D Visualization Placeholder</span>
-              <span v-else-if="activePlugin === 'editor'">Code Editor Placeholder</span>
+          <div class="bg-slate-900 rounded aspect-video flex items-center justify-center overflow-hidden">
+            <img 
+              v-if="activePlugin === 'volview'" 
+              src="/volview.jpg" 
+              class="w-full h-full object-cover" 
+              alt="VolView Visualization" 
+            />
+            <p v-else class="text-slate-400 text-sm">
+              <span v-if="activePlugin === 'editor'">Code Editor Placeholder</span>
               <span v-else-if="activePlugin === 'image'">Image Preview Placeholder</span>
             </p>
           </div>

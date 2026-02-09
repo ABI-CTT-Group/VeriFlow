@@ -119,6 +119,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         error.value = null
 
         try {
+            // Try API first
             const response = await endpoints.loadExample(exampleName)
             const data = response.data
 
@@ -136,12 +137,22 @@ export const useWorkflowStore = defineStore('workflow', () => {
             await fetchStudyDesignFromApi(data.upload_id)
 
         } catch (err: any) {
-            error.value = err.response?.data?.detail || err.message || 'Failed to load example'
+            console.warn('API loadExample failed, falling back to mock data', err)
+
+            // Mock Fallback
+            uploadId.value = 'mock-mama-mia-id'
+            uploadedPdfUrl.value = null
+            hasUploadedFiles.value = true
+
             addLog({
                 timestamp: new Date().toISOString(),
-                level: 'ERROR',
-                message: `Failed to load example: ${error.value}`
+                level: 'WARNING',
+                message: `Backend unavailable. Loaded local mock data for ${exampleName}`
             })
+
+            // Use fetchStudyDesign which has its own mock fallback
+            await fetchStudyDesign(uploadId.value)
+
         } finally {
             isLoading.value = false
             loadingMessage.value = null

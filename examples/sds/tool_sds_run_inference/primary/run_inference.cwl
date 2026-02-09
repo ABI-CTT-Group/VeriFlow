@@ -3,112 +3,57 @@ cwlVersion: v1.2
 class: CommandLineTool
 
 label: nnUNet Inference
-doc: |
-  Runs nnUNet inference on a dataset to generate segmentation results.
-  Wraps the nnUNetv2_predict command with configurable parameters.
-
-baseCommand: ["python", "run_inference.py"]
+doc: Runs nnUNet inference on NIfTI images using a pre-trained model
 
 requirements:
   DockerRequirement:
-    dockerPull: python:3.9
+    dockerPull: clin864/run-inference:latest
   InitialWorkDirRequirement:
     listing:
-      - entryname: run_inference.py
-        entry: |
-          #!/usr/bin/env python
-          import argparse
-          import os
-          import subprocess
-          import sys
+      - entry: $(inputs.input_images)
+        writable: false
+      - entry: $(inputs.pre_trained_network)
+        writable: false
 
-          def run_nnunet_inference(input_folder: str, output_folder: str, dataset_name: str, configuration: str):
-              if not os.path.exists(output_folder):
-                  os.makedirs(output_folder)
-                  print(f"Created output directory: {output_folder}")
-
-              command = [
-                  "nnUNetv2_predict",
-                  "-i", input_folder,
-                  "-o", output_folder,
-                  "-d", dataset_name,
-                  "-c", configuration
-              ]
-
-              subprocess.run(command, check=True)
-
-          def main():
-              parser = argparse.ArgumentParser(description="Run nnUNet inference on a dataset.")
-              
-              parser.add_argument("-i", "--input-folder", type=str, required=True,
-                  help="Path to the input folder containing images for inference.")
-              parser.add_argument("-o", "--output-folder", type=str, required=True,
-                  help="Path to the output folder for segmentation results.")
-              parser.add_argument("-d", "--dataset-name", type=str,
-                  default=os.environ.get("NNUNET_DATASET_NAME", "new_dataset"),
-                  help="Name of the dataset.")
-              parser.add_argument("-c", "--configuration", type=str,
-                  default=os.environ.get("NNUNET_CONFIGURATION", "3d_fullres"),
-                  help="nnUNet configuration.")
-
-              parser.add_argument("--pre-trained-network", type=str, required=True,
-                  help="Path to the pre-trained network (nnUNet_results) directory.")
-
-              args = parser.parse_args()
-
-
-              if args.pre_trained_network:
-                  os.environ['nnUNet_results'] = args.pre_trained_network
-
-              run_nnunet_inference(
-                  input_folder=args.input_folder,
-                  output_folder=args.output_folder,
-                  dataset_name=args.dataset_name,
-                  configuration=args.configuration
-              )
-
-          if __name__ == "__main__":
-              main()
+baseCommand: ["python", "/app/run_inference.py"]
 
 inputs:
-  input_folder:
+  input_images:
     type: Directory
     inputBinding:
       prefix: --input-folder
-    doc: Directory containing images for inference
+    doc: Directory containing NIfTI images for inference
 
   output_folder:
     type: string
-    default: "inference_output"
+    default: "."
     inputBinding:
       prefix: --output-folder
-    doc: Name of the output directory for segmentation results
+    doc: Output folder path (uses CWL working directory)
 
   dataset_name:
-    type: string?
+    type: string
     default: "new_dataset"
     inputBinding:
       prefix: --dataset-name
-    doc: Name of the dataset
+    doc: nnUNet dataset name
 
   configuration:
-    type: string?
+    type: string
     default: "3d_fullres"
     inputBinding:
       prefix: --configuration
-    doc: nnUNet configuration (e.g., 3d_fullres, 2d)
-
-
+    doc: nnUNet configuration (e.g., 2d, 3d_fullres, 3d_lowres)
 
   pre_trained_network:
     type: Directory
     inputBinding:
       prefix: --pre-trained-network
-    doc: Path to the pre-trained network (nnUNet_results) directory
+    doc: Directory containing the pre-trained nnUNet model (nnUNet_results)
 
 outputs:
-  segmentation_output:
-    type: Directory
+  segmentation_results:
+    type: File[]
     outputBinding:
-      glob: $(inputs.output_folder)
-    doc: Directory containing the segmentation results
+      glob: "*.nii.gz"
+    doc: Segmentation output files in NIfTI format

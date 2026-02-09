@@ -10,7 +10,11 @@ services:
     networks:
       - veriflow-network
     volumes:
+      - ./cwl:/opt/airflow/cwl
       - ./cwl/workflows:/workflows
+      - ./cwl/input_data:/input_data
+      - cwl-output:/opt/airflow/cwl-output
+      - cwl-tmp:/tmp
 
   # FastAPI Backend
   backend:
@@ -130,6 +134,8 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -172,6 +178,8 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -191,8 +199,11 @@ services:
       - TMPDIR=/tmp
       - HOME=/tmp
     volumes:
-      - cwl-tmp:/tmp
       - ./cwl/workflows:/workflows
+      - ./cwl/input_data:/input_data
+      - ./cwl/output:/output
+      - cwl-tmp:/tmp
+    working_dir: /workflows
     depends_on:
       - dind
     networks:

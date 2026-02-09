@@ -9,8 +9,9 @@ services:
     environment:
       DOCKER_TLS_CERTDIR: ""
     volumes:
-      - ./examples:/opt/airflow/cwl
+      - ./cwl:/opt/airflow/cwl
       - ./cwl/workflows:/workflows
+      - ./cwl/input_data:/input_data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     networks:
@@ -142,8 +143,8 @@ services:
       - airflow-logs:/opt/airflow/logs
       # - /var/run/docker.sock:/var/run/docker.sock # Removed in favor of dind
       # CWL workflow files and data directories
-      - ./examples:/opt/airflow/cwl
-      - ./examples:/opt/airflow/data
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -186,8 +187,8 @@ services:
       - airflow-logs:/opt/airflow/logs
       # - /var/run/docker.sock:/var/run/docker.sock # Removed in favor of dind
       # CWL workflow files and data directories
-      - ./examples:/opt/airflow/cwl
-      - ./examples:/opt/airflow/data
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -210,6 +211,8 @@ services:
       - HOME=/tmp
     volumes:
       - ./cwl/workflows:/workflows
+      - ./cwl/input_data:/input_data
+      - ./cwl/output:/output
       - cwl-tmp:/tmp
     working_dir: /workflows
     depends_on:
