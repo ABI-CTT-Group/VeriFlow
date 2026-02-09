@@ -114,7 +114,11 @@ export const endpoints = {
 
     // Cached MAMA-MIA Demo
     mamaMiaCache: (clientId?: string) =>
-        api.get<OrchestrationResponse>('/mama-mia-cache', { params: { client_id: clientId } })
+        api.get<OrchestrationResponse>('/mama-mia-cache', { params: { client_id: clientId } }),
+
+    // Artifact Retrieval (Polling)
+    getArtifact: (runId: string, agentName: string) =>
+        api.get(`/orchestrate/${runId}/artifacts/${agentName}`)
 }
 
 export interface OrchestrationResponse {

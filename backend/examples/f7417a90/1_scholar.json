@@ -1,6 +1,6 @@
 {
   "inputs": {
-    "pdf_path": "C:\\Users\\lgao142\\Desktop\\AI Agent 2026\\a-google-hackathon\\VeriFlow\\backend\\tests\\mamamiaworkflow.pdf"
+    "pdf_path": "/app/examples/data/70611af3-3aa6-4c47-b361-2881ec2fea0f/s41597-025-04707-4.pdf"
   },
   "prompt_truncated": "You are an expert Scientific Data Curator.\nAnalyze the PDF and extract the experimental design into ISA JSON format.\n\nCRITICAL:\n- Identify if steps require 'File' inputs or 'Directory' inputs based on...",
   "model_thoughts": [],
@@ -11,115 +11,131 @@
         "title": "A large-scale multicenter breast cancer DCE-MRI benchmark dataset with expert segmentations",
         "authors": "Lidia Garrucho et al.",
         "year": "2025",
-        "abstract": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. To address this, we present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA), where only 163 cases with expert segmentations were initially available. To facilitate the annotation process, a deep learning model was trained to produce preliminary segmentations for the remaining cases. These were subsequently corrected and verified by 16 breast cancer experts (averaging 9 years of experience), creating a fully annotated dataset. Additionally, the dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model trained on the annotated data. This resource addresses a critical gap in publicly available breast cancer datasets, enabling the development, validation, and benchmarking of advanced deep learning models, thus driving progress in breast cancer diagnostics, treatment response prediction, and personalized care."
+        "abstract": "Artificial Intelligence (AI) research in breast cancer Magnetic Resonance Imaging (MRI) faces challenges due to limited expert-labeled segmentations. To address this, we present a multicenter dataset of 1506 pre-treatment T1-weighted dynamic contrast-enhanced MRI cases, including expert annotations of primary tumors and non-mass-enhanced regions. The dataset integrates imaging data from four collections in The Cancer Imaging Archive (TCIA). To facilitate the annotation process, a deep learning model was trained to produce preliminary segmentations for the remaining cases. These were subsequently corrected and verified by 16 breast cancer experts, creating a fully annotated dataset. Additionally, the dataset includes 49 harmonized clinical and demographic variables, as well as pre-trained weights for a baseline nnU-Net model trained on the annotated data."
       },
       "investigation": {
-        "id": "inv-1",
-        "title": "Breast Cancer DCE-MRI Analysis with Expert Segmentations",
-        "description": "An investigation into leveraging a large-scale breast cancer DCE-MRI dataset with expert segmentations for the development, validation, and benchmarking of advanced deep learning models.",
-        "submissionDate": "2024-06-20"
+        "id": "inv-mama-mia",
+        "title": "MAMA-MIA Dataset Creation and Benchmarking",
+        "description": "Creation of a large-scale, multicenter, expert-annotated breast cancer DCE-MRI dataset and training of baseline segmentation models.",
+        "submissionDate": "2025-03-19"
       },
       "study": {
-        "id": "study-1",
-        "title": "Multicenter Breast Cancer DCE-MRI Benchmark Dataset Study",
-        "description": "A study focused on creating a comprehensive breast cancer DCE-MRI benchmark dataset with expert segmentations from multiple centers to advance AI-driven diagnostics and personalized care.",
+        "id": "study-mama-mia",
+        "title": "MAMA-MIA Multicenter Breast Cancer MRI Study",
+        "description": "Retrospective collection, harmonization, and segmentation of 1506 pre-treatment DCE-MRI cases from four public datasets (ISPY1, ISPY2, NACT, DUKE).",
         "numSubjects": 1506,
-        "design": "Retrospective, multicenter data collection and annotation study"
+        "design": "Retrospective multicenter cohort study"
       },
       "assays": [
         {
           "id": "assay-1",
-          "name": "Image Segmentation and Analysis",
-          "stepCount": 4,
+          "name": "Dataset Curation and Model Training Pipeline",
+          "stepCount": 5,
           "workflowSteps": [
             {
               "id": "step-1",
-              "description": "Collection of DCE-MRI Cases",
+              "description": "Conversion of original DICOM images from TCIA to NIfTI format.",
               "tool": {
                 "id": "tool-1",
-                "name": "TCIA Data Retriever"
+                "name": "pycad"
               },
               "input": [
                 {
-                  "name": "TCIA Collections",
-                  "type": "string"
+                  "name": "dicom_directory",
+                  "type": "Directory"
                 }
               ],
               "output": [
                 {
-                  "name": "DCE-MRI Images",
-                  "type": "Directory"
+                  "name": "nifti_image",
+                  "type": "File"
                 }
               ]
             },
             {
               "id": "step-2",
-              "description": "Preliminary Automatic Segmentation",
+              "description": "Standardization of image orientation (Axial to LAS, Sagittal to PSR).",
               "tool": {
                 "id": "tool-2",
-                "name": "nnU-Net"
+                "name": "nibabel/SimpleITK"
               },
               "input": [
                 {
-                  "name": "DCE-MRI Images",
-                  "type": "Directory"
-                },
-                {
-                  "name": "Pre-trained Segmentation Model",
+                  "name": "nifti_image",
                   "type": "File"
                 }
               ],
               "output": [
                 {
-                  "name": "Automatic Segmentations",
-                  "type": "Directory"
+                  "name": "harmonized_nifti",
+                  "type": "File"
                 }
               ]
             },
             {
               "id": "step-3",
-              "description": "Expert Segmentation Correction and Verification",
+              "description": "Generation of preliminary automatic segmentations using a deep learning model.",
               "tool": {
                 "id": "tool-3",
-                "name": "Manual Annotation Tool"
+                "name": "nnU-Net"
               },
               "input": [
                 {
-                  "name": "Automatic Segmentations",
-                  "type": "Directory"
-                },
-                {
-                  "name": "DCE-MRI Images",
-                  "type": "Directory"
+                  "name": "harmonized_nifti",
+                  "type": "File"
                 }
               ],
               "output": [
                 {
-                  "name": "Expert Segmentations",
-                  "type": "Directory"
+                  "name": "preliminary_segmentation",
+                  "type": "File"
                 }
               ]
             },
             {
               "id": "step-4",
-              "description": "Model Training and Validation",
+              "description": "Manual correction and verification of segmentations by experts.",
               "tool": {
                 "id": "tool-4",
-                "name": "nnU-Net"
+                "name": "Mango"
               },
               "input": [
                 {
-                  "name": "DCE-MRI Images",
-                  "type": "Directory"
+                  "name": "preliminary_segmentation",
+                  "type": "File"
                 },
                 {
-                  "name": "Expert Segmentations",
-                  "type": "Directory"
+                  "name": "harmonized_nifti",
+                  "type": "File"
                 }
               ],
               "output": [
                 {
-                  "name": "Trained Segmentation Model",
+                  "name": "expert_segmentation",
+                  "type": "File"
+                }
+              ]
+            },
+            {
+              "id": "step-5",
+              "description": "Calculation of segmentation metrics (Dice coefficient, 95% Hausdorff Distance).",
+              "tool": {
+                "id": "tool-5",
+                "name": "seg-metrics"
+              },
+              "input": [
+                {
+                  "name": "expert_segmentation",
+                  "type": "File"
+                },
+                {
+                  "name": "automatic_segmentation",
+                  "type": "File"
+                }
+              ],
+              "output": [
+                {
+                  "name": "metrics_csv",
                   "type": "File"
                 }
               ]

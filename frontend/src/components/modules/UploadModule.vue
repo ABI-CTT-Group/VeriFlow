@@ -197,28 +197,74 @@ async function handleModalSubmit(info: string) {
           uploadedRepoPath.value,
           info, // Pass additional info as userContext
           clientId 
-      ).then(response => {
-          console.log("Orchestration completed:", response.data)
+      ).then(async response => {
+          console.log("Orchestration Started:", response.data)
           
-          if (response.data.status === 'completed' && response.data.result) {
-              const res = response.data.result
-              // Update store with ISA JSON
-              if (res.isa_json) {
-                  // Map to store hierarchy format 
-                  // (Logic similar to loadExample in store, likely need a store action for this)
-                   console.log("Setting hierarchy from orchestration result")
-                   // Direct store manipulation for now or call a specific action if refactored
-                   // reusing logic from manual mapping if needed, or better:
-                   // Call a store action to process the result
-                   store.setHierarchyFromOrchestration(res.isa_json)
+          if (response.data.status === 'started' && (response.data.result as any)?.run_id) {
+              const runId = (response.data.result as any).run_id
+              
+              const consoleStore = useConsoleStore()
+              consoleStore.addSystemMessage(`Orchestration started (Run ID: ${runId}). Waiting for Scholar...`)
+              
+              // Poll for Scholar Result
+              const pollForArtifact = async (attempt = 1) => {
+                  if (attempt > 60) {
+                       throw new Error("Timeout waiting for Scholar results")
+                  }
+                  
+                  try {
+                      if (attempt <= 2) {
+                          consoleStore.addSystemMessage(`Checking for Scholar results... (Attempt ${attempt})`)
+                      }
+                      const artifactRes = await endpoints.getArtifact(runId, 'scholar')
+                      
+                      if (artifactRes.status === 200 && artifactRes.data) {
+                          consoleStore.addSystemMessage("Scholar results received.")
+                          
+                          const scholarData = artifactRes.data
+                          
+                          // Create pseudo-result to match old structure
+                          const pseudoResult = {
+                              isa_json: scholarData.final_output || scholarData.isa_json,
+                              generated_code: {}
+                          }
+                          
+                          if (pseudoResult.isa_json) {
+                               console.log("Setting hierarchy from orchestration result")
+                               store.setHierarchyFromOrchestration(pseudoResult.isa_json)
+                          }
+                          return // Success
+                      }
+                  } catch (e: any) {
+                      if (e.response && e.response.status === 404) {
+                          // Not ready yet, wait and retry
+                          await new Promise(resolve => setTimeout(resolve, 5000))
+                          await pollForArtifact(attempt + 1)
+                      } else {
+                          throw e // Critical error
+                      }
+                  }
               }
+              
+              await pollForArtifact()
+          } else {
+              // Fallback for immediate completion (unlikely)
+             if (response.data.status === 'completed' && response.data.result) {
+                  const res = response.data.result
+                  if (res.isa_json) {
+                       console.log("Setting hierarchy from orchestration result")
+                       store.setHierarchyFromOrchestration(res.isa_json)
+                  }
+             } else {
+                 throw new Error("Failed to start orchestration")
+             }
           }
       }).catch(error => {
           console.error("Orchestration failed", error)
-          // We can't alert easily as user might have moved on, 
-          // but Console should show error via WS if backend sent it.
-          // Or we can use a store error state.
           store.error = "Orchestration failed: " + (error.message || "Unknown error")
+          
+          const consoleStore = useConsoleStore()
+          consoleStore.addSystemMessage(`Orchestration failed: ${error.message}`)
       }).finally(() => {
           store.isLoading = false
           store.loadingMessage = null

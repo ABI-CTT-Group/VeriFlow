@@ -165,18 +165,31 @@ class GeminiClient:
             
             if stream_callback:
                 # Streaming Mode
-                response_stream = self.client.models.generate_content_stream(
-                    model=target_model,
-                    contents=contents,
-                    config=gen_config
-                )
-                
-                full_text = ""
-                for chunk in response_stream:
-                    if chunk.text:
-                        full_text += chunk.text
-                        # Stream the raw text chunk to the callback
-                        await stream_callback(chunk.text)
+                if hasattr(self.client, 'aio'):
+                     # Async Streaming
+                     response_stream = await self.client.aio.models.generate_content_stream(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
+                     full_text = ""
+                     async for chunk in response_stream:
+                        if chunk.text:
+                            full_text += chunk.text
+                            await stream_callback(chunk.text)
+                else:
+                    # Sync Streaming (Blocking)
+                    response_stream = self.client.models.generate_content_stream(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
+                    
+                    full_text = ""
+                    for chunk in response_stream:
+                        if chunk.text:
+                            full_text += chunk.text
+                            await stream_callback(chunk.text)
                 
                 # After stream finishes, construct a pseudo-response object for parsing
                 # This simplifies downstream logic which expects a response object
@@ -190,11 +203,18 @@ class GeminiClient:
                 
             else:
                 # Standard Mode
-                response = self.client.models.generate_content(
-                    model=target_model,
-                    contents=contents,
-                    config=gen_config
-                )
+                if hasattr(self.client, 'aio'):
+                    response = await self.client.aio.models.generate_content(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
+                else:
+                    response = self.client.models.generate_content(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
 
             # Process
             thoughts = self._extract_thoughts(response)
@@ -263,17 +283,31 @@ class GeminiClient:
             contents = [types.Content(parts=[file_part, text_part])]
 
             if stream_callback:
-                response_stream = self.client.models.generate_content_stream(
-                    model=target_model,
-                    contents=contents,
-                    config=gen_config
-                )
-                
-                full_text = ""
-                for chunk in response_stream:
-                    if chunk.text:
-                        full_text += chunk.text
-                        await stream_callback(chunk.text)
+                if hasattr(self.client, 'aio'):
+                    # Use Async Client for non-blocking stream
+                    response_stream = await self.client.aio.models.generate_content_stream(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
+                    full_text = ""
+                    async for chunk in response_stream:
+                        if chunk.text:
+                            full_text += chunk.text
+                            await stream_callback(chunk.text)
+                else:
+                    # Fallback to sync stream (blocking)
+                    response_stream = self.client.models.generate_content_stream(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
+                    
+                    full_text = ""
+                    for chunk in response_stream:
+                        if chunk.text:
+                            full_text += chunk.text
+                            await stream_callback(chunk.text)
                 
                 # Mock response object for parsing
                 class MockResponse:
@@ -284,11 +318,19 @@ class GeminiClient:
                 
                 response = MockResponse(full_text)
             else:
-                response = self.client.models.generate_content(
-                    model=target_model,
-                    contents=contents,
-                    config=gen_config
-                )
+                # Use Async Client for non-blocking generate
+                if hasattr(self.client, 'aio'):
+                     response = await self.client.aio.models.generate_content(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
+                else:
+                    response = self.client.models.generate_content(
+                        model=target_model,
+                        contents=contents,
+                        config=gen_config
+                    )
 
             thoughts = self._extract_thoughts(response)
             
