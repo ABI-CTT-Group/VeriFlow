@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - veriflow-network
 
