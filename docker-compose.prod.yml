@@ -10,7 +10,7 @@ services:
     networks:
       - veriflow-network
     volumes:
-      - ./examples:/opt/airflow/cwl
+      - ./cwl:/opt/airflow/cwl
       - ./cwl/workflows:/workflows
       - ./cwl/input_data:/input_data
       - cwl-output:/opt/airflow/cwl-output
@@ -134,8 +134,8 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
-      - ./examples:/opt/airflow/cwl
-      - ./examples:/opt/airflow/data
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
@@ -178,8 +178,8 @@ services:
     volumes:
       - airflow-dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
-      - ./examples:/opt/airflow/cwl
-      - ./examples:/opt/airflow/data
+      - ./cwl:/opt/airflow/cwl
+      - ./airflow/data:/opt/airflow/data
       - cwl-output:/opt/airflow/cwl-output
       - cwl-tmp:/tmp
     depends_on:
