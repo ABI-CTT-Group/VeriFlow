@@ -34,6 +34,8 @@ Built for the [Gemini 3 Hackathon](https://gemini3.devpost.com/).
 - [Testing](#testing)
 - [Documentation](#documentation)
 - [License](#license)
+- [Team](#team)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
@@ -442,3 +444,21 @@ cd frontend && npx vitest run
 ## License
 
 VeriFlow is fully open source and distributed under the Apache License 2.0. See [LICENSE](https://github.com/ABI-CTT-Group/VeriFlow/blob/main/LICENSE) for more information.
+
+## Team
+
+- Thiranja Prasad Babarenda Gamage
+- Jagir Hussan
+- Tim Wu
+- Linkun Gao
+- Patrick Zhang
+- Emily Clark Murphy
+- Holly Hogan-Murphy
+- Chinchien Lin
+
+  
+## Acknowledgements
+
+- We would like to thank the organizers of the [Gemini Hachathon](https://gemini3.devpost.com/?_gl=1*blvul0*_gcl_au*Njk3Mjg1OTYxLjE3Njc4Mjk3NDk.*_ga*MTkyMDMzMjMyNy4xNzY3ODI5NzUw*_ga_0YHJK3Y10M*czE3NzA2ODIwMjAkbzYkZzEkdDE3NzA2ODIxNTUkajYwJGwwJGgw) for organising this event and all the support doucmnetation
+- [ARDC Nectar Research Cloud](https://ardc.edu.au/services/ardc-nectar-research-cloud/) for providing the infrasture for hosting this project
+
