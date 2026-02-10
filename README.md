@@ -447,14 +447,14 @@ VeriFlow is fully open source and distributed under the Apache License 2.0. See 
 
 ## Team
 
-- Thiranja Prasad Babarenda Gamage
-- Jagir Hussan
-- Tim Wu
-- Linkun Gao
-- Patrick Zhang
+- [Thiranja Prasad Babarenda Gamage](https://github.com/PrasadBabarendaGamage)
+- [Jagir Hussan](https://github.com/Jagirhussan)
+- [Tim Wu](https://github.com/ttme1986)
+- [Linkun Gao](https://github.com/LinkunGao)
+- [Patrick Zhang](https://github.com/Pat1525)
 - Emily Clark Murphy
 - Holly Hogan-Murphy
-- Chinchien Lin
+- [Chinchien Lin](https://github.com/chinchien-lin)
 
   
 ## Acknowledgements
